@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { DocumentSourceConfig } from "@/types/document";
-import { DocumentFile } from "./DocumentsTab";
+import { DocumentSourceConfig, DocumentFile } from "@/types/document";
 
 export async function fetchSourceConfig(documentSource: string) {
   try {
