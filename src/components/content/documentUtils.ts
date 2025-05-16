@@ -180,6 +180,11 @@ export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
       throw new Error(error.message || "Failed to fetch processed documents");
     }
     
+    if (!data) {
+      console.log("No processed documents found");
+      return [];
+    }
+    
     console.log("Fetched processed documents:", data);
     return data as ProcessedDocument[];
   } catch (err) {

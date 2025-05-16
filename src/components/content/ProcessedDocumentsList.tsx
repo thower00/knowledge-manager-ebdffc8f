@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { fetchProcessedDocuments } from "./documentUtils";
 import { useToast } from "@/components/ui/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProcessedDocumentsListProps {
   onRefresh?: () => void;
@@ -60,19 +61,6 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
     }
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-2">Loading processed documents...</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardContent className="p-0">
@@ -99,7 +87,15 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
           </Button>
         </div>
         
-        {documents.length === 0 ? (
+        {isLoading ? (
+          <div className="p-4">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          </div>
+        ) : documents.length === 0 ? (
           <div className="text-center p-8 text-muted-foreground">
             No documents have been processed yet.
           </div>

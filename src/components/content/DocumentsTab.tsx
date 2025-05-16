@@ -132,6 +132,7 @@ export function DocumentsTab() {
 
   // Callback to manually trigger refresh
   const handleRefresh = useCallback(() => {
+    console.log("Manual refresh triggered");
     setRefreshKey(prev => prev + 1);
   }, []);
 
