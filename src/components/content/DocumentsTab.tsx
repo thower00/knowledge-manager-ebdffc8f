@@ -27,10 +27,15 @@ export function DocumentsTab() {
     uploadDocuments
   } = useDocuments(documentSource, sourceConfig, () => {
     // Callback when upload completes to refresh the processed documents list
+    console.log("Upload success callback triggered");
+    // Refresh immediately and then again after a delay to catch status changes
+    setRefreshKey(prev => prev + 1);
+    
+    // Additional refresh after a short delay to catch status updates
     setTimeout(() => {
-      console.log("Triggering refresh of processed documents list");
+      console.log("Triggering delayed refresh of processed documents list");
       setRefreshKey(prev => prev + 1);
-    }, 2000);
+    }, 3000);
   });
 
   // Make configuration fetching more robust

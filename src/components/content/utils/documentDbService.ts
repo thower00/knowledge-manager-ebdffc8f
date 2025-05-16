@@ -9,19 +9,6 @@ export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
   try {
     console.log("Fetching processed documents from the database");
     
-    // Add some logging for debugging
-    const { data: testData, error: testError } = await supabase
-      .from("processed_documents")
-      .select("count", { count: "exact", head: true });
-    
-    if (testError) {
-      console.error("Error checking processed_documents count:", testError);
-    } else {
-      // Safely access the count property - check if testData exists first
-      const count = testData !== null ? (testData as any).count : 0;
-      console.log("Number of documents in processed_documents table:", count);
-    }
-    
     // Actual data fetch with better error handling
     const { data, error } = await supabase
       .from("processed_documents")
