@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentSourceConfig, DocumentFile, ProcessedDocument } from "@/types/document";
 

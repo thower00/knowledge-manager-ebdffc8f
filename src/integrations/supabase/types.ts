@@ -36,6 +36,48 @@ export type Database = {
         }
         Relationships: []
       }
+      processed_documents: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          mime_type: string
+          processed_at: string | null
+          size: number | null
+          source_id: string
+          source_type: string
+          status: string
+          title: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          mime_type: string
+          processed_at?: string | null
+          size?: number | null
+          source_id: string
+          source_type: string
+          status: string
+          title: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          mime_type?: string
+          processed_at?: string | null
+          size?: number | null
+          source_id?: string
+          source_type?: string
+          status?: string
+          title?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
