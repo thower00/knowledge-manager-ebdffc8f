@@ -127,6 +127,15 @@ export function DocumentsTab() {
     );
   };
 
+  // Toggle select all documents
+  const toggleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedDocuments(documents.map(doc => doc.id));
+    } else {
+      setSelectedDocuments([]);
+    }
+  };
+
   // Upload selected documents
   const uploadDocuments = async () => {
     if (selectedDocuments.length === 0) {
@@ -225,6 +234,7 @@ export function DocumentsTab() {
         selectedDocuments={selectedDocuments}
         isLoading={isLoading}
         toggleSelection={toggleDocumentSelection}
+        toggleSelectAll={toggleSelectAll}
       />
     </div>
   );

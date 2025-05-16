@@ -1,7 +1,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Folder } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentFile } from "./DocumentsTab";
 
@@ -10,13 +10,15 @@ interface DocumentListProps {
   selectedDocuments: string[];
   isLoading: boolean;
   toggleSelection: (documentId: string) => void;
+  toggleSelectAll: (selectAll: boolean) => void;
 }
 
 export function DocumentList({
   documents,
   selectedDocuments,
   isLoading,
-  toggleSelection
+  toggleSelection,
+  toggleSelectAll
 }: DocumentListProps) {
   if (isLoading) {
     return (
@@ -66,11 +68,7 @@ export function DocumentList({
                 <Checkbox 
                   checked={documents.length > 0 && selectedDocuments.length === documents.length}
                   onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedDocuments(documents.map(doc => doc.id));
-                    } else {
-                      setSelectedDocuments([]);
-                    }
+                    toggleSelectAll(!!checked);
                   }}
                 />
               </TableHead>
