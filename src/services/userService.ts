@@ -7,7 +7,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     // First, get all users from profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email');
+      .select('id, first_name, last_name');
 
     if (profilesError) throw profilesError;
 
@@ -22,7 +22,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     // Map profiles and roles to user objects
     const users: User[] = profiles.map(profile => ({
       id: profile.id,
-      email: profile.email || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
+      email: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
       isAdmin: userRoles.some(role => role.user_id === profile.id)
     }));
 
