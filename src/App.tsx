@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import ConfigurationManagement from "./pages/ConfigurationManagement";
 import TestManagement from "./pages/TestManagement";
+import ContentManagement from "./pages/ContentManagement";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
 
@@ -88,6 +89,11 @@ const App = () => (
                         <Route path="/user-management" element={
                           <AdminRoute>
                             <UserManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/content-management" element={
+                          <AdminRoute>
+                            <ContentManagement />
                           </AdminRoute>
                         } />
                         <Route path="/configuration-management" element={

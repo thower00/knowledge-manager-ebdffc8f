@@ -13,7 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { Settings, Users, FileText, Home, User, TestTube, Cog } from "lucide-react";
+import { Settings, Users, FileText, Home, User, TestTube, Cog, FileEdit } from "lucide-react";
 
 export default function AppSidebar() {
   const { user, isAdmin } = useAuth();
@@ -75,6 +75,16 @@ export default function AppSidebar() {
                   >
                     <Users className="h-5 w-5" />
                     <span>User Management</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    isActive={isActive("/content-management")} 
+                    onClick={() => navigate("/content-management")}
+                    tooltip="Content Management"
+                  >
+                    <FileEdit className="h-5 w-5" />
+                    <span>Content Management</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

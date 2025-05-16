@@ -24,8 +24,7 @@ export default function Auth() {
   }, [user]);
   
   // Only redirect if explicitly authenticated and not in loading state
-  // This condition is critical for the Lovable preview environment
-  if (!isLoading && user) {
+  if (user && !isLoading) {
     console.log("Auth page - User authenticated, redirecting to home", user);
     return <Navigate to="/" replace />;
   }
