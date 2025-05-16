@@ -25,6 +25,8 @@ serve(async (req) => {
       );
     }
 
+    console.log("Attempting to verify OpenAI API key");
+    
     // Make a simple request to OpenAI API to verify the key
     const response = await fetch('https://api.openai.com/v1/models', {
       headers: {
@@ -33,18 +35,26 @@ serve(async (req) => {
       }
     });
 
-    const data = await response.json();
+    const responseData = await response.json();
     
     if (response.ok) {
+      console.log("OpenAI API key verification successful");
       return new Response(
-        JSON.stringify({ valid: true, models: data.data.slice(0, 5).map((model: any) => model.id) }),
+        JSON.stringify({ 
+          valid: true, 
+          models: responseData.data.slice(0, 5).map((model: any) => model.id) 
+        }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     } else {
+      console.log("OpenAI API key verification failed:", responseData.error);
       return new Response(
-        JSON.stringify({ valid: false, error: data.error?.message || "Invalid API key" }),
+        JSON.stringify({ 
+          valid: false, 
+          error: responseData.error?.message || "Invalid API key" 
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -54,7 +64,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error verifying OpenAI API key:", error);
     return new Response(
-      JSON.stringify({ valid: false, error: error.message || "An unknown error occurred" }),
+      JSON.stringify({ 
+        valid: false, 
+        error: error.message || "An unknown error occurred" 
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

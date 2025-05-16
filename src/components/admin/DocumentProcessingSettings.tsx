@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VerificationStatusAlert, VerificationButton } from "./VerificationStatus";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConfigSettings {
   apiKey: string;
@@ -89,28 +90,30 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
     setOpenAIVerification({ isVerifying: true });
     
     try {
-      // Call Edge Function to verify OpenAI API key
-      const response = await fetch('/api/verify-openai-key', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ apiKey: config.apiKey }),
+      console.log("Verifying OpenAI API key:", config.apiKey.substring(0, 5) + "...");
+      
+      // Call Supabase Edge Function to verify OpenAI API key
+      const { data, error } = await supabase.functions.invoke("verify-openai-key", {
+        body: { apiKey: config.apiKey },
       });
       
-      const data = await response.json();
+      console.log("Verification response:", data, error);
       
-      if (response.ok && data.valid) {
+      if (error) {
+        throw new Error(error.message || "Verification failed");
+      }
+      
+      if (data?.valid) {
         setOpenAIVerification({ 
           isVerifying: false, 
           isValid: true, 
-          message: "OpenAI API key is valid" 
+          message: "OpenAI API key is valid" + (data.models ? ` (Available models: ${data.models.join(', ')})` : '')
         });
       } else {
         setOpenAIVerification({ 
           isVerifying: false, 
           isValid: false, 
-          message: data.error || "Invalid OpenAI API key" 
+          message: data?.error || "Invalid OpenAI API key" 
         });
       }
     } catch (error: any) {
