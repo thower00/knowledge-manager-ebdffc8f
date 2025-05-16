@@ -1,23 +1,41 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { cors } from "../_shared/cors.ts";
+
+// Define CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 // Edge function to list files from Google Drive
 serve(async (req: Request) => {
-  // Handle CORS
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return cors();
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
   
   try {
-    const { client_email, private_key, folder_id } = await req.json();
+    // Parse request body with error handling
+    let reqBody;
+    try {
+      reqBody = await req.json();
+    } catch (jsonError) {
+      console.error("Error parsing request JSON:", jsonError);
+      return new Response(
+        JSON.stringify({ error: "Invalid request format" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
+    const { client_email, private_key, folder_id } = reqBody;
     
     // Validate required parameters
     if (!client_email || !private_key) {
       console.error("Missing required Google Drive credentials");
       return new Response(
         JSON.stringify({ error: "Missing required Google Drive credentials" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
     
@@ -38,13 +56,13 @@ serve(async (req: Request) => {
       
       return new Response(
         JSON.stringify({ files }),
-        { status: 200, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     } catch (tokenError) {
       console.error("Error with Google authentication:", tokenError);
       return new Response(
         JSON.stringify({ error: `Google authentication failed: ${tokenError.message}` }),
-        { status: 401, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
   } catch (error) {
@@ -52,7 +70,7 @@ serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ error: error.message || "Failed to list Google Drive files" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...cors().headers } }
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 });
@@ -87,10 +105,15 @@ async function generateGoogleAuthToken(clientEmail: string, privateKey: string):
       }),
     });
     
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.text();
+      throw new Error(`Failed to get access token: ${errorData}`);
+    }
+    
     const tokenData = await tokenResponse.json();
     
-    if (!tokenResponse.ok) {
-      throw new Error(`Failed to get access token: ${JSON.stringify(tokenData)}`);
+    if (!tokenData.access_token) {
+      throw new Error("No access token received from Google OAuth");
     }
     
     return tokenData.access_token;
@@ -113,39 +136,75 @@ async function createJWT(payload: any, privateKey: string): Promise<string> {
     
     // Create signature
     const signatureInput = `${headerEncoded}.${payloadEncoded}`;
-    const keyData = encoder.encode(privateKey);
     
-    const cryptoKey = await crypto.subtle.importKey(
-      "pkcs8",
-      keyData,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
-      false,
-      ["sign"]
-    );
-    
-    const signature = await crypto.subtle.sign(
-      { name: "RSASSA-PKCS1-v1_5" },
-      cryptoKey,
-      encoder.encode(signatureInput)
-    );
-    
-    // Convert signature to base64
-    const signatureBytes = new Uint8Array(signature);
-    let signatureBase64 = "";
-    for (let i = 0; i < signatureBytes.length; i++) {
-      signatureBase64 += String.fromCharCode(signatureBytes[i]);
+    try {
+      // Convert private key from PEM format to ArrayBuffer
+      const privateKeyDER = pemToArrayBuffer(privateKey);
+      
+      // Import the private key
+      const cryptoKey = await crypto.subtle.importKey(
+        "pkcs8",
+        privateKeyDER,
+        {
+          name: "RSASSA-PKCS1-v1_5",
+          hash: "SHA-256",
+        },
+        false,
+        ["sign"]
+      );
+      
+      // Sign the data
+      const signature = await crypto.subtle.sign(
+        { name: "RSASSA-PKCS1-v1_5" },
+        cryptoKey,
+        encoder.encode(signatureInput)
+      );
+      
+      // Convert signature to base64
+      const signatureBase64 = arrayBufferToBase64(signature);
+      
+      // Return JWT
+      return `${headerEncoded}.${payloadEncoded}.${signatureBase64}`;
+    } catch (keyError) {
+      console.error("Error with key processing:", keyError);
+      throw new Error(`Key processing error: ${keyError.message}`);
     }
-    const signatureEncoded = btoa(signatureBase64);
-    
-    // Return JWT
-    return `${headerEncoded}.${payloadEncoded}.${signatureEncoded}`;
   } catch (error) {
     console.error("Error creating JWT:", error);
     throw new Error(`JWT creation failed: ${error.message}`);
   }
+}
+
+// Helper function to convert PEM to ArrayBuffer
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  // Remove header, footer and newlines
+  const base64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\n/g, "")
+    .trim();
+  
+  // Decode base64 to binary string
+  const binary = atob(base64);
+  
+  // Convert binary string to ArrayBuffer
+  const buffer = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < binary.length; i++) {
+    view[i] = binary.charCodeAt(i);
+  }
+  
+  return buffer;
+}
+
+// Helper function to convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 // List files from Google Drive
@@ -168,9 +227,14 @@ async function listGoogleDriveFiles(accessToken: string, folderId?: string): Pro
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Google Drive API error response:", errorData);
-      throw new Error(`Google Drive API error: ${JSON.stringify(errorData)}`);
+      const errorText = await response.text();
+      console.error("Google Drive API error response:", errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(`Google Drive API error: ${JSON.stringify(errorData)}`);
+      } catch (parseError) {
+        throw new Error(`Google Drive API error (${response.status}): ${errorText.substring(0, 200)}`);
+      }
     }
     
     const data = await response.json();
