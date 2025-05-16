@@ -11,16 +11,6 @@ export default function ConfigurationManagement() {
   const { isAdmin, isLoading } = useAuth();
   const { toast } = useToast();
 
-  // If user is not loading and not admin, redirect
-  if (!isLoading && !isAdmin) {
-    toast({
-      variant: "destructive",
-      title: "Access Denied",
-      description: "You don't have permission to access this page.",
-    });
-    return <Navigate to="/" replace />;
-  }
-
   // Show loading state while checking authorization
   if (isLoading) {
     return (
@@ -29,6 +19,16 @@ export default function ConfigurationManagement() {
         <span className="ml-2">Loading...</span>
       </div>
     );
+  }
+
+  // If user is not admin, redirect
+  if (!isAdmin) {
+    toast({
+      variant: "destructive",
+      title: "Access Denied",
+      description: "You don't have permission to access this page.",
+    });
+    return <Navigate to="/" replace />;
   }
 
   return (

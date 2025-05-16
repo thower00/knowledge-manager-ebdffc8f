@@ -22,16 +22,6 @@ export default function UserManagement() {
   const { toast } = useToast();
   const { user: currentUser, isAdmin, isLoading } = useAuth();
 
-  // If user is not loading and not admin, redirect
-  if (!isLoading && !isAdmin) {
-    toast({
-      variant: "destructive",
-      title: "Access Denied",
-      description: "You don't have permission to access this page.",
-    });
-    return <Navigate to="/" replace />;
-  }
-
   // Fetch all users
   const fetchUsers = async () => {
     setLoading(true);
@@ -122,6 +112,16 @@ export default function UserManagement() {
         <span className="ml-2">Loading...</span>
       </div>
     );
+  }
+
+  // If user is not admin, redirect
+  if (!isAdmin) {
+    toast({
+      variant: "destructive",
+      title: "Access Denied",
+      description: "You don't have permission to access this page.",
+    });
+    return <Navigate to="/" replace />;
   }
 
   return (
