@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface SignInFormProps {
   onSignUp: () => void;
@@ -15,6 +16,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Function to clean up auth state from localStorage
   const cleanupAuthState = () => {
@@ -39,6 +41,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
     
     try {
       setIsLoading(true);
+      console.log("Starting sign in process");
 
       // Clean up existing auth state
       cleanupAuthState();
@@ -46,6 +49,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
       // Try to sign out first (in case there's a stale session)
       try {
         await supabase.auth.signOut({ scope: 'global' });
+        console.log("Pre-login cleanup complete");
       } catch (err) {
         console.log("Error during pre-login cleanup:", err);
         // Continue even if this fails
@@ -66,8 +70,8 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
         description: "You've been signed in.",
       });
       
-      // Don't reload the page - let the app's router handle navigation
-      // React Router will handle the redirect based on AuthContext
+      // Navigate programmatically instead of reloading the page
+      navigate("/");
     } catch (error: any) {
       console.error('Login error:', error);
       toast({

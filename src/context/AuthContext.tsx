@@ -56,11 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out function
   const signOut = async () => {
     try {
+      console.log("Signing out...");
       setIsLoading(true);
+      
+      // Clean up auth state
       cleanupAuthState();
       
+      // Sign out from Supabase
       await supabase.auth.signOut({ scope: 'global' });
       
+      // Clear state
       setUser(null);
       setSession(null);
       setIsAdmin(false);
@@ -70,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "You have been signed out of your account.",
       });
       
-      // Force page reload
+      // Force page reload to clear any cached state
       window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
@@ -91,7 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log("Auth state change:", event, currentSession?.user?.id || 'no user');
+        console.log("Auth state change event:", event);
+        console.log("Auth state change session:", currentSession?.user?.id || 'no user');
+        
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -112,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Current session:", currentSession ? `exists: ${currentSession.user.id}` : "none");
+      console.log("Initial session check:", currentSession ? `exists: ${currentSession.user.id}` : "none");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -127,8 +134,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const contextValue = {
+    session,
+    user,
+    isLoading,
+    isAdmin,
+    signOut
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user, isLoading, isAdmin, signOut }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,27 +1,41 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import SignInForm from "@/components/auth/SignInForm";
 import SignUpForm from "@/components/auth/SignUpForm";
 import { useAuth } from "@/context/AuthContext";
+import { debugAuthState } from "@/integrations/supabase/client";
 
 export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
   
+  // Debug function to help diagnose auth issues
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log("Auth page mounted, checking auth state");
+      const session = await debugAuthState();
+      console.log("Auth page debug - Current user state:", user);
+      console.log("Auth page debug - Current session state:", session);
+    };
+    
+    checkAuth();
+  }, [user]);
+  
   // Show loading state while checking authentication
   if (isLoading) {
+    console.log("Auth page - Loading state...");
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
-  // Only redirect if user is definitely authenticated and not null
-  if (user !== null && user !== undefined) {
-    console.log("User is authenticated, redirecting to home", user);
+  // Only redirect if user is definitely authenticated
+  if (user) {
+    console.log("Auth page - User authenticated, redirecting to home", user);
     return <Navigate to="/" replace />;
   }
 
-  console.log("Rendering Auth page, user:", user);
+  console.log("Auth page - Rendering login/signup form. User:", user);
   
   return (
     <div className="container flex items-center justify-center min-h-[calc(100vh-16rem)] py-8">

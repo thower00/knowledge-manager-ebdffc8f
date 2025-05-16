@@ -51,6 +51,7 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
     
     try {
       setIsLoading(true);
+      console.log("Starting sign up process");
       
       // Clean up existing auth state
       cleanupAuthState();
@@ -58,7 +59,9 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
       // Try to sign out first (in case there's a stale session)
       try {
         await supabase.auth.signOut({ scope: 'global' });
+        console.log("Pre-signup cleanup complete");
       } catch (err) {
+        console.log("Error during pre-signup cleanup:", err);
         // Continue even if this fails
       }
       
@@ -74,6 +77,8 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
       });
       
       if (error) throw error;
+      
+      console.log("Sign up result:", data);
       
       toast({
         title: "Account created!",
