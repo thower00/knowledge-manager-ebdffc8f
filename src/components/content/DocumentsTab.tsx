@@ -6,6 +6,7 @@ import { DocumentSourceConfig, DocumentFile } from "@/types/document";
 import { DocumentSourceSelector } from "./DocumentSourceSelector";
 import { DocumentActions } from "./DocumentActions";
 import { DocumentList } from "./DocumentList";
+import { ProcessedDocumentsList } from "./ProcessedDocumentsList";
 import { fetchSourceConfig, fetchGoogleDriveDocuments, processSelectedDocuments } from "./documentUtils";
 
 export function DocumentsTab() {
@@ -126,7 +127,7 @@ export function DocumentsTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -155,6 +156,11 @@ export function DocumentsTab() {
         toggleSelection={toggleDocumentSelection}
         toggleSelectAll={toggleSelectAll}
       />
+      
+      <div className="mt-6">
+        <h2 className="text-lg font-medium mb-4">Database Documents</h2>
+        <ProcessedDocumentsList />
+      </div>
     </div>
   );
 }

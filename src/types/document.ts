@@ -33,3 +33,18 @@ export interface DocumentFile {
   createdTime?: string;
   webViewLink?: string;
 }
+
+// Add ProcessedDocument interface for database records
+export interface ProcessedDocument {
+  id: string;
+  title: string;
+  source_id: string;
+  source_type: string;
+  mime_type: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  processed_at?: string;
+  error?: string;
+  size?: number;
+  url?: string;
+}

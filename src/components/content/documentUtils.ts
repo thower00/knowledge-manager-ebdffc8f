@@ -1,6 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { DocumentSourceConfig, DocumentFile } from "@/types/document";
+import { DocumentSourceConfig, DocumentFile, ProcessedDocument } from "@/types/document";
 
 // Define our own type for functions response since it's not exported by the package
 interface EdgeFunctionResponse<T> {
@@ -163,4 +162,27 @@ export async function processSelectedDocuments(
   }
 
   return { success: false, message: "Unsupported document source" };
+}
+
+// Add a new function to fetch processed documents from the database
+export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
+  try {
+    console.log("Fetching processed documents from the database");
+    
+    const { data, error } = await supabase
+      .from("processed_documents")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching processed documents:", error);
+      throw new Error(error.message || "Failed to fetch processed documents");
+    }
+    
+    console.log("Fetched processed documents:", data);
+    return data as ProcessedDocument[];
+  } catch (err) {
+    console.error("Exception in fetchProcessedDocuments:", err);
+    throw err;
+  }
 }
