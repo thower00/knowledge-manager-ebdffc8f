@@ -38,25 +38,31 @@ export async function fetchGoogleDriveDocuments(sourceConfig: DocumentSourceConf
     folder_id: sourceConfig.folder_id || "Not specified",
   });
   
-  const { data, error } = await supabase.functions.invoke("list-google-drive-files", {
-    body: { 
-      client_email: sourceConfig.client_email,
-      private_key: sourceConfig.private_key,
-      folder_id: sourceConfig.folder_id || "",
-    },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke("list-google-drive-files", {
+      body: { 
+        client_email: sourceConfig.client_email,
+        private_key: sourceConfig.private_key,
+        folder_id: sourceConfig.folder_id || "",
+      },
+    });
 
-  if (error) {
-    throw new Error(error.message || "Failed to fetch documents");
-  }
+    if (error) {
+      console.error("Edge function error:", error);
+      throw new Error(error.message || "Failed to fetch documents");
+    }
 
-  console.log("Google Drive API response:", data);
-  
-  if (data?.files) {
-    return data.files as DocumentFile[];
+    console.log("Google Drive API response:", data);
+    
+    if (data?.files) {
+      return data.files as DocumentFile[];
+    }
+    
+    return [] as DocumentFile[];
+  } catch (err) {
+    console.error("Error invoking Edge function:", err);
+    throw new Error(err instanceof Error ? err.message : "Failed to fetch documents from Google Drive");
   }
-  
-  return [] as DocumentFile[];
 }
 
 export async function processSelectedDocuments(
@@ -67,19 +73,25 @@ export async function processSelectedDocuments(
   if (documentSource === "google-drive") {
     console.log("Processing selected documents:", selectedDocuments);
     
-    const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
-      body: { 
-        client_email: sourceConfig?.client_email,
-        private_key: sourceConfig?.private_key,
-        documentIds: selectedDocuments,
-      },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
+        body: { 
+          client_email: sourceConfig?.client_email,
+          private_key: sourceConfig?.private_key,
+          documentIds: selectedDocuments,
+        },
+      });
 
-    if (error) {
-      throw new Error(error.message || "Failed to process documents");
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Failed to process documents");
+      }
+
+      return { success: true, message: `Processing ${selectedDocuments.length} document(s). This may take some time.` };
+    } catch (err) {
+      console.error("Error invoking Edge function:", err);
+      throw new Error(err instanceof Error ? err.message : "Failed to process documents");
     }
-
-    return { success: true, message: `Processing ${selectedDocuments.length} document(s). This may take some time.` };
   }
 
   return { success: false, message: "Unsupported document source" };

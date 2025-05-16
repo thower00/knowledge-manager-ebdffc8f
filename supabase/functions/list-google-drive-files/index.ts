@@ -26,19 +26,27 @@ serve(async (req: Request) => {
     console.log(`Private key provided: ${private_key ? "Yes" : "No"}`);
     console.log(`Folder ID: ${folder_id || "Not specified"}`);
     
-    // Generate JWT token for Google Drive API
-    const token = await generateGoogleAuthToken(client_email, private_key);
-    console.log("Token generated successfully");
-    
-    // Call Google Drive API to list files
-    console.log("Listing Google Drive files");
-    const files = await listGoogleDriveFiles(token, folder_id);
-    console.log(`Found ${files.length} files`);
-    
-    return new Response(
-      JSON.stringify({ files }),
-      { status: 200, headers: { "Content-Type": "application/json", ...cors().headers } }
-    );
+    try {
+      // Generate JWT token for Google Drive API
+      const token = await generateGoogleAuthToken(client_email, private_key);
+      console.log("Token generated successfully");
+      
+      // Call Google Drive API to list files
+      console.log("Listing Google Drive files");
+      const files = await listGoogleDriveFiles(token, folder_id);
+      console.log(`Found ${files.length} files`);
+      
+      return new Response(
+        JSON.stringify({ files }),
+        { status: 200, headers: { "Content-Type": "application/json", ...cors().headers } }
+      );
+    } catch (tokenError) {
+      console.error("Error with Google authentication:", tokenError);
+      return new Response(
+        JSON.stringify({ error: `Google authentication failed: ${tokenError.message}` }),
+        { status: 401, headers: { "Content-Type": "application/json", ...cors().headers } }
+      );
+    }
   } catch (error) {
     console.error("Error in list-google-drive-files:", error);
     
@@ -94,45 +102,50 @@ async function generateGoogleAuthToken(clientEmail: string, privateKey: string):
 
 // Create JWT token
 async function createJWT(payload: any, privateKey: string): Promise<string> {
-  // Header
-  const header = { alg: "RS256", typ: "JWT" };
-  
-  // Encode header and payload
-  const encoder = new TextEncoder();
-  const headerEncoded = btoa(JSON.stringify(header));
-  const payloadEncoded = btoa(JSON.stringify(payload));
-  
-  // Create signature
-  const signatureInput = `${headerEncoded}.${payloadEncoded}`;
-  const keyData = encoder.encode(privateKey);
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    keyData,
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256",
-    },
-    false,
-    ["sign"]
-  );
-  
-  const signature = await crypto.subtle.sign(
-    { name: "RSASSA-PKCS1-v1_5" },
-    cryptoKey,
-    encoder.encode(signatureInput)
-  );
-  
-  // Convert signature to base64
-  const signatureBytes = new Uint8Array(signature);
-  let signatureBase64 = "";
-  for (let i = 0; i < signatureBytes.length; i++) {
-    signatureBase64 += String.fromCharCode(signatureBytes[i]);
+  try {
+    // Header
+    const header = { alg: "RS256", typ: "JWT" };
+    
+    // Encode header and payload
+    const encoder = new TextEncoder();
+    const headerEncoded = btoa(JSON.stringify(header));
+    const payloadEncoded = btoa(JSON.stringify(payload));
+    
+    // Create signature
+    const signatureInput = `${headerEncoded}.${payloadEncoded}`;
+    const keyData = encoder.encode(privateKey);
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      keyData,
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
+      false,
+      ["sign"]
+    );
+    
+    const signature = await crypto.subtle.sign(
+      { name: "RSASSA-PKCS1-v1_5" },
+      cryptoKey,
+      encoder.encode(signatureInput)
+    );
+    
+    // Convert signature to base64
+    const signatureBytes = new Uint8Array(signature);
+    let signatureBase64 = "";
+    for (let i = 0; i < signatureBytes.length; i++) {
+      signatureBase64 += String.fromCharCode(signatureBytes[i]);
+    }
+    const signatureEncoded = btoa(signatureBase64);
+    
+    // Return JWT
+    return `${headerEncoded}.${payloadEncoded}.${signatureEncoded}`;
+  } catch (error) {
+    console.error("Error creating JWT:", error);
+    throw new Error(`JWT creation failed: ${error.message}`);
   }
-  const signatureEncoded = btoa(signatureBase64);
-  
-  // Return JWT
-  return `${headerEncoded}.${payloadEncoded}.${signatureEncoded}`;
 }
 
 // List files from Google Drive
