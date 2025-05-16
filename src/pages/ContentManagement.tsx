@@ -1,20 +1,11 @@
 
-import { useEffect } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DocumentsTab } from "@/components/content/DocumentsTab";
 
 export default function ContentManagement() {
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // Notify user this is a placeholder
-    toast({
-      title: "Content Management",
-      description: "This is a placeholder for the Content Management feature.",
-    });
-  }, [toast]);
-
   return (
     <>
       <Helmet>
@@ -29,37 +20,15 @@ export default function ContentManagement() {
           </p>
         </div>
         
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents</CardTitle>
-              <CardDescription>Upload and manage your document library</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Placeholder for document management interface</p>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="documents">
+          <TabsList className="mb-4">
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+          </TabsList>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Knowledge Base</CardTitle>
-              <CardDescription>Create and organize knowledge base articles</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Placeholder for knowledge base management</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Media Library</CardTitle>
-              <CardDescription>Manage images and other media assets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Placeholder for media library management</p>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="documents" className="space-y-4">
+            <DocumentsTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );
