@@ -1,7 +1,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText } from "lucide-react";
+import { FileText, Folder } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentFile } from "./DocumentsTab";
 
@@ -49,10 +49,31 @@ export function DocumentList({
   return (
     <Card>
       <CardContent className="p-0">
+        <div className="p-4 border-b bg-muted/50">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="font-medium">{documents.length} documents found</span>
+              <span className="text-sm text-muted-foreground ml-2">
+                ({selectedDocuments.length} selected)
+              </span>
+            </div>
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-12">
+                <Checkbox 
+                  checked={documents.length > 0 && selectedDocuments.length === documents.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedDocuments(documents.map(doc => doc.id));
+                    } else {
+                      setSelectedDocuments([]);
+                    }
+                  }}
+                />
+              </TableHead>
               <TableHead>Document Name</TableHead>
               <TableHead className="hidden md:table-cell">Type</TableHead>
               <TableHead className="hidden md:table-cell">Size</TableHead>

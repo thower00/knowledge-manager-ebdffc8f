@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +25,23 @@ export default function ContentManagement() {
           </TabsList>
           
           <TabsContent value="documents" className="space-y-4">
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Document Management</CardTitle>
+                <CardDescription>
+                  Follow these steps to manage documents:
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ol className="list-decimal pl-5 space-y-2">
+                  <li>Select a document source from the dropdown (currently Google Drive)</li>
+                  <li>Click "Refresh Documents" to retrieve files from the selected source</li>
+                  <li>Select files you want to process by checking the boxes</li>
+                  <li>Click "Process Selected" to upload the documents to the database</li>
+                </ol>
+              </CardContent>
+            </Card>
+            
             <DocumentsTab />
           </TabsContent>
         </Tabs>

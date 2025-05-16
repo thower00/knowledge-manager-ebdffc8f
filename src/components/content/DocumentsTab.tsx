@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, FileText, RefreshCw } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,7 @@ export function DocumentsTab() {
   const [sourceConfig, setSourceConfig] = useState<DocumentSourceConfig | null>(null);
   const { toast } = useToast();
 
-  // Fetch configuration for the selected document source
+  // Make configuration fetching more robust
   useEffect(() => {
     const fetchSourceConfig = async () => {
       try {
@@ -27,20 +27,31 @@ export function DocumentsTab() {
           const { data, error } = await supabase
             .from("configurations")
             .select("value")
-            .eq("key", `${documentSource}_integration`)
-            .single();
+            .eq("key", `${documentSource.replace('-', '_')}_integration`)
+            .maybeSingle();
 
           if (error) {
             console.error("Error fetching source config:", error);
             toast({
               variant: "destructive",
               title: "Configuration Error",
-              description: `Could not load ${documentSource} configuration.`,
+              description: `Could not load ${documentSource} configuration. Please set it up in Configuration Management.`,
             });
             setSourceConfig(null);
             return;
           }
 
+          if (!data) {
+            toast({
+              variant: "destructive",
+              title: "Missing Configuration",
+              description: `No configuration found for ${documentSource}. Please set it up in Configuration Management.`,
+            });
+            setSourceConfig(null);
+            return;
+          }
+
+          console.log("Retrieved source config:", data);
           setSourceConfig(data.value as DocumentSourceConfig);
         }
       } catch (err) {
@@ -58,7 +69,7 @@ export function DocumentsTab() {
       toast({
         variant: "destructive",
         title: "Configuration Missing",
-        description: `Please configure ${documentSource} integration first.`,
+        description: `Please configure ${documentSource} integration first in the Configuration Management page.`,
       });
       return;
     }
@@ -69,6 +80,12 @@ export function DocumentsTab() {
     try {
       // For Google Drive, call the appropriate edge function
       if (documentSource === "google-drive") {
+        console.log("Fetching Google Drive documents with config:", {
+          client_email: sourceConfig.client_email ? "✓ Present" : "✗ Missing",
+          private_key: sourceConfig.private_key ? "✓ Present" : "✗ Missing",
+          folder_id: sourceConfig.folder_id || "Not specified",
+        });
+        
         const { data, error } = await supabase.functions.invoke("list-google-drive-files", {
           body: { 
             client_email: sourceConfig.client_email,
@@ -81,6 +98,8 @@ export function DocumentsTab() {
           throw new Error(error.message || "Failed to fetch documents");
         }
 
+        console.log("Google Drive API response:", data);
+        
         if (data?.files) {
           setDocuments(data.files);
         } else {
@@ -123,6 +142,8 @@ export function DocumentsTab() {
     try {
       // For Google Drive, call the appropriate edge function
       if (documentSource === "google-drive") {
+        console.log("Processing selected documents:", selectedDocuments);
+        
         const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
           body: { 
             client_email: sourceConfig?.client_email,

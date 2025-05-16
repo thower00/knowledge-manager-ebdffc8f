@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { cors } from "../_shared/cors.ts";
-import { JSONWebToken } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 // Edge function to list files from Google Drive
 serve(async (req: Request) => {
@@ -15,17 +14,26 @@ serve(async (req: Request) => {
     
     // Validate required parameters
     if (!client_email || !private_key) {
+      console.error("Missing required Google Drive credentials");
       return new Response(
         JSON.stringify({ error: "Missing required Google Drive credentials" }),
         { status: 400, headers: { "Content-Type": "application/json", ...cors().headers } }
       );
     }
     
+    console.log("Generating Google auth token");
+    console.log(`Using client_email: ${client_email.substring(0, 5)}...`);
+    console.log(`Private key provided: ${private_key ? "Yes" : "No"}`);
+    console.log(`Folder ID: ${folder_id || "Not specified"}`);
+    
     // Generate JWT token for Google Drive API
     const token = await generateGoogleAuthToken(client_email, private_key);
+    console.log("Token generated successfully");
     
     // Call Google Drive API to list files
+    console.log("Listing Google Drive files");
     const files = await listGoogleDriveFiles(token, folder_id);
+    console.log(`Found ${files.length} files`);
     
     return new Response(
       JSON.stringify({ files }),
@@ -59,27 +67,7 @@ async function generateGoogleAuthToken(clientEmail: string, privateKey: string):
   
   try {
     // Create JWT
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(formattedKey);
-    
-    const cryptoKey = await crypto.subtle.importKey(
-      "pkcs8",
-      keyData,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
-      false,
-      ["sign"]
-    );
-    
-    const signature = await crypto.subtle.sign(
-      { name: "RSASSA-PKCS1-v1_5" },
-      cryptoKey,
-      encoder.encode(JSON.stringify(payload))
-    );
-    
-    const jwt = `${btoa(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${btoa(JSON.stringify(payload))}.${btoa(String.fromCharCode(...new Uint8Array(signature)))}`;
+    const jwt = await createJWT(payload, formattedKey);
     
     // Exchange JWT for access token
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -104,16 +92,61 @@ async function generateGoogleAuthToken(clientEmail: string, privateKey: string):
   }
 }
 
+// Create JWT token
+async function createJWT(payload: any, privateKey: string): Promise<string> {
+  // Header
+  const header = { alg: "RS256", typ: "JWT" };
+  
+  // Encode header and payload
+  const encoder = new TextEncoder();
+  const headerEncoded = btoa(JSON.stringify(header));
+  const payloadEncoded = btoa(JSON.stringify(payload));
+  
+  // Create signature
+  const signatureInput = `${headerEncoded}.${payloadEncoded}`;
+  const keyData = encoder.encode(privateKey);
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyData,
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: "SHA-256",
+    },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5" },
+    cryptoKey,
+    encoder.encode(signatureInput)
+  );
+  
+  // Convert signature to base64
+  const signatureBytes = new Uint8Array(signature);
+  let signatureBase64 = "";
+  for (let i = 0; i < signatureBytes.length; i++) {
+    signatureBase64 += String.fromCharCode(signatureBytes[i]);
+  }
+  const signatureEncoded = btoa(signatureBase64);
+  
+  // Return JWT
+  return `${headerEncoded}.${payloadEncoded}.${signatureEncoded}`;
+}
+
 // List files from Google Drive
 async function listGoogleDriveFiles(accessToken: string, folderId?: string): Promise<any[]> {
   try {
     let query = "mimeType='application/pdf' or mimeType contains 'text/' or mimeType contains 'document' or mimeType contains 'spreadsheet'";
     
-    if (folderId) {
+    if (folderId && folderId.trim() !== "") {
       query += ` and '${folderId}' in parents`;
     }
     
     const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size,createdTime,webViewLink)`;
+    
+    console.log(`Calling Google Drive API with URL: ${url}`);
     
     const response = await fetch(url, {
       headers: {
@@ -123,6 +156,7 @@ async function listGoogleDriveFiles(accessToken: string, folderId?: string): Pro
     
     if (!response.ok) {
       const errorData = await response.json();
+      console.error("Google Drive API error response:", errorData);
       throw new Error(`Google Drive API error: ${JSON.stringify(errorData)}`);
     }
     
