@@ -76,7 +76,7 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     console.log(`Started processing ${documentIds.length} documents`);
     
-    // Get metadata for documents (in a real implementation, this would fetch from Google Drive API)
+    // Get metadata for documents from Google Drive API
     try {
       // Fetch document names from the list-google-drive-files function
       const { data: driveFilesResponse, error: driveError } = await supabase.functions.invoke("list-google-drive-files", {
@@ -108,7 +108,7 @@ serve(async (req: Request) => {
       }
 
       // Insert records into processed_documents table
-      const insertPromises = documentIds.map(async (docId: string) => {
+      for (const docId of documentIds) {
         // Find matching file from Drive API response
         const fileData = filesToProcess.find((f: any) => f.id === docId) || { 
           name: `Document ${docId}`,
@@ -134,37 +134,32 @@ serve(async (req: Request) => {
           
         if (error) {
           console.error("Error inserting document record:", error);
-          return { id: docId, success: false, error: error.message };
+          console.log("Failed to insert document:", documentEntry);
+        } else {
+          console.log("Successfully inserted document record:", data);
+          
+          // Simulate processing completion after a short delay
+          // In a real implementation, this would be a more complex background task
+          setTimeout(async () => {
+            try {
+              const { error: updateError } = await supabase
+                .from("processed_documents")
+                .update({ 
+                  status: "completed", 
+                  processed_at: new Date().toISOString() 
+                })
+                .eq("source_id", docId);
+                
+              if (updateError) {
+                console.error("Error updating document status:", updateError);
+              } else {
+                console.log(`Document ${docId} marked as completed`);
+              }
+            } catch (err) {
+              console.error("Error in update timeout:", err);
+            }
+          }, 5000); // Complete after 5 seconds for demonstration
         }
-        
-        console.log("Successfully inserted document record:", data);
-
-        // Simulate processing completion after a short delay
-        // In a real implementation, this would be a more complex background task
-        setTimeout(async () => {
-          const { error: updateError } = await supabase
-            .from("processed_documents")
-            .update({ 
-              status: "completed", 
-              processed_at: new Date().toISOString() 
-            })
-            .eq("source_id", docId);
-            
-          if (updateError) {
-            console.error("Error updating document status:", updateError);
-          } else {
-            console.log(`Document ${docId} marked as completed`);
-          }
-        }, 3000); // Complete after 3 seconds for demonstration
-        
-        return { id: docId, success: true };
-      });
-      
-      try {
-        const results = await Promise.all(insertPromises);
-        console.log("Document processing results:", results);
-      } catch (error) {
-        console.error("Error in document processing:", error);
       }
       
     } catch (dbError) {

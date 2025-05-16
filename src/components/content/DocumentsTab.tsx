@@ -117,7 +117,7 @@ export function DocumentsTab() {
         setTimeout(() => {
           console.log("Triggering refresh of processed documents list");
           setRefreshKey(prev => prev + 1);
-        }, 1000);
+        }, 2000);
       } else {
         throw new Error(result.message);
       }
