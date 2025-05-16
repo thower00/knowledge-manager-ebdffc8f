@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentSourceConfig, DocumentFile } from "@/types/document";
+import { FunctionsResponse, FunctionsError } from "@supabase/supabase-js";
 
 export async function fetchSourceConfig(documentSource: string) {
   try {
@@ -113,7 +114,7 @@ export async function processSelectedDocuments(
       }
       
       // Create a promise that will reject after the specified timeout
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("Request timeout")), 30000); // 30 seconds timeout
       });
       
@@ -135,9 +136,9 @@ export async function processSelectedDocuments(
         timeoutPromise
       ]);
       
-      // Now we need to await the result properly to get the actual response
-      // Since we know it's the apiCallPromise that won if we reach here
-      const response = await result;
+      // Type guard to ensure we have the API response and not the timeout error
+      // If timeoutPromise won, it would have thrown an error already
+      const response = result as FunctionsResponse<any>;
       
       console.log("Edge function response:", response);
 
