@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
@@ -79,26 +80,28 @@ const AppRoutes = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <SidebarProvider defaultOpen={true}>
-            <div className="flex flex-col min-h-screen w-full">
-              <Navbar />
-              <div className="flex flex-1">
-                <AppSidebar />
-                <SidebarInset className="flex-grow">
-                  <main className="flex-grow">
-                    <AppRoutes />
-                  </main>
-                  <Footer />
-                </SidebarInset>
+      <HelmetProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <SidebarProvider defaultOpen={true}>
+              <div className="flex flex-col min-h-screen w-full">
+                <Navbar />
+                <div className="flex flex-1">
+                  <AppSidebar />
+                  <SidebarInset className="flex-grow">
+                    <main className="flex-grow">
+                      <AppRoutes />
+                    </main>
+                    <Footer />
+                  </SidebarInset>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+            </SidebarProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </HelmetProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
