@@ -20,6 +20,7 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
+    console.log("Loading processed documents...");
     setIsLoading(true);
     try {
       const docs = await fetchProcessedDocuments();
@@ -44,7 +45,17 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
 
   useEffect(() => {
     loadProcessedDocuments();
-  }, [loadProcessedDocuments]);
+    // Set up a refresh interval (every 10 seconds)
+    const intervalId = setInterval(() => {
+      // Only auto-refresh if there are processing documents
+      if (documents.some(doc => doc.status === 'processing')) {
+        console.log("Auto-refreshing documents list due to processing status");
+        loadProcessedDocuments();
+      }
+    }, 10000);
+    
+    return () => clearInterval(intervalId);
+  }, [loadProcessedDocuments, documents]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Define proper CORS headers
 const corsHeaders = {
@@ -60,14 +61,98 @@ serve(async (req: Request) => {
       );
     }
     
-    // This is a placeholder for the actual implementation
-    // In a real implementation, we would:
-    // 1. Generate a JWT token for Google Drive API
-    // 2. Download the documents
-    // 3. Process them (e.g., extract text)
-    // 4. Store them in the database
-    
+    // Create Supabase client with correct environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     console.log(`Started processing ${documentIds.length} documents`);
+    
+    // Get metadata for documents (in a real implementation, this would fetch from Google Drive API)
+    // For now, we'll just create placeholder entries in the database for demonstration
+    try {
+      // Since we don't have the full Google Drive integration yet, we'll fetch document names
+      // from the list-google-drive-files function to get at least the document names
+      const { data: driveFiles, error: driveError } = await supabase.functions.invoke("list-google-drive-files", {
+        body: { 
+          client_email: client_email,
+          private_key: private_key,
+          folder_id: "",
+        },
+      });
+
+      if (driveError) {
+        console.error("Error fetching document metadata:", driveError);
+      }
+
+      // Filter files to only the ones we're processing
+      let filesToProcess = [];
+      if (driveFiles && driveFiles.files) {
+        filesToProcess = driveFiles.files.filter((file: any) => documentIds.includes(file.id));
+        console.log("Files to process:", filesToProcess);
+      }
+
+      // Insert records into processed_documents table
+      const insertPromises = documentIds.map(async (docId: string) => {
+        // Find matching file from Drive API response
+        const fileData = filesToProcess.find((f: any) => f.id === docId) || { 
+          name: `Document ${docId}`,
+          mimeType: "application/unknown" 
+        };
+
+        const documentEntry = {
+          source_id: docId,
+          title: fileData.name,
+          source_type: "google-drive",
+          mime_type: fileData.mimeType || "application/unknown",
+          status: "processing", // Initial status is processing
+          size: fileData.size || null,
+          url: fileData.webViewLink || null
+        };
+
+        console.log("Inserting document record:", documentEntry);
+        
+        const { data, error } = await supabase
+          .from("processed_documents")
+          .insert(documentEntry)
+          .select();
+          
+        if (error) {
+          console.error("Error inserting document record:", error);
+          return { id: docId, success: false, error: error.message };
+        }
+        
+        console.log("Successfully inserted document record:", data);
+
+        // Simulate processing completion after a short delay
+        // In a real implementation, this would be a more complex background task
+        setTimeout(async () => {
+          const { error: updateError } = await supabase
+            .from("processed_documents")
+            .update({ 
+              status: "completed", 
+              processed_at: new Date().toISOString() 
+            })
+            .eq("source_id", docId);
+            
+          if (updateError) {
+            console.error("Error updating document status:", updateError);
+          } else {
+            console.log(`Document ${docId} marked as completed`);
+          }
+        }, 3000); // Complete after 3 seconds for demonstration
+        
+        return { id: docId, success: true };
+      });
+      
+      await Promise.all(insertPromises);
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      return new Response(
+        JSON.stringify({ error: "Failed to save documents to database" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
     
     // Return success response with CORS headers
     return new Response(
