@@ -118,38 +118,22 @@ export async function processSelectedDocuments(
         throw new Error("Missing required Google Drive credentials. Please update your configuration.");
       }
       
-      // Create a promise that will reject after the specified timeout
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Request timeout")), 30000); // 30 seconds timeout
-      });
-      
-      // Create the actual API call promise
-      const apiCallPromise = supabase.functions.invoke("process-google-drive-documents", {
+      // Call the Edge function directly without Promise.race
+      console.log("Calling process-google-drive-documents edge function");
+      const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
         body: { 
           client_email: sourceConfig.client_email,
           private_key: sourceConfig.private_key,
           documentIds: selectedDocuments,
         },
-        headers: {
-          "Content-Type": "application/json",
-        },
       });
       
-      // Race the API call against the timeout
-      const result = await Promise.race([
-        apiCallPromise,
-        timeoutPromise
-      ]);
-      
-      // Type assertion for the response
-      // If timeoutPromise won, it would have thrown an error already
-      const response = result as EdgeFunctionResponse<any>;
-      
-      console.log("Edge function response:", response);
+      console.log("Edge function response:", { data, error });
 
-      if (response.error) {
-        console.error("Edge function error:", response.error);
-        throw new Error(response.error.message || "Failed to process documents");
+      // Handle errors from the edge function
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Failed to process documents");
       }
 
       return { 
@@ -162,11 +146,6 @@ export async function processSelectedDocuments(
       
       if (err instanceof Error) {
         errorMessage = err.message;
-        
-        // Check for timeout
-        if (errorMessage === "Request timeout") {
-          errorMessage = "Request timed out. The operation took too long to complete.";
-        }
       }
       
       // Specific error handling for network-related issues
