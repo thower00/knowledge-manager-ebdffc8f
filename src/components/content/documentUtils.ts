@@ -1,7 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentSourceConfig, DocumentFile } from "@/types/document";
-import { FunctionsResponse, FunctionsError } from "@supabase/supabase-js";
+
+// Define our own type for functions response since it's not exported by the package
+interface EdgeFunctionResponse<T> {
+  data: T | null;
+  error: Error | null;
+}
 
 export async function fetchSourceConfig(documentSource: string) {
   try {
@@ -136,9 +141,9 @@ export async function processSelectedDocuments(
         timeoutPromise
       ]);
       
-      // Type guard to ensure we have the API response and not the timeout error
+      // Type assertion for the response
       // If timeoutPromise won, it would have thrown an error already
-      const response = result as FunctionsResponse<any>;
+      const response = result as EdgeFunctionResponse<any>;
       
       console.log("Edge function response:", response);
 
