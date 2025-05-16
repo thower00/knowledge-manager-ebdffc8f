@@ -10,16 +10,19 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
   
-  // Show loading state but don't redirect immediately
+  // Show loading state while checking authentication
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
-  // Only redirect if user is definitely authenticated
-  if (user !== null) {
+  // Only redirect if user is definitely authenticated and not null
+  if (user !== null && user !== undefined) {
+    console.log("User is authenticated, redirecting to home", user);
     return <Navigate to="/" replace />;
   }
 
+  console.log("Rendering Auth page, user:", user);
+  
   return (
     <div className="container flex items-center justify-center min-h-[calc(100vh-16rem)] py-8">
       <Card className="w-full max-w-md">

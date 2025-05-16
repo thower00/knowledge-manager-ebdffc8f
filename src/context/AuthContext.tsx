@@ -86,13 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log("AuthProvider mounted");
-    // Clean up any existing auth state to ensure proper initialization
-    // cleanupAuthState(); // We don't want to clean up on initial mount as it might break login state
-
+    setIsLoading(true);
+    
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log("Auth state change:", event);
+        console.log("Auth state change:", event, currentSession?.user?.id || 'no user');
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -106,17 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAdmin(false);
         }
 
-        if (event === 'SIGNED_IN') {
-          console.log("User signed in");
-        } else if (event === 'SIGNED_OUT') {
-          console.log("User signed out");
-        }
+        // Mark loading as complete after a state change
+        setIsLoading(false);
       }
     );
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Current session:", currentSession ? "exists" : "none");
+      console.log("Current session:", currentSession ? `exists: ${currentSession.user.id}` : "none");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       

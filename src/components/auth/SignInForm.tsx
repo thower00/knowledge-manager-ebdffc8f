@@ -66,8 +66,8 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
         description: "You've been signed in.",
       });
       
-      // Reload the page to ensure a fresh state
-      window.location.href = '/';
+      // Don't reload the page - let the app's router handle navigation
+      // React Router will handle the redirect based on AuthContext
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
