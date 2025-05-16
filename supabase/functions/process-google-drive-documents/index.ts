@@ -1,12 +1,22 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { cors } from "../_shared/cors.ts";
+
+// Define proper CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey",
+  "Access-Control-Max-Age": "86400",
+};
 
 // Edge function to process documents from Google Drive
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return cors();
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders
+    });
   }
   
   try {
@@ -30,7 +40,7 @@ serve(async (req: Request) => {
       console.error("Missing client_email parameter");
       return new Response(
         JSON.stringify({ error: "Missing client_email parameter" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
     
@@ -38,7 +48,7 @@ serve(async (req: Request) => {
       console.error("Missing private_key parameter");
       return new Response(
         JSON.stringify({ error: "Missing private_key parameter" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
     
@@ -46,7 +56,7 @@ serve(async (req: Request) => {
       console.error("No documents selected for processing");
       return new Response(
         JSON.stringify({ error: "No documents selected for processing" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...cors().headers } }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
     
@@ -70,7 +80,7 @@ serve(async (req: Request) => {
         status: 200, 
         headers: { 
           "Content-Type": "application/json", 
-          ...cors().headers 
+          ...corsHeaders 
         } 
       }
     );
@@ -81,8 +91,8 @@ serve(async (req: Request) => {
     // Check if this is a network-related error
     const errorMessage = error.message || "Failed to process documents";
     const isNetworkError = errorMessage.includes("NetworkError") || 
-                          errorMessage.includes("Failed to fetch") ||
-                          errorMessage.includes("network");
+                           errorMessage.includes("Failed to fetch") ||
+                           errorMessage.includes("network");
     
     const statusCode = isNetworkError ? 503 : 500; // 503 for network issues
     const responseMessage = isNetworkError 
@@ -96,7 +106,7 @@ serve(async (req: Request) => {
         status: statusCode, 
         headers: { 
           "Content-Type": "application/json", 
-          ...cors().headers 
+          ...corsHeaders 
         } 
       }
     );

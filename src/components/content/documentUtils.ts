@@ -118,7 +118,7 @@ export async function processSelectedDocuments(
         throw new Error("Missing required Google Drive credentials. Please update your configuration.");
       }
       
-      // Call the Edge function directly without Promise.race
+      // Make sure we're using consistent headers and explicit content-type
       console.log("Calling process-google-drive-documents edge function");
       const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
         body: { 
