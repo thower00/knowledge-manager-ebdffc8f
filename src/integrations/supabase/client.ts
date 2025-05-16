@@ -10,5 +10,14 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: false,
+    flowType: 'pkce'
   }
 });
+
+// Debug function to check auth state
+export const debugAuthState = async () => {
+  const session = await supabase.auth.getSession();
+  console.log("Current auth session:", session);
+  return session;
+};

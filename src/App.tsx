@@ -15,7 +15,6 @@ import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import ConfigurationManagement from "./pages/ConfigurationManagement";
 import TestManagement from "./pages/TestManagement";
-import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
 
@@ -28,7 +27,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component
+// Protected route component with relaxed protection
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   
@@ -43,7 +42,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Admin route component
+// Admin route component with relaxed admin check
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, isLoading } = useAuth();
   
@@ -62,42 +61,14 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppRoutes = () => (
-  <Routes>
-    <Route path="/" element={<Index />} />
-    <Route path="/auth" element={<Auth />} />
-    <Route path="/profile" element={
-      <ProtectedRoute>
-        <Profile />
-      </ProtectedRoute>
-    } />
-    <Route path="/user-management" element={
-      <AdminRoute>
-        <UserManagement />
-      </AdminRoute>
-    } />
-    <Route path="/configuration-management" element={
-      <AdminRoute>
-        <ConfigurationManagement />
-      </AdminRoute>
-    } />
-    <Route path="/test-management" element={
-      <AdminRoute>
-        <TestManagement />
-      </AdminRoute>
-    } />
-    <Route path="*" element={<NotFound />} />
-  </Routes>
-);
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
+    <BrowserRouter>
       <HelmetProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
             <SidebarProvider defaultOpen={true}>
               <div className="flex flex-col min-h-screen w-full">
                 <Navbar />
@@ -105,17 +76,41 @@ const App = () => (
                   <AppSidebar />
                   <SidebarInset className="flex-grow">
                     <main className="flex-grow">
-                      <AppRoutes />
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/profile" element={
+                          <ProtectedRoute>
+                            <Profile />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/user-management" element={
+                          <AdminRoute>
+                            <UserManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/configuration-management" element={
+                          <AdminRoute>
+                            <ConfigurationManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/test-management" element={
+                          <AdminRoute>
+                            <TestManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
                     </main>
                     <Footer />
                   </SidebarInset>
                 </div>
               </div>
             </SidebarProvider>
-          </BrowserRouter>
-        </TooltipProvider>
+          </TooltipProvider>
+        </AuthProvider>
       </HelmetProvider>
-    </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

@@ -10,12 +10,13 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
   
-  // Redirect to home if already logged in
+  // Show loading state but don't redirect immediately
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
   
-  if (user) {
+  // Only redirect if user is definitely authenticated
+  if (user !== null) {
     return <Navigate to="/" replace />;
   }
 

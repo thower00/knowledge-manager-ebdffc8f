@@ -47,9 +47,11 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
       try {
         await supabase.auth.signOut({ scope: 'global' });
       } catch (err) {
+        console.log("Error during pre-login cleanup:", err);
         // Continue even if this fails
       }
       
+      console.log("Signing in with:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -57,10 +59,15 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
       
       if (error) throw error;
       
+      console.log("Sign in successful:", data.user?.id);
+      
       toast({
         title: "Success!",
         description: "You've been signed in.",
       });
+      
+      // Reload the page to ensure a fresh state
+      window.location.href = '/';
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
