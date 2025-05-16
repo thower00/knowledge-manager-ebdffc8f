@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/select";
 import { VerificationStatusAlert, VerificationButton } from "./VerificationStatus";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
+// Define the ConfigSettings interface with an index signature to make it compatible with Json type
 interface ConfigSettings {
   apiKey: string;
   embeddingModel: string;
@@ -30,6 +32,7 @@ interface ConfigSettings {
   chunkOverlap: string;
   storagePath: string;
   customConfiguration: string;
+  [key: string]: string; // Add index signature to make it compatible with { [key: string]: Json }
 }
 
 interface VerificationStatus {
@@ -79,13 +82,14 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
         
         // If configuration exists, populate the form
         if (data?.value) {
+          const configValue = data.value as any;
           setConfig({
-            apiKey: data.value.apiKey || "",
-            embeddingModel: data.value.embeddingModel || "openai",
-            chunkSize: data.value.chunkSize || "1000",
-            chunkOverlap: data.value.chunkOverlap || "200",
-            storagePath: data.value.storagePath || "/data/documents",
-            customConfiguration: data.value.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
+            apiKey: configValue.apiKey || "",
+            embeddingModel: configValue.embeddingModel || "openai",
+            chunkSize: configValue.chunkSize || "1000",
+            chunkOverlap: configValue.chunkOverlap || "200",
+            storagePath: configValue.storagePath || "/data/documents",
+            customConfiguration: configValue.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
           });
         }
       } catch (err: any) {
@@ -127,13 +131,14 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
       
       // If configuration exists, populate the form with its values
       if (data?.value) {
+        const configValue = data.value as any;
         setConfig({
-          apiKey: data.value.apiKey || "",
-          embeddingModel: data.value.embeddingModel || "openai",
-          chunkSize: data.value.chunkSize || "1000",
-          chunkOverlap: data.value.chunkOverlap || "200",
-          storagePath: data.value.storagePath || "/data/documents",
-          customConfiguration: data.value.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
+          apiKey: configValue.apiKey || "",
+          embeddingModel: configValue.embeddingModel || "openai",
+          chunkSize: configValue.chunkSize || "1000",
+          chunkOverlap: configValue.chunkOverlap || "200",
+          storagePath: configValue.storagePath || "/data/documents",
+          customConfiguration: configValue.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
         });
         
         toast({
@@ -202,21 +207,21 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
       let result;
       
       if (existingConfig) {
-        // Update existing configuration
+        // Update existing configuration - Convert config to a plain object for Json compatibility
         result = await supabase
           .from('configurations')
           .update({
-            value: config,
+            value: config as unknown as Json,
             updated_at: new Date().toISOString()
           })
           .eq('key', 'document_processing');
       } else {
-        // Insert new configuration
+        // Insert new configuration - Convert config to a plain object for Json compatibility
         result = await supabase
           .from('configurations')
           .insert({
             key: 'document_processing',
-            value: config,
+            value: config as unknown as Json,
             description: 'Document processing configuration'
           });
       }
