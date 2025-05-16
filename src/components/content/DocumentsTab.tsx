@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { DocumentSourceConfig } from "@/types/document";
+import { DocumentSourceConfig, DocumentFile } from "@/types/document";
 import { DocumentSourceSelector } from "./DocumentSourceSelector";
 import { DocumentActions } from "./DocumentActions";
 import { DocumentList } from "./DocumentList";

@@ -23,3 +23,13 @@ export interface DocumentMetadata {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
 }
+
+// Adding DocumentFile interface
+export interface DocumentFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+  createdTime?: string;
+  webViewLink?: string;
+}
