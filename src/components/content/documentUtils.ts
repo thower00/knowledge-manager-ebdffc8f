@@ -130,11 +130,15 @@ export async function processSelectedDocuments(
       });
       
       // Race the API call against the timeout
-      const response = await Promise.race([
+      const result = await Promise.race([
         apiCallPromise,
         timeoutPromise
-      ]) as typeof apiCallPromise;
-
+      ]);
+      
+      // Now we need to await the result properly to get the actual response
+      // Since we know it's the apiCallPromise that won if we reach here
+      const response = await result;
+      
       console.log("Edge function response:", response);
 
       if (response.error) {
