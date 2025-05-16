@@ -16,6 +16,24 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
+// Function to completely clean up auth state from localStorage and sessionStorage
+export const cleanupAuthState = () => {
+  console.log("Cleaning up auth state");
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log("Removing localStorage key:", key);
+      localStorage.removeItem(key);
+    }
+  });
+  
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log("Removing sessionStorage key:", key);
+      sessionStorage.removeItem(key);
+    }
+  });
+};
+
 // Debug function to check auth state
 export const debugAuthState = async () => {
   const session = await supabase.auth.getSession();
@@ -26,6 +44,11 @@ export const debugAuthState = async () => {
     key.startsWith('supabase.auth.') || key.includes('sb-')
   );
   console.log("Auth-related localStorage keys:", keys);
+  
+  const sessionKeys = Object.keys(sessionStorage || {}).filter(key => 
+    key.startsWith('supabase.auth.') || key.includes('sb-')
+  );
+  console.log("Auth-related sessionStorage keys:", sessionKeys);
   
   return session;
 };

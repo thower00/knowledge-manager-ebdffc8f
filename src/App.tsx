@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component with relaxed protection
+// Protected route component
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   
@@ -42,7 +42,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Admin route component with relaxed admin check
+// Admin route component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, isLoading } = useAuth();
   
@@ -78,6 +78,7 @@ const App = () => (
                     <main className="flex-grow">
                       <Routes>
                         <Route path="/" element={<Index />} />
+                        {/* Auth route - DO NOT protect this route */}
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/profile" element={
                           <ProtectedRoute>
