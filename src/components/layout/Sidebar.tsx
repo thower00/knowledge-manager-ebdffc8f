@@ -13,7 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { Settings, Users, FileText, Home, User } from "lucide-react";
+import { Settings, Users, FileText, Home, User, TestTube, Cog } from "lucide-react";
 
 export default function AppSidebar() {
   const { user, isAdmin } = useAuth();
@@ -69,22 +69,32 @@ export default function AppSidebar() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton 
-                    isActive={isActive("/admin")} 
-                    onClick={() => navigate("/admin")}
-                    tooltip="Admin Dashboard"
-                  >
-                    <Settings className="h-5 w-5" />
-                    <span>Admin Dashboard</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
                     isActive={isActive("/user-management")} 
                     onClick={() => navigate("/user-management")}
                     tooltip="User Management"
                   >
                     <Users className="h-5 w-5" />
                     <span>User Management</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    isActive={isActive("/configuration-management")} 
+                    onClick={() => navigate("/configuration-management")}
+                    tooltip="Configuration Management"
+                  >
+                    <Cog className="h-5 w-5" />
+                    <span>Configuration Management</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    isActive={isActive("/test-management")} 
+                    onClick={() => navigate("/test-management")}
+                    tooltip="Test Management"
+                  >
+                    <TestTube className="h-5 w-5" />
+                    <span>Test Management</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

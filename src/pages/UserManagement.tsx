@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,15 @@ import { User } from "@/types/user";
 import { UserTable } from "@/components/user/UserTable";
 import { UserSearch } from "@/components/user/UserSearch";
 import { fetchAllUsers, promoteUserToAdmin, removeUserAdmin } from "@/services/userService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UserRoleManagement } from "@/components/admin/UserRoleManagement";
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("users");
   const { toast } = useToast();
   const { user: currentUser, isAdmin, isLoading } = useAuth();
 
@@ -46,12 +50,12 @@ export default function UserManagement() {
     }
   };
 
-  useEffect(() => {
-    // Only fetch users if the user is an admin
-    if (isAdmin && !isLoading) {
+  useState(() => {
+    // Only fetch users if the user is an admin and we're on the users tab
+    if (isAdmin && !isLoading && activeTab === "users") {
       fetchUsers();
     }
-  }, [isAdmin, isLoading]);
+  }, [isAdmin, isLoading, activeTab]);
 
   const promoteToAdmin = async (userId: string) => {
     try {
@@ -126,26 +130,46 @@ export default function UserManagement() {
         <title>User Management | Knowledge Manager</title>
       </Helmet>
       <div className="container py-8 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <Button onClick={() => fetchUsers()}>Refresh</Button>
-        </div>
+        <h1 className="text-3xl font-bold">User Management</h1>
         
-        <div className="space-y-4">
-          <UserSearch 
-            searchQuery={searchQuery} 
-            onSearchChange={setSearchQuery} 
-          />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="roles">Role Management</TabsTrigger>
+          </TabsList>
           
-          <UserTable
-            users={users}
-            loading={loading}
-            currentUserId={currentUser?.id}
-            onPromoteToAdmin={promoteToAdmin}
-            onRemoveAdmin={removeAdmin}
-            searchQuery={searchQuery}
-          />
-        </div>
+          <TabsContent value="users" className="mt-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <UserSearch 
+                  searchQuery={searchQuery} 
+                  onSearchChange={setSearchQuery} 
+                />
+                <Button onClick={() => fetchUsers()}>Refresh</Button>
+              </div>
+              
+              <UserTable
+                users={users}
+                loading={loading}
+                currentUserId={currentUser?.id}
+                onPromoteToAdmin={promoteToAdmin}
+                onRemoveAdmin={removeAdmin}
+                searchQuery={searchQuery}
+              />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="roles" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Role Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UserRoleManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );

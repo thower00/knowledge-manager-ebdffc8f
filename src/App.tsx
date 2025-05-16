@@ -9,11 +9,12 @@ import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import Index from "./pages/Index";
-import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
+import ConfigurationManagement from "./pages/ConfigurationManagement";
+import TestManagement from "./pages/TestManagement";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
@@ -70,14 +71,19 @@ const AppRoutes = () => (
         <Profile />
       </ProtectedRoute>
     } />
-    <Route path="/admin" element={
-      <AdminRoute>
-        <Admin />
-      </AdminRoute>
-    } />
     <Route path="/user-management" element={
       <AdminRoute>
         <UserManagement />
+      </AdminRoute>
+    } />
+    <Route path="/configuration-management" element={
+      <AdminRoute>
+        <ConfigurationManagement />
+      </AdminRoute>
+    } />
+    <Route path="/test-management" element={
+      <AdminRoute>
+        <TestManagement />
       </AdminRoute>
     } />
     <Route path="*" element={<NotFound />} />
