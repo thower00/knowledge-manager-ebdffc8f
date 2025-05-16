@@ -59,7 +59,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
         description: "You've been signed in.",
       });
       
-      // Force page reload
+      // Force page reload to ensure proper state update
       window.location.href = "/";
     } catch (error: any) {
       console.error('Login error:', error);
@@ -84,6 +84,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
+          autoComplete="email"
         />
       </div>
       
@@ -101,6 +102,7 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={isLoading}
+          autoComplete="current-password"
         />
       </div>
       

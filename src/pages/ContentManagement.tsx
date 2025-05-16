@@ -1,70 +1,66 @@
 
-import { useState } from "react";
+import { useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function ContentManagement() {
-  const [activeTab, setActiveTab] = useState("documents");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Notify user this is a placeholder
+    toast({
+      title: "Content Management",
+      description: "This is a placeholder for the Content Management feature.",
+    });
+  }, [toast]);
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Content Management</h1>
+    <>
+      <Helmet>
+        <title>Content Management | Knowledge Manager</title>
+      </Helmet>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="media">Media</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-        </TabsList>
+      <div className="container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight">Content Management</h1>
+          <p className="text-muted-foreground">
+            Manage your content assets and knowledge base resources.
+          </p>
+        </div>
         
-        <TabsContent value="documents" className="mt-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Document Management</CardTitle>
-              <CardDescription>
-                Manage your document library, including uploads, organization, and metadata.
-              </CardDescription>
+              <CardTitle>Documents</CardTitle>
+              <CardDescription>Upload and manage your document library</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="text-center py-8 text-muted-foreground">
-                Document management functionality coming soon.
-              </div>
+            <CardContent>
+              <p>Placeholder for document management interface</p>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="media" className="mt-6">
+          
           <Card>
             <CardHeader>
-              <CardTitle>Media Management</CardTitle>
-              <CardDescription>
-                Manage images, videos, and other media files.
-              </CardDescription>
+              <CardTitle>Knowledge Base</CardTitle>
+              <CardDescription>Create and organize knowledge base articles</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="text-center py-8 text-muted-foreground">
-                Media management functionality coming soon.
-              </div>
+            <CardContent>
+              <p>Placeholder for knowledge base management</p>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="templates" className="mt-6">
+          
           <Card>
             <CardHeader>
-              <CardTitle>Template Management</CardTitle>
-              <CardDescription>
-                Create and manage content templates for consistent formatting.
-              </CardDescription>
+              <CardTitle>Media Library</CardTitle>
+              <CardDescription>Manage images and other media assets</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="text-center py-8 text-muted-foreground">
-                Template management functionality coming soon.
-              </div>
+            <CardContent>
+              <p>Placeholder for media library management</p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }

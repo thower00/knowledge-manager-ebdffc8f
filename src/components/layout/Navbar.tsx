@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { FileText, LogOut, User, UserCircle, UserRound, Settings } from "lucide-react";
+import { FileText, LogOut, User, UserCircle, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   DropdownMenu,
@@ -116,7 +116,7 @@ export default function Navbar() {
             <Button 
               variant="default"
               className="bg-brand-600 hover:bg-brand-700"
-              onClick={() => navigate('/auth')}
+              onClick={() => window.location.href = '/auth'}
             >
               Sign In
             </Button>

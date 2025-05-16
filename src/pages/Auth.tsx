@@ -39,7 +39,7 @@ export default function Auth() {
   
   return (
     <div className="container flex items-center justify-center min-h-[calc(100vh-16rem)] py-8">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md mx-auto">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">
             {isSignUp ? "Create an account" : "Sign in"}

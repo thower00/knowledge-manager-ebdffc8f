@@ -1,122 +1,114 @@
 
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
-  SidebarGroup,
-  SidebarGroupLabel,
+  SidebarMenuButton,
+  SidebarTrigger
 } from "@/components/ui/sidebar";
-import { Settings, Users, FileText, Home, User, TestTube, Cog, FileEdit } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  Settings, 
+  Users, 
+  ListChecks,
+  FileText,
+  LogOut
+} from "lucide-react";
 
 export default function AppSidebar() {
-  const { user, isAdmin } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const { user, isAdmin, signOut } = useAuth();
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+  const isActive = (path: string) => location.pathname === path;
+
+  if (!user) return null;
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex flex-col items-center justify-center p-4">
-        <FileText className="h-8 w-8 text-brand-600 mb-2" />
-        <h1 className="text-lg font-semibold">Knowledge Manager</h1>
+      <SidebarHeader className="flex items-center justify-between">
+        <div className="flex items-center gap-2 px-4">
+          <FileText className="h-6 w-6 text-brand-600" />
+          <span className="font-semibold">Knowledge Manager</span>
+        </div>
+        <SidebarTrigger />
       </SidebarHeader>
       
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>General</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                isActive={isActive("/")} 
-                onClick={() => navigate("/")}
-                tooltip="Home"
-              >
-                <Home className="h-5 w-5" />
-                <span>Home</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            
-            {user && (
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive("/")} tooltip="Dashboard">
+              <Link to="/">
+                <LayoutDashboard />
+                <span>Dashboard</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive("/profile")} tooltip="Profile">
+              <Link to="/profile">
+                <Users />
+                <span>Profile</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          {isAdmin && (
+            <>
               <SidebarMenuItem>
-                <SidebarMenuButton 
-                  isActive={isActive("/profile")} 
-                  onClick={() => navigate("/profile")}
-                  tooltip="Profile"
-                >
-                  <User className="h-5 w-5" />
-                  <span>Profile</span>
+                <SidebarMenuButton asChild isActive={isActive("/user-management")} tooltip="User Management">
+                  <Link to="/user-management">
+                    <Users />
+                    <span>User Management</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-        </SidebarGroup>
-        
-        {isAdmin && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Admin</SidebarGroupLabel>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    isActive={isActive("/user-management")} 
-                    onClick={() => navigate("/user-management")}
-                    tooltip="User Management"
-                  >
-                    <Users className="h-5 w-5" />
-                    <span>User Management</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    isActive={isActive("/content-management")} 
-                    onClick={() => navigate("/content-management")}
-                    tooltip="Content Management"
-                  >
-                    <FileEdit className="h-5 w-5" />
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/content-management")} tooltip="Content Management">
+                  <Link to="/content-management">
+                    <FileText />
                     <span>Content Management</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    isActive={isActive("/configuration-management")} 
-                    onClick={() => navigate("/configuration-management")}
-                    tooltip="Configuration Management"
-                  >
-                    <Cog className="h-5 w-5" />
-                    <span>Configuration Management</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    isActive={isActive("/test-management")} 
-                    onClick={() => navigate("/test-management")}
-                    tooltip="Test Management"
-                  >
-                    <TestTube className="h-5 w-5" />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/configuration-management")} tooltip="Configuration">
+                  <Link to="/configuration-management">
+                    <Settings />
+                    <span>Configuration</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/test-management")} tooltip="Testing">
+                  <Link to="/test-management">
+                    <ListChecks />
                     <span>Test Management</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-          </>
-        )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
+          )}
+        </SidebarMenu>
       </SidebarContent>
       
-      <SidebarFooter className="p-4">
-        <div className="text-xs text-muted-foreground text-center">
-          Knowledge Manager v1.0
-        </div>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Sign Out" onClick={() => signOut()}>
+              <LogOut />
+              <span>Sign Out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
