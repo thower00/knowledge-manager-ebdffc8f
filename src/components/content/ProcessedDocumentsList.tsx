@@ -38,14 +38,14 @@ export function ProcessedDocumentsList() {
     // Initial load
     loadProcessedDocuments();
     
-    // Set up a refresh interval (every 3 seconds)
+    // Set up a refresh interval (every 2 seconds)
     const intervalId = setInterval(() => {
       // Only auto-refresh if there are processing documents
       if (documents.some(doc => doc.status === 'processing')) {
         console.log("Auto-refreshing documents list due to processing status");
         loadProcessedDocuments();
       }
-    }, 3000); // Reduced from 5 seconds to 3 seconds for more responsive updates
+    }, 2000); // Reduced interval for more responsive updates
     
     return () => clearInterval(intervalId);
   }, [loadProcessedDocuments, documents]);
