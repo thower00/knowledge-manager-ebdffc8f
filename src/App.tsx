@@ -10,13 +10,14 @@ import Footer from "./components/layout/Footer";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "@/context/AuthContext";
 
 const queryClient = new QueryClient();
 
 // Protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   
   if (isLoading) {
@@ -53,6 +54,11 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<Index />} />
     <Route path="/auth" element={<Auth />} />
+    <Route path="/profile" element={
+      <ProtectedRoute>
+        <Profile />
+      </ProtectedRoute>
+    } />
     <Route path="/admin" element={
       <AdminRoute>
         <Admin />
