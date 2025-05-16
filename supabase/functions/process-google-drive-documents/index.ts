@@ -64,16 +64,22 @@ serve(async (req: Request) => {
     // Create Supabase client with correct environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Missing Supabase environment variables");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
-
     console.log(`Started processing ${documentIds.length} documents`);
     
     // Get metadata for documents (in a real implementation, this would fetch from Google Drive API)
-    // For now, we'll just create placeholder entries in the database for demonstration
     try {
-      // Since we don't have the full Google Drive integration yet, we'll fetch document names
-      // from the list-google-drive-files function to get at least the document names
-      const { data: driveFiles, error: driveError } = await supabase.functions.invoke("list-google-drive-files", {
+      // Fetch document names from the list-google-drive-files function
+      const { data: driveFilesResponse, error: driveError } = await supabase.functions.invoke("list-google-drive-files", {
         body: { 
           client_email: client_email,
           private_key: private_key,
@@ -83,13 +89,22 @@ serve(async (req: Request) => {
 
       if (driveError) {
         console.error("Error fetching document metadata:", driveError);
+        throw new Error(`Failed to fetch document metadata: ${driveError.message}`);
+      }
+
+      if (!driveFilesResponse || !driveFilesResponse.files) {
+        console.error("Invalid response from list-google-drive-files:", driveFilesResponse);
+        throw new Error("Failed to get document metadata");
       }
 
       // Filter files to only the ones we're processing
-      let filesToProcess = [];
-      if (driveFiles && driveFiles.files) {
-        filesToProcess = driveFiles.files.filter((file: any) => documentIds.includes(file.id));
-        console.log("Files to process:", filesToProcess);
+      console.log("All files from Drive:", driveFilesResponse.files.length);
+      let filesToProcess = driveFilesResponse.files.filter((file: any) => documentIds.includes(file.id));
+      console.log("Files to process:", filesToProcess);
+
+      // Verify we have matching files for all requested IDs
+      if (filesToProcess.length !== documentIds.length) {
+        console.warn(`Warning: Found ${filesToProcess.length} files but expected ${documentIds.length}`);
       }
 
       // Insert records into processed_documents table
@@ -145,7 +160,13 @@ serve(async (req: Request) => {
         return { id: docId, success: true };
       });
       
-      await Promise.all(insertPromises);
+      try {
+        const results = await Promise.all(insertPromises);
+        console.log("Document processing results:", results);
+      } catch (error) {
+        console.error("Error in document processing:", error);
+      }
+      
     } catch (dbError) {
       console.error("Database error:", dbError);
       return new Response(

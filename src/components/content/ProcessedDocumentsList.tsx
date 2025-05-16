@@ -44,15 +44,17 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
   }, [toast, onRefresh]);
 
   useEffect(() => {
+    // Initial load
     loadProcessedDocuments();
-    // Set up a refresh interval (every 10 seconds)
+    
+    // Set up a refresh interval (every 5 seconds)
     const intervalId = setInterval(() => {
       // Only auto-refresh if there are processing documents
       if (documents.some(doc => doc.status === 'processing')) {
         console.log("Auto-refreshing documents list due to processing status");
         loadProcessedDocuments();
       }
-    }, 10000);
+    }, 5000); // Reduced from 10 seconds to 5 seconds for more responsive updates
     
     return () => clearInterval(intervalId);
   }, [loadProcessedDocuments, documents]);

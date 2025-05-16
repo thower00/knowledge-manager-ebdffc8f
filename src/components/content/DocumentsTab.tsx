@@ -113,8 +113,11 @@ export function DocumentsTab() {
         // Reset selection
         setSelectedDocuments([]);
         
-        // Trigger refresh of the processed documents list
-        setRefreshKey(prev => prev + 1);
+        // Wait a moment before triggering refresh to allow processing to start
+        setTimeout(() => {
+          console.log("Triggering refresh of processed documents list");
+          setRefreshKey(prev => prev + 1);
+        }, 1000);
       } else {
         throw new Error(result.message);
       }
@@ -169,6 +172,7 @@ export function DocumentsTab() {
       
       <div className="mt-6">
         <h2 className="text-lg font-medium mb-4">Database Documents</h2>
+        {/* Use the key to force re-render when refreshKey changes */}
         <ProcessedDocumentsList key={refreshKey} onRefresh={handleRefresh} />
       </div>
     </div>
