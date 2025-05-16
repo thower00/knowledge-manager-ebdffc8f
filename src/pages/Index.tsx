@@ -2,11 +2,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Key, Settings, UserPlus } from "lucide-react";
-import { useState } from "react";
-import AuthModal from "@/components/auth/AuthModal";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Index() {
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -27,9 +28,9 @@ export default function Index() {
                 <Button 
                   className="bg-brand-600 hover:bg-brand-700"
                   size="lg"
-                  onClick={() => setAuthModalOpen(true)}
+                  onClick={() => user ? navigate('/dashboard') : navigate('/auth')}
                 >
-                  Get Started
+                  {user ? 'Go to Dashboard' : 'Get Started'}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -144,15 +145,6 @@ export default function Index() {
           </div>
         </section>
       </main>
-      
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={() => {
-          // In a real app, this would handle post-authentication navigation
-          setAuthModalOpen(false);
-        }}
-      />
     </div>
   );
 }

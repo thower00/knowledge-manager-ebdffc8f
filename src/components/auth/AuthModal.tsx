@@ -7,10 +7,9 @@ import SignUpForm from "./SignUpForm";
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
 }
 
-export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   
   return (
@@ -25,12 +24,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         {isSignUp ? (
           <SignUpForm 
             onSignIn={() => setIsSignUp(false)} 
-            onSuccess={onSuccess} 
           />
         ) : (
           <SignInForm 
             onSignUp={() => setIsSignUp(true)} 
-            onSuccess={onSuccess} 
           />
         )}
       </DialogContent>

@@ -1,15 +1,20 @@
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { FileText, User } from "lucide-react";
-import AuthModal from "../auth/AuthModal";
+import { Link, useNavigate } from "react-router-dom";
+import { FileText, LogOut, User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Navbar() {
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  // In a real application, this would be determined by authentication state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
   
   return (
     <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,7 +37,7 @@ export default function Navbar() {
             Documentation
           </Link>
           
-          {isLoggedIn && (
+          {user && (
             <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-brand-700">
               Dashboard
             </Link>
@@ -44,40 +49,49 @@ export default function Navbar() {
             </Link>
           )}
           
-          {isLoggedIn ? (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => {
-                // For demo purposes, just toggle login state
-                setIsLoggedIn(false);
-                setIsAdmin(false);
-              }}
-            >
-              <User className="h-5 w-5" />
-            </Button>
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <User className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => navigate('/profile')}
+                >
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-red-600 focus:text-red-600"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Button 
               variant="default"
               className="bg-brand-600 hover:bg-brand-700"
-              onClick={() => setAuthModalOpen(true)}
+              onClick={() => navigate('/auth')}
             >
               Sign In
             </Button>
           )}
         </nav>
       </div>
-      
-      <AuthModal 
-        isOpen={authModalOpen} 
-        onClose={() => setAuthModalOpen(false)} 
-        onSuccess={() => {
-          setIsLoggedIn(true);
-          // For demo purposes, 50% chance of being admin
-          setIsAdmin(Math.random() > 0.5);
-          setAuthModalOpen(false);
-        }}
-      />
     </header>
   );
 }

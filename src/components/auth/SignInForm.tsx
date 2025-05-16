@@ -4,17 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SignInFormProps {
   onSignUp: () => void;
-  onSuccess: () => void;
 }
 
-export default function SignInForm({ onSignUp, onSuccess }: SignInFormProps) {
+export default function SignInForm({ onSignUp }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Function to clean up auth state from localStorage
+  const cleanupAuthState = () => {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,22 +39,34 @@ export default function SignInForm({ onSignUp, onSuccess }: SignInFormProps) {
     
     try {
       setIsLoading(true);
+
+      // Clean up existing auth state
+      cleanupAuthState();
       
-      // In a real app, this would make an API call to authenticate the user
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Try to sign out first (in case there's a stale session)
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        // Continue even if this fails
+      }
       
-      // For demo purposes we'll simulate a successful login
-      onSuccess();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
       
       toast({
         title: "Success!",
         description: "You've been signed in.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "Authentication Failed",
-        description: "Invalid email or password.",
+        description: error.message || "Invalid email or password.",
       });
     } finally {
       setIsLoading(false);
