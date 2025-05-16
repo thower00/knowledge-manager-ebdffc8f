@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-brand-600" />
           <p className="text-sm text-muted-foreground">
-            DocProcessor &copy; {new Date().getFullYear()}
+            Knowledge Manager &copy; {new Date().getFullYear()}
           </p>
         </div>
         

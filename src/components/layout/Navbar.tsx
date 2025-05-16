@@ -17,7 +17,7 @@ export default function Navbar() {
         <div className="flex items-center gap-2">
           <FileText className="h-6 w-6 text-brand-600" />
           <Link to="/" className="logo-text">
-            DocProcessor
+            Knowledge Manager
           </Link>
         </div>
         
