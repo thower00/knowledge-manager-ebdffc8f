@@ -12,7 +12,10 @@ import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import UserManagement from "./pages/UserManagement";
 import { useAuth } from "@/context/AuthContext";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import AppSidebar from "./components/layout/Sidebar";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +67,11 @@ const AppRoutes = () => (
         <Admin />
       </AdminRoute>
     } />
+    <Route path="/user-management" element={
+      <AdminRoute>
+        <UserManagement />
+      </AdminRoute>
+    } />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
@@ -75,13 +83,20 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="flex flex-col min-h-screen">
-            <Navbar />
-            <main className="flex-grow">
-              <AppRoutes />
-            </main>
-            <Footer />
-          </div>
+          <SidebarProvider defaultOpen={true}>
+            <div className="flex flex-col min-h-screen w-full">
+              <Navbar />
+              <div className="flex flex-1">
+                <AppSidebar />
+                <SidebarInset className="flex-grow">
+                  <main className="flex-grow">
+                    <AppRoutes />
+                  </main>
+                  <Footer />
+                </SidebarInset>
+              </div>
+            </div>
+          </SidebarProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
