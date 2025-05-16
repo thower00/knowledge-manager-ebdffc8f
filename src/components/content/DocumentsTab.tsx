@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { DocumentSourceConfig, DocumentFile } from "@/types/document";
@@ -16,6 +16,7 @@ export function DocumentsTab() {
   const [documents, setDocuments] = useState<DocumentFile[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [sourceConfig, setSourceConfig] = useState<DocumentSourceConfig | null>(null);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
   const { toast } = useToast();
 
   // Make configuration fetching more robust
@@ -111,6 +112,9 @@ export function DocumentsTab() {
 
         // Reset selection
         setSelectedDocuments([]);
+        
+        // Trigger refresh of the processed documents list
+        setRefreshKey(prev => prev + 1);
       } else {
         throw new Error(result.message);
       }
@@ -125,6 +129,11 @@ export function DocumentsTab() {
       setIsUploading(false);
     }
   };
+
+  // Callback to manually trigger refresh
+  const handleRefresh = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -159,7 +168,7 @@ export function DocumentsTab() {
       
       <div className="mt-6">
         <h2 className="text-lg font-medium mb-4">Database Documents</h2>
-        <ProcessedDocumentsList />
+        <ProcessedDocumentsList key={refreshKey} onRefresh={handleRefresh} />
       </div>
     </div>
   );

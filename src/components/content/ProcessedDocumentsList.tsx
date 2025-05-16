@@ -1,38 +1,49 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { fetchProcessedDocuments } from "./documentUtils";
 import { useToast } from "@/components/ui/use-toast";
 
-export function ProcessedDocumentsList() {
+interface ProcessedDocumentsListProps {
+  onRefresh?: () => void;
+}
+
+export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProps) {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const loadProcessedDocuments = async () => {
-      setIsLoading(true);
-      try {
-        const docs = await fetchProcessedDocuments();
-        setDocuments(docs);
-      } catch (err: any) {
-        console.error("Error fetching processed documents:", err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load processed documents."
-        });
-      } finally {
-        setIsLoading(false);
+  const loadProcessedDocuments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const docs = await fetchProcessedDocuments();
+      console.log("Fetched processed documents:", docs);
+      setDocuments(docs);
+      
+      // Call the parent's refresh handler if provided
+      if (onRefresh) {
+        onRefresh();
       }
-    };
+    } catch (err: any) {
+      console.error("Error fetching processed documents:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load processed documents."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast, onRefresh]);
 
+  useEffect(() => {
     loadProcessedDocuments();
-  }, [toast]);
+  }, [loadProcessedDocuments]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -62,77 +73,88 @@ export function ProcessedDocumentsList() {
     );
   }
 
-  if (!documents.length) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center p-8 text-muted-foreground">
-            No documents have been processed yet.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardContent className="p-0">
-        <div className="p-4 border-b bg-muted/50">
-          <div className="font-medium">Processed Documents</div>
-          <div className="text-sm text-muted-foreground">
-            Documents that have been processed and stored in the database
+        <div className="p-4 border-b bg-muted/50 flex justify-between items-center">
+          <div>
+            <div className="font-medium">Processed Documents</div>
+            <div className="text-sm text-muted-foreground">
+              Documents that have been processed and stored in the database
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={loadProcessedDocuments} 
+            className="whitespace-nowrap"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Refresh
+          </Button>
         </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="hidden md:table-cell">Source</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Processed</TableHead>
-                <TableHead className="hidden md:table-cell">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {documents.map((doc) => (
-                <TableRow key={doc.id}>
-                  <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell>
-                    <span className="text-xs whitespace-nowrap">{doc.mime_type}</span>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {doc.source_type}
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(doc.status)}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {doc.processed_at ? new Date(doc.processed_at).toLocaleString() : 'N/A'}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {doc.url && (
-                      <a 
-                        href={doc.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-blue-500 hover:text-blue-700"
-                      >
-                        View <ExternalLink className="h-4 w-4 ml-1" />
-                      </a>
-                    )}
-                    {doc.error && (
-                      <span className="text-red-500" title={doc.error}>
-                        Error
-                      </span>
-                    )}
-                  </TableCell>
+        
+        {documents.length === 0 ? (
+          <div className="text-center p-8 text-muted-foreground">
+            No documents have been processed yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="hidden md:table-cell">Source</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden md:table-cell">Processed</TableHead>
+                  <TableHead className="hidden md:table-cell">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {documents.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell className="font-medium">{doc.title}</TableCell>
+                    <TableCell>
+                      <span className="text-xs whitespace-nowrap">{doc.mime_type}</span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {doc.source_type}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(doc.status)}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {doc.processed_at ? new Date(doc.processed_at).toLocaleString() : 'N/A'}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {doc.url && (
+                        <a 
+                          href={doc.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-blue-500 hover:text-blue-700"
+                        >
+                          View <ExternalLink className="h-4 w-4 ml-1" />
+                        </a>
+                      )}
+                      {doc.error && (
+                        <span className="text-red-500" title={doc.error}>
+                          Error
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
