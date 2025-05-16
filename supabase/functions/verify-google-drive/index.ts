@@ -29,6 +29,12 @@ serve(async (req) => {
       );
     }
 
+    console.log("Attempting to verify Google Drive configuration");
+    console.log(`Client email: ${client_email.substring(0, 5)}...`);
+    console.log(`Private key provided: ${private_key ? 'Yes' : 'No'}`);
+    console.log(`Project ID: ${project_id || 'Not provided'}`);
+    console.log(`Folder ID: ${folder_id || 'Not provided'}`);
+
     // In a real implementation, we would use the Google Drive API SDK
     // to verify the credentials. For this example, we'll do a basic check
     // of the format and simulate a verification.
@@ -36,6 +42,7 @@ serve(async (req) => {
     // Check if client_email has correct format
     const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
     if (!emailRegex.test(client_email)) {
+      console.log("Invalid client email format");
       return new Response(
         JSON.stringify({ 
           valid: false, 
@@ -50,6 +57,7 @@ serve(async (req) => {
 
     // Check if private_key has correct format (starts with -----BEGIN PRIVATE KEY-----)
     if (!private_key.includes("-----BEGIN PRIVATE KEY-----")) {
+      console.log("Invalid private key format");
       return new Response(
         JSON.stringify({ 
           valid: false, 
@@ -64,6 +72,7 @@ serve(async (req) => {
 
     // In a real implementation, we would make an actual API call to Google Drive
     // to verify the credentials. Here we're just simulating a successful verification.
+    console.log("Google Drive configuration verification successful");
     
     return new Response(
       JSON.stringify({ 

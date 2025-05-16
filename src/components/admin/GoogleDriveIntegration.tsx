@@ -169,33 +169,35 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     setGoogleDriveVerification({ isVerifying: true });
     
     try {
-      // Call Edge Function to verify Google Drive configuration
-      const response = await fetch('/api/verify-google-drive', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
+      console.log("Verifying Google Drive configuration");
+      
+      // Call Supabase Edge Function to verify Google Drive configuration
+      const { data, error } = await supabase.functions.invoke("verify-google-drive", {
+        body: { 
           client_email: googleDriveConfig.client_email,
           private_key: googleDriveConfig.private_key,
           project_id: googleDriveConfig.project_id,
           folder_id: googleDriveConfig.folder_id,
-        }),
+        },
       });
       
-      const data = await response.json();
+      console.log("Google Drive verification response:", data, error);
       
-      if (response.ok && data.valid) {
+      if (error) {
+        throw new Error(error.message || "Verification failed");
+      }
+      
+      if (data?.valid) {
         setGoogleDriveVerification({ 
           isVerifying: false, 
           isValid: true, 
-          message: "Google Drive configuration is valid" 
+          message: data.message || "Google Drive configuration is valid" 
         });
       } else {
         setGoogleDriveVerification({ 
           isVerifying: false, 
           isValid: false, 
-          message: data.error || "Invalid Google Drive configuration" 
+          message: data?.error || "Invalid Google Drive configuration" 
         });
       }
     } catch (error: any) {
