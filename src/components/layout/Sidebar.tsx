@@ -13,7 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { Settings, Users, FileText, Home } from "lucide-react";
+import { Settings, Users, FileText, Home, User } from "lucide-react";
 
 export default function AppSidebar() {
   const { user, isAdmin } = useAuth();
@@ -53,7 +53,7 @@ export default function AppSidebar() {
                   onClick={() => navigate("/profile")}
                   tooltip="Profile"
                 >
-                  <Settings className="h-5 w-5" />
+                  <User className="h-5 w-5" />
                   <span>Profile</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
