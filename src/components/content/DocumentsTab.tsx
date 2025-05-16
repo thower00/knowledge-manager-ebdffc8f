@@ -1,14 +1,12 @@
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, RefreshCw } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { DocumentList } from "./DocumentList";
 import { DocumentSourceConfig } from "@/types/document";
+import { DocumentSourceSelector } from "./DocumentSourceSelector";
+import { DocumentActions } from "./DocumentActions";
+import { DocumentList } from "./DocumentList";
+import { fetchSourceConfig, fetchGoogleDriveDocuments, processSelectedDocuments } from "./documentUtils";
 
 export function DocumentsTab() {
   const [documentSource, setDocumentSource] = useState<string>("google-drive");
@@ -21,46 +19,22 @@ export function DocumentsTab() {
 
   // Make configuration fetching more robust
   useEffect(() => {
-    const fetchSourceConfig = async () => {
-      try {
-        if (documentSource) {
-          const { data, error } = await supabase
-            .from("configurations")
-            .select("value")
-            .eq("key", `${documentSource.replace('-', '_')}_integration`)
-            .maybeSingle();
-
-          if (error) {
-            console.error("Error fetching source config:", error);
-            toast({
-              variant: "destructive",
-              title: "Configuration Error",
-              description: `Could not load ${documentSource} configuration. Please set it up in Configuration Management.`,
-            });
-            setSourceConfig(null);
-            return;
-          }
-
-          if (!data) {
-            toast({
-              variant: "destructive",
-              title: "Missing Configuration",
-              description: `No configuration found for ${documentSource}. Please set it up in Configuration Management.`,
-            });
-            setSourceConfig(null);
-            return;
-          }
-
-          console.log("Retrieved source config:", data);
-          setSourceConfig(data.value as DocumentSourceConfig);
-        }
-      } catch (err) {
-        console.error("Error in fetchSourceConfig:", err);
+    const getSourceConfig = async () => {
+      const result = await fetchSourceConfig(documentSource);
+      
+      if (result.error) {
+        toast({
+          variant: "destructive",
+          title: "Configuration Error",
+          description: result.error,
+        });
         setSourceConfig(null);
+      } else if (result.config) {
+        setSourceConfig(result.config);
       }
     };
 
-    fetchSourceConfig();
+    getSourceConfig();
   }, [documentSource, toast]);
 
   // Function to fetch documents from the selected source
@@ -80,31 +54,8 @@ export function DocumentsTab() {
     try {
       // For Google Drive, call the appropriate edge function
       if (documentSource === "google-drive") {
-        console.log("Fetching Google Drive documents with config:", {
-          client_email: sourceConfig.client_email ? "✓ Present" : "✗ Missing",
-          private_key: sourceConfig.private_key ? "✓ Present" : "✗ Missing",
-          folder_id: sourceConfig.folder_id || "Not specified",
-        });
-        
-        const { data, error } = await supabase.functions.invoke("list-google-drive-files", {
-          body: { 
-            client_email: sourceConfig.client_email,
-            private_key: sourceConfig.private_key,
-            folder_id: sourceConfig.folder_id || "",
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message || "Failed to fetch documents");
-        }
-
-        console.log("Google Drive API response:", data);
-        
-        if (data?.files) {
-          setDocuments(data.files);
-        } else {
-          setDocuments([]);
-        }
+        const files = await fetchGoogleDriveDocuments(sourceConfig);
+        setDocuments(files);
       }
     } catch (err: any) {
       console.error("Error fetching documents:", err);
@@ -149,29 +100,18 @@ export function DocumentsTab() {
     setIsUploading(true);
 
     try {
-      // For Google Drive, call the appropriate edge function
-      if (documentSource === "google-drive") {
-        console.log("Processing selected documents:", selectedDocuments);
-        
-        const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
-          body: { 
-            client_email: sourceConfig?.client_email,
-            private_key: sourceConfig?.private_key,
-            documentIds: selectedDocuments,
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message || "Failed to process documents");
-        }
-
+      const result = await processSelectedDocuments(documentSource, sourceConfig, selectedDocuments);
+      
+      if (result.success) {
         toast({
           title: "Documents Processing Started",
-          description: `Processing ${selectedDocuments.length} document(s). This may take some time.`,
+          description: result.message,
         });
 
         // Reset selection
         setSelectedDocuments([]);
+      } else {
+        throw new Error(result.message);
       }
     } catch (err: any) {
       console.error("Error processing documents:", err);
@@ -190,41 +130,20 @@ export function DocumentsTab() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full sm:w-64">
-              <Select 
-                value={documentSource} 
-                onValueChange={setDocumentSource}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Document Source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="google-drive">Google Drive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <DocumentSourceSelector 
+              documentSource={documentSource}
+              onChange={setDocumentSource}
+              disabled={isLoading}
+            />
             
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={fetchDocuments} 
-                disabled={isLoading || !sourceConfig}
-              >
-                {isLoading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Refresh Documents
-              </Button>
-              
-              <Button 
-                onClick={uploadDocuments} 
-                disabled={isUploading || selectedDocuments.length === 0}
-              >
-                {isUploading ? "Processing..." : "Process Selected"}
-              </Button>
-            </div>
+            <DocumentActions
+              onRefresh={fetchDocuments}
+              onProcess={uploadDocuments}
+              isLoading={isLoading}
+              isUploading={isUploading}
+              selectedCount={selectedDocuments.length}
+              disableRefresh={!sourceConfig}
+            />
           </div>
         </CardContent>
       </Card>
