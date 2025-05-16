@@ -112,11 +112,13 @@ export async function processSelectedDocuments(
         throw new Error("Missing required Google Drive credentials. Please update your configuration.");
       }
       
-      // Add a timeout for the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+      // Create a promise that will reject after the specified timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Request timeout")), 30000); // 30 seconds timeout
+      });
       
-      const response = await supabase.functions.invoke("process-google-drive-documents", {
+      // Create the actual API call promise
+      const apiCallPromise = supabase.functions.invoke("process-google-drive-documents", {
         body: { 
           client_email: sourceConfig.client_email,
           private_key: sourceConfig.private_key,
@@ -125,10 +127,13 @@ export async function processSelectedDocuments(
         headers: {
           "Content-Type": "application/json",
         },
-        signal: controller.signal,
       });
       
-      clearTimeout(timeoutId);
+      // Race the API call against the timeout
+      const response = await Promise.race([
+        apiCallPromise,
+        timeoutPromise
+      ]) as typeof apiCallPromise;
 
       console.log("Edge function response:", response);
 
@@ -148,8 +153,8 @@ export async function processSelectedDocuments(
       if (err instanceof Error) {
         errorMessage = err.message;
         
-        // Check for AbortController timeout
-        if (err.name === 'AbortError') {
+        // Check for timeout
+        if (errorMessage === "Request timeout") {
           errorMessage = "Request timed out. The operation took too long to complete.";
         }
       }
