@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -7,7 +6,11 @@ import { DocumentSourceSelector } from "./DocumentSourceSelector";
 import { DocumentActions } from "./DocumentActions";
 import { DocumentList } from "./DocumentList";
 import { ProcessedDocumentsList } from "./ProcessedDocumentsList";
-import { fetchSourceConfig, fetchGoogleDriveDocuments, processSelectedDocuments } from "./documentUtils";
+import { 
+  fetchSourceConfig,
+  fetchGoogleDriveDocuments, 
+  processSelectedDocuments 
+} from "./documentUtils";
 
 export function DocumentsTab() {
   const [documentSource, setDocumentSource] = useState<string>("google-drive");
