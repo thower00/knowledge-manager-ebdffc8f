@@ -4,10 +4,10 @@ import { User } from "@/types/user";
 
 export async function fetchAllUsers(): Promise<User[]> {
   try {
-    // First, get all users from auth.users via profiles
+    // First, get all users from profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name');
+      .select('id, first_name, last_name, email');
 
     if (profilesError) throw profilesError;
 
@@ -19,36 +19,14 @@ export async function fetchAllUsers(): Promise<User[]> {
 
     if (rolesError) throw rolesError;
 
-    // Now get email addresses for each user
-    const userPromises = profiles.map(async (profile) => {
-      try {
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
-        
-        if (userError) {
-          console.error("Error fetching user details:", userError);
-          return {
-            id: profile.id,
-            email: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
-            isAdmin: userRoles.some(role => role.user_id === profile.id)
-          };
-        }
-        
-        return {
-          id: profile.id,
-          email: userData?.user?.email || "No Email",
-          isAdmin: userRoles.some(role => role.user_id === profile.id)
-        };
-      } catch (error) {
-        console.error(`Error processing user ${profile.id}:`, error);
-        return {
-          id: profile.id,
-          email: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
-          isAdmin: userRoles.some(role => role.user_id === profile.id)
-        };
-      }
-    });
+    // Map profiles and roles to user objects
+    const users: User[] = profiles.map(profile => ({
+      id: profile.id,
+      email: profile.email || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
+      isAdmin: userRoles.some(role => role.user_id === profile.id)
+    }));
 
-    return await Promise.all(userPromises);
+    return users;
   } catch (error) {
     console.error("Error in fetchAllUsers:", error);
     throw error;
