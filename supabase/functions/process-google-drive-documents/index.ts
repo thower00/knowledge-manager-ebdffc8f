@@ -59,13 +59,20 @@ serve(async (req: Request) => {
     
     console.log(`Started processing ${documentIds.length} documents`);
     
+    // Return success response with CORS headers
     return new Response(
       JSON.stringify({ 
         status: "processing", 
         message: `Started processing ${documentIds.length} documents`,
         documentIds
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...cors().headers } }
+      { 
+        status: 200, 
+        headers: { 
+          "Content-Type": "application/json", 
+          ...cors().headers 
+        } 
+      }
     );
   } catch (error) {
     // Log the error for debugging
@@ -82,6 +89,7 @@ serve(async (req: Request) => {
       ? "Network error: Unable to connect to required services. Please check your internet connection and try again."
       : errorMessage;
     
+    // Return error response with CORS headers
     return new Response(
       JSON.stringify({ error: responseMessage }),
       { 
