@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import SignInForm from "@/components/auth/SignInForm";
 import SignUpForm from "@/components/auth/SignUpForm";
@@ -10,7 +10,6 @@ import { debugAuthState } from "@/integrations/supabase/client";
 export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
-  const navigate = useNavigate();
   
   // Debug function to help diagnose auth issues
   useEffect(() => {

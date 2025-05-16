@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 
 interface SignInFormProps {
   onSignUp: () => void;
@@ -16,16 +15,6 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  // Function to clean up auth state from localStorage
-  const cleanupAuthState = () => {
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        localStorage.removeItem(key);
-      }
-    });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +59,8 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
         description: "You've been signed in.",
       });
       
-      // Navigate programmatically instead of reloading the page
-      navigate("/");
+      // Force page reload
+      window.location.href = "/";
     } catch (error: any) {
       console.error('Login error:', error);
       toast({

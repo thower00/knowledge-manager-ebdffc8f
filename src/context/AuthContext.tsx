@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
 interface AuthContextProps {
@@ -12,6 +12,7 @@ interface AuthContextProps {
   signOut: () => Promise<void>;
 }
 
+// Create context with undefined default value
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -20,20 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
-
-  // Function to clean up auth state from localStorage
-  const cleanupAuthState = () => {
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        localStorage.removeItem(key);
-      }
-    });
-    Object.keys(sessionStorage || {}).forEach((key) => {
-      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        sessionStorage.removeItem(key);
-      }
-    });
-  };
 
   // Check for user role
   const checkUserRole = async (userId: string) => {
@@ -76,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       // Force page reload to clear any cached state
-      window.location.href = '/';
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
