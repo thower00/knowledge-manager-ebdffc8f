@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -156,14 +157,4 @@ export function DocumentsTab() {
       />
     </div>
   );
-}
-
-// Types for document files
-export interface DocumentFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  size?: number;
-  createdTime?: string;
-  webViewLink?: string;
 }
