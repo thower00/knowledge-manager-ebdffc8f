@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +66,36 @@ export function ConfigurationManagement() {
   useEffect(() => {
     const fetchGoogleDriveConfig = async () => {
       try {
+        // First check if the configuration entry exists
+        const { data: configExists, error: checkError } = await supabase
+          .from("configurations")
+          .select("id")
+          .eq("key", "google_drive_integration")
+          .maybeSingle();
+          
+        if (checkError) {
+          console.error("Error checking Google Drive config:", checkError);
+          return;
+        }
+        
+        // If the configuration doesn't exist, create it
+        if (!configExists) {
+          console.log("Creating new Google Drive configuration entry");
+          const { error: createError } = await supabase
+            .from("configurations")
+            .insert({ 
+              key: "google_drive_integration", 
+              value: {}, 
+              description: "Google Drive integration settings"
+            });
+            
+          if (createError) {
+            console.error("Error creating Google Drive config:", createError);
+            return;
+          }
+        }
+        
+        // Now fetch the configuration
         const { data, error } = await supabase
           .from("configurations")
           .select("value")
@@ -90,7 +119,7 @@ export function ConfigurationManagement() {
           });
         }
       } catch (error) {
-        console.error("Error fetching Google Drive config:", error);
+        console.error("Error in fetchGoogleDriveConfig:", error);
       }
     };
     
@@ -119,14 +148,10 @@ export function ConfigurationManagement() {
     setIsSaving(true);
     
     try {
-      // Save document processing settings (in a real app)
-      toast({
-        title: "Document Processing settings saved",
-        description: "Your configuration has been saved successfully",
-      });
-      
       // If we're on the Google Drive tab, save that config
       if (activeTab === "google-drive") {
+        console.log("Saving Google Drive configuration");
+        
         // Convert GoogleDriveConfig to Json compatible object
         const jsonValue = {
           client_email: googleDriveConfig.client_email,
@@ -146,7 +171,7 @@ export function ConfigurationManagement() {
           toast({
             variant: "destructive",
             title: "Error saving configuration",
-            description: "There was a problem saving your Google Drive configuration.",
+            description: "There was a problem saving your Google Drive configuration. " + error.message,
           });
           return;
         }
@@ -155,13 +180,19 @@ export function ConfigurationManagement() {
           title: "Google Drive configuration saved",
           description: "Your Google Drive integration settings have been saved successfully",
         });
+      } else {
+        // Save document processing settings (in a real app)
+        toast({
+          title: "Document Processing settings saved",
+          description: "Your configuration has been saved successfully",
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving configuration:", error);
       toast({
         variant: "destructive",
         title: "Error saving configuration",
-        description: "There was a problem saving your configuration.",
+        description: `There was a problem saving your configuration: ${error.message || "Unknown error"}`,
       });
     } finally {
       setIsSaving(false);
