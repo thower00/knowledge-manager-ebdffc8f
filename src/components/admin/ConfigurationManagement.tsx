@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 interface ConfigSettings {
   apiKey: string;
@@ -38,6 +45,12 @@ interface GoogleDriveConfig {
   project_id: string;
   private_key_id: string;
   folder_id: string;
+}
+
+interface VerificationStatus {
+  isVerifying: boolean;
+  isValid?: boolean;
+  message?: string;
 }
 
 export function ConfigurationManagement() {
@@ -60,6 +73,12 @@ export function ConfigurationManagement() {
   
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("document-processing");
+  const [openAIVerification, setOpenAIVerification] = useState<VerificationStatus>({
+    isVerifying: false
+  });
+  const [googleDriveVerification, setGoogleDriveVerification] = useState<VerificationStatus>({
+    isVerifying: false
+  });
   const { toast } = useToast();
 
   // Fetch configurations from the database
@@ -198,6 +217,87 @@ export function ConfigurationManagement() {
       setIsSaving(false);
     }
   };
+  
+  const verifyOpenAIKey = async () => {
+    setOpenAIVerification({ isVerifying: true });
+    
+    try {
+      // Call Edge Function to verify OpenAI API key
+      const response = await fetch('/api/verify-openai-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiKey: config.apiKey }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.valid) {
+        setOpenAIVerification({ 
+          isVerifying: false, 
+          isValid: true, 
+          message: "OpenAI API key is valid" 
+        });
+      } else {
+        setOpenAIVerification({ 
+          isVerifying: false, 
+          isValid: false, 
+          message: data.error || "Invalid OpenAI API key" 
+        });
+      }
+    } catch (error: any) {
+      console.error("Error verifying OpenAI key:", error);
+      setOpenAIVerification({ 
+        isVerifying: false, 
+        isValid: false, 
+        message: `Verification failed: ${error.message || "Unknown error"}` 
+      });
+    }
+  };
+  
+  const verifyGoogleDriveConfig = async () => {
+    setGoogleDriveVerification({ isVerifying: true });
+    
+    try {
+      // Call Edge Function to verify Google Drive configuration
+      const response = await fetch('/api/verify-google-drive', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          client_email: googleDriveConfig.client_email,
+          private_key: googleDriveConfig.private_key,
+          project_id: googleDriveConfig.project_id,
+          folder_id: googleDriveConfig.folder_id,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.valid) {
+        setGoogleDriveVerification({ 
+          isVerifying: false, 
+          isValid: true, 
+          message: "Google Drive configuration is valid" 
+        });
+      } else {
+        setGoogleDriveVerification({ 
+          isVerifying: false, 
+          isValid: false, 
+          message: data.error || "Invalid Google Drive configuration" 
+        });
+      }
+    } catch (error: any) {
+      console.error("Error verifying Google Drive config:", error);
+      setGoogleDriveVerification({ 
+        isVerifying: false, 
+        isValid: false, 
+        message: `Verification failed: ${error.message || "Unknown error"}` 
+      });
+    }
+  };
 
   return (
     <div className="grid gap-6">
@@ -223,14 +323,42 @@ export function ConfigurationManagement() {
             <CardContent className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  name="apiKey"
-                  type="password"
-                  value={config.apiKey}
-                  onChange={handleChange}
-                  placeholder="Enter your API key"
-                />
+                <div className="flex space-x-2">
+                  <Input
+                    id="apiKey"
+                    name="apiKey"
+                    type="password"
+                    value={config.apiKey}
+                    onChange={handleChange}
+                    placeholder="Enter your API key"
+                    className="flex-grow"
+                  />
+                  <Button 
+                    onClick={verifyOpenAIKey} 
+                    disabled={openAIVerification.isVerifying || !config.apiKey}
+                    variant="outline"
+                  >
+                    {openAIVerification.isVerifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying
+                      </>
+                    ) : "Verify Key"}
+                  </Button>
+                </div>
+                {openAIVerification.message && (
+                  <Alert variant={openAIVerification.isValid ? "default" : "destructive"} className="mt-2">
+                    {openAIVerification.isValid ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <AlertTitle>{openAIVerification.isValid ? "Verification Successful" : "Verification Failed"}</AlertTitle>
+                    <AlertDescription>
+                      {openAIVerification.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <p className="text-sm text-muted-foreground">
                   API key for external services like OpenAI or Cohere.
                 </p>
@@ -414,6 +542,40 @@ export function ConfigurationManagement() {
                 <p className="text-sm text-muted-foreground">
                   ID of the Google Drive folder to use for document storage.
                 </p>
+              </div>
+              
+              <div className="mt-4">
+                <Button 
+                  onClick={verifyGoogleDriveConfig} 
+                  disabled={googleDriveVerification.isVerifying || !googleDriveConfig.client_email || !googleDriveConfig.private_key}
+                  variant="outline"
+                >
+                  {googleDriveVerification.isVerifying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying
+                    </>
+                  ) : "Verify Configuration"}
+                </Button>
+                
+                {googleDriveVerification.message && (
+                  <Alert 
+                    variant={googleDriveVerification.isValid ? "default" : "destructive"} 
+                    className="mt-2"
+                  >
+                    {googleDriveVerification.isValid ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <AlertTitle>
+                      {googleDriveVerification.isValid ? "Verification Successful" : "Verification Failed"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {googleDriveVerification.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
