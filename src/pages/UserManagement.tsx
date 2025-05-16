@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -27,7 +29,17 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin, isLoading } = useAuth();
+
+  // If user is not loading and not admin, redirect
+  if (!isLoading && !isAdmin) {
+    toast({
+      variant: "destructive",
+      title: "Access Denied",
+      description: "You don't have permission to access this page.",
+    });
+    return <Navigate to="/" replace />;
+  }
 
   // Fetch all users
   const fetchUsers = async () => {
@@ -50,22 +62,31 @@ export default function UserManagement() {
 
       // Now get email addresses for each user
       const userPromises = profiles.map(async (profile) => {
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
-        
-        if (userError) {
-          console.error("Error fetching user details:", userError);
+        try {
+          const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
+          
+          if (userError) {
+            console.error("Error fetching user details:", userError);
+            return {
+              id: profile.id,
+              email: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
+              isAdmin: userRoles.some(role => role.user_id === profile.id)
+            };
+          }
+          
+          return {
+            id: profile.id,
+            email: userData?.user?.email || "No Email",
+            isAdmin: userRoles.some(role => role.user_id === profile.id)
+          };
+        } catch (error) {
+          console.error(`Error processing user ${profile.id}:`, error);
           return {
             id: profile.id,
             email: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "Unknown User",
             isAdmin: userRoles.some(role => role.user_id === profile.id)
           };
         }
-        
-        return {
-          id: profile.id,
-          email: userData?.user?.email || "No Email",
-          isAdmin: userRoles.some(role => role.user_id === profile.id)
-        };
       });
 
       const resolvedUsers = await Promise.all(userPromises);
@@ -83,8 +104,11 @@ export default function UserManagement() {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    // Only fetch users if the user is an admin
+    if (isAdmin && !isLoading) {
+      fetchUsers();
+    }
+  }, [isAdmin, isLoading]);
 
   const promoteToAdmin = async (userId: string) => {
     try {
@@ -162,6 +186,16 @@ export default function UserManagement() {
     (user) => user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Show loading state while checking authorization
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
+
   return (
     <>
       <Helmet>
@@ -194,7 +228,10 @@ export default function UserManagement() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-4">
-                      Loading users...
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Loading users...
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length > 0 ? (

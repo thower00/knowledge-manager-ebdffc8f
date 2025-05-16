@@ -49,19 +49,6 @@ export default function AppSidebar() {
             {user && (
               <SidebarMenuItem>
                 <SidebarMenuButton 
-                  isActive={isActive("/dashboard")} 
-                  onClick={() => navigate("/dashboard")}
-                  tooltip="Dashboard"
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-
-            {user && (
-              <SidebarMenuItem>
-                <SidebarMenuButton 
                   isActive={isActive("/profile")} 
                   onClick={() => navigate("/profile")}
                   tooltip="Profile"

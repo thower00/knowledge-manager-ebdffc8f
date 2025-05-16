@@ -18,7 +18,14 @@ import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected route component
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
