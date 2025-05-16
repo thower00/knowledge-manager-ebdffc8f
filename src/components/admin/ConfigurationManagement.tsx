@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
 interface ConfigSettings {
   apiKey: string;
@@ -78,7 +79,15 @@ export function ConfigurationManagement() {
         }
         
         if (data && data.value) {
-          setGoogleDriveConfig(data.value as GoogleDriveConfig);
+          // Type assertion to safely convert from Json to GoogleDriveConfig
+          const configData = data.value as Record<string, string>;
+          setGoogleDriveConfig({
+            client_email: configData.client_email || "",
+            private_key: configData.private_key || "",
+            project_id: configData.project_id || "",
+            private_key_id: configData.private_key_id || "",
+            folder_id: configData.folder_id || ""
+          });
         }
       } catch (error) {
         console.error("Error fetching Google Drive config:", error);
@@ -118,9 +127,18 @@ export function ConfigurationManagement() {
       
       // If we're on the Google Drive tab, save that config
       if (activeTab === "google-drive") {
+        // Convert GoogleDriveConfig to Json compatible object
+        const jsonValue = {
+          client_email: googleDriveConfig.client_email,
+          private_key: googleDriveConfig.private_key,
+          project_id: googleDriveConfig.project_id,
+          private_key_id: googleDriveConfig.private_key_id,
+          folder_id: googleDriveConfig.folder_id
+        } as Json;
+        
         const { error } = await supabase
           .from("configurations")
-          .update({ value: googleDriveConfig })
+          .update({ value: jsonValue })
           .eq("key", "google_drive_integration");
           
         if (error) {
