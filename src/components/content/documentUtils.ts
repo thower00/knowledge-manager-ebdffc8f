@@ -99,37 +99,60 @@ export async function processSelectedDocuments(
     return { success: false, message: "Missing configuration" };
   }
   
+  if (selectedDocuments.length === 0) {
+    return { success: false, message: "No documents selected" };
+  }
+  
   if (documentSource === "google-drive") {
     console.log("Processing selected documents:", selectedDocuments);
     
     try {
-      const { data, error } = await supabase.functions.invoke("process-google-drive-documents", {
+      // Validate required fields before making the request
+      if (!sourceConfig.client_email || !sourceConfig.private_key) {
+        throw new Error("Missing required Google Drive credentials. Please update your configuration.");
+      }
+      
+      const response = await supabase.functions.invoke("process-google-drive-documents", {
         body: { 
           client_email: sourceConfig.client_email,
           private_key: sourceConfig.private_key,
           documentIds: selectedDocuments,
         },
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || "Failed to process documents");
+      console.log("Edge function response:", response);
+
+      if (response.error) {
+        console.error("Edge function error:", response.error);
+        throw new Error(response.error.message || "Failed to process documents");
       }
 
-      return { success: true, message: `Processing ${selectedDocuments.length} document(s). This may take some time.` };
+      return { 
+        success: true, 
+        message: `Processing ${selectedDocuments.length} document(s). This may take some time.` 
+      };
     } catch (err) {
-      console.error("Error invoking Edge function:", err);
+      console.error("Error invoking process-google-drive-documents:", err);
       let errorMessage = "Failed to process documents";
       
       if (err instanceof Error) {
         errorMessage = err.message;
       }
       
-      if (errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
+      // Specific error handling for network-related issues
+      if (
+        typeof errorMessage === 'string' && 
+        (errorMessage.includes("NetworkError") || 
+         errorMessage.includes("Failed to fetch") || 
+         errorMessage.includes("network"))
+      ) {
         errorMessage = "Network error: Unable to connect to the Edge function. Please check your internet connection and try again.";
       }
       
-      throw new Error(errorMessage);
+      return { success: false, message: errorMessage };
     }
   }
 
