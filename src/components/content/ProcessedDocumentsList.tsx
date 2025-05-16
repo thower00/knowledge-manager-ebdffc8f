@@ -6,15 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, RefreshCw } from "lucide-react";
-import { fetchProcessedDocuments } from "./documentUtils";
+import { fetchProcessedDocuments } from "./utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface ProcessedDocumentsListProps {
-  onRefresh?: () => void;
-}
-
-export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProps) {
+export function ProcessedDocumentsList() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -26,11 +22,6 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
       const docs = await fetchProcessedDocuments();
       console.log("Fetched processed documents:", docs);
       setDocuments(docs);
-      
-      // Call the parent's refresh handler if provided
-      if (onRefresh) {
-        onRefresh();
-      }
     } catch (err: any) {
       console.error("Error fetching processed documents:", err);
       toast({
@@ -41,7 +32,7 @@ export function ProcessedDocumentsList({ onRefresh }: ProcessedDocumentsListProp
     } finally {
       setIsLoading(false);
     }
-  }, [toast, onRefresh]);
+  }, [toast]);
 
   useEffect(() => {
     // Initial load

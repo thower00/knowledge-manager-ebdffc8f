@@ -1,26 +1,37 @@
-import { useState, useEffect, useCallback } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { DocumentSourceConfig, DocumentFile } from "@/types/document";
+import { DocumentSourceConfig } from "@/types/document";
+import { fetchSourceConfig } from "./utils/configService";
 import { DocumentSourceSelector } from "./DocumentSourceSelector";
 import { DocumentActions } from "./DocumentActions";
 import { DocumentList } from "./DocumentList";
 import { ProcessedDocumentsList } from "./ProcessedDocumentsList";
-import { 
-  fetchSourceConfig,
-  fetchGoogleDriveDocuments, 
-  processSelectedDocuments 
-} from "./documentUtils";
+import { useDocuments } from "./hooks/useDocuments";
 
 export function DocumentsTab() {
   const [documentSource, setDocumentSource] = useState<string>("google-drive");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [documents, setDocuments] = useState<DocumentFile[]>([]);
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [sourceConfig, setSourceConfig] = useState<DocumentSourceConfig | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const { toast } = useToast();
+  
+  const { 
+    documents, 
+    selectedDocuments, 
+    isLoading,
+    isUploading,
+    fetchDocuments,
+    toggleDocumentSelection,
+    toggleSelectAll,
+    uploadDocuments
+  } = useDocuments(documentSource, sourceConfig, () => {
+    // Callback when upload completes to refresh the processed documents list
+    setTimeout(() => {
+      console.log("Triggering refresh of processed documents list");
+      setRefreshKey(prev => prev + 1);
+    }, 2000);
+  });
 
   // Make configuration fetching more robust
   useEffect(() => {
@@ -41,106 +52,6 @@ export function DocumentsTab() {
 
     getSourceConfig();
   }, [documentSource, toast]);
-
-  // Function to fetch documents from the selected source
-  const fetchDocuments = async () => {
-    if (!sourceConfig) {
-      toast({
-        variant: "destructive",
-        title: "Configuration Missing",
-        description: `Please configure ${documentSource} integration first in the Configuration Management page.`,
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    setDocuments([]);
-
-    try {
-      // For Google Drive, call the appropriate edge function
-      if (documentSource === "google-drive") {
-        const files = await fetchGoogleDriveDocuments(sourceConfig);
-        setDocuments(files);
-      }
-    } catch (err: any) {
-      console.error("Error fetching documents:", err);
-      toast({
-        variant: "destructive",
-        title: "Error Fetching Documents",
-        description: err.message || "Failed to load documents from source",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle document selection
-  const toggleDocumentSelection = (documentId: string) => {
-    setSelectedDocuments(prev => 
-      prev.includes(documentId)
-        ? prev.filter(id => id !== documentId)
-        : [...prev, documentId]
-    );
-  };
-
-  // Toggle select all documents
-  const toggleSelectAll = (selectAll: boolean) => {
-    if (selectAll) {
-      setSelectedDocuments(documents.map(doc => doc.id));
-    } else {
-      setSelectedDocuments([]);
-    }
-  };
-
-  // Upload selected documents
-  const uploadDocuments = async () => {
-    if (selectedDocuments.length === 0) {
-      toast({
-        title: "No Documents Selected",
-        description: "Please select at least one document to upload.",
-      });
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      const result = await processSelectedDocuments(documentSource, sourceConfig, selectedDocuments);
-      
-      if (result.success) {
-        toast({
-          title: "Documents Processing Started",
-          description: result.message,
-        });
-
-        // Reset selection
-        setSelectedDocuments([]);
-        
-        // Wait a moment before triggering refresh to allow processing to start
-        setTimeout(() => {
-          console.log("Triggering refresh of processed documents list");
-          setRefreshKey(prev => prev + 1);
-        }, 2000);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (err: any) {
-      console.error("Error processing documents:", err);
-      toast({
-        variant: "destructive",
-        title: "Document Processing Failed",
-        description: err.message || "Failed to process selected documents",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Callback to manually trigger refresh
-  const handleRefresh = useCallback(() => {
-    console.log("Manual refresh triggered");
-    setRefreshKey(prev => prev + 1);
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -176,7 +87,7 @@ export function DocumentsTab() {
       <div className="mt-6">
         <h2 className="text-lg font-medium mb-4">Database Documents</h2>
         {/* Use the key to force re-render when refreshKey changes */}
-        <ProcessedDocumentsList key={refreshKey} onRefresh={handleRefresh} />
+        <ProcessedDocumentsList key={refreshKey} />
       </div>
     </div>
   );
