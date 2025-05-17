@@ -39,21 +39,24 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Execute the delete operation directly without select count
-    const { error } = await supabase
-      .from("processed_documents")
-      .delete()
-      .in("id", documentIds);
+    // Delete each document individually to ensure they're all removed
+    let allSuccessful = true;
     
-    if (error) {
-      console.error("Database error when deleting documents:", error);
-      throw new Error(`Failed to delete documents: ${error.message}`);
+    for (const id of documentIds) {
+      const { error } = await supabase
+        .from("processed_documents")
+        .delete()
+        .eq("id", id);
+      
+      if (error) {
+        console.error(`Error deleting document ID ${id}:`, error);
+        allSuccessful = false;
+      } else {
+        console.log(`Successfully deleted document ID: ${id}`);
+      }
     }
     
-    // Log successful deletion request
-    console.log(`Deletion operation completed for IDs:`, documentIds);
-    
-    // Perform a verification check to confirm documents were deleted
+    // Perform verification to confirm documents were deleted
     const { data: remainingDocs, error: verifyError } = await supabase
       .from("processed_documents")
       .select("id")
@@ -61,17 +64,18 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     if (verifyError) {
       console.error("Error verifying document deletion:", verifyError);
-    } else {
-      const docsRemaining = remainingDocs?.length || 0;
-      if (docsRemaining > 0) {
-        console.warn(`Warning: ${docsRemaining} documents still exist after deletion attempt`);
-        console.warn("Remaining document IDs:", remainingDocs?.map(doc => doc.id));
-        return false;
-      }
-      console.log(`Verification successful: All ${documentIds.length} documents were deleted`);
+      return false;
     }
     
-    return true;
+    const docsRemaining = remainingDocs?.length || 0;
+    if (docsRemaining > 0) {
+      console.warn(`Warning: ${docsRemaining} documents still exist after deletion attempt`);
+      console.warn("Remaining document IDs:", remainingDocs?.map(doc => doc.id));
+      return false;
+    }
+    
+    console.log(`Verification successful: All ${documentIds.length} documents were deleted`);
+    return allSuccessful;
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
     throw err;

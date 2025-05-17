@@ -75,13 +75,13 @@ export function useProcessedDocuments() {
       const idsToDelete = [...selectedDocuments];
       console.log("Attempting to delete IDs:", idsToDelete);
       
+      // Update UI immediately for better UX
+      setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
+      
+      // Perform actual deletion
       const success = await deleteProcessedDocuments(idsToDelete);
       
       if (success) {
-        // Update local state immediately for UI feedback
-        setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
-        setSelectedDocuments([]);
-        
         // Show success message
         toast({
           title: "Success",
@@ -91,14 +91,24 @@ export function useProcessedDocuments() {
         // Close dialog
         setIsDeleteDialogOpen(false);
         
-        // Force a database refresh to ensure UI is in sync with database
-        // Use a slightly longer timeout to ensure the database operation completes
+        // Clear selection
+        setSelectedDocuments([]);
+        
+        // Refresh documents list to ensure synchronization with the database
         setTimeout(() => {
-          console.log("Refreshing document list after deletion");
+          console.log("Refreshing document list after successful deletion");
           loadProcessedDocuments();
-        }, 1500);
+        }, 2000); // Increased timeout to ensure server-side operation completes
       } else {
-        throw new Error("Failed to delete one or more documents");
+        // If deletion failed, restore the documents in the UI and show error
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete one or more documents. Please try again."
+        });
+        
+        // Refresh to get the current state
+        loadProcessedDocuments();
       }
     } catch (err: any) {
       console.error("Error deleting documents:", err);
@@ -108,10 +118,8 @@ export function useProcessedDocuments() {
         description: err.message || "Failed to delete documents."
       });
       
-      // Even if there's an error, refresh to get the current state
-      setTimeout(() => {
-        loadProcessedDocuments();
-      }, 1000);
+      // Refresh to get the current state
+      loadProcessedDocuments();
     } finally {
       setIsDeleting(false);
     }
