@@ -10,12 +10,23 @@ import { fetchProcessedDocuments, deleteProcessedDocuments } from "./utils/docum
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  AlertDialog,
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent,
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 
 export function ProcessedDocumentsList() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
@@ -80,12 +91,20 @@ export function ProcessedDocumentsList() {
     );
   };
 
-  const handleDeleteSelected = async () => {
+  const confirmDeleteSelected = () => {
     if (selectedDocuments.length === 0) {
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document to delete.",
       });
+      return;
+    }
+
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedDocuments.length === 0) {
       return;
     }
 
@@ -107,6 +126,7 @@ export function ProcessedDocumentsList() {
       });
     } finally {
       setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -125,7 +145,7 @@ export function ProcessedDocumentsList() {
               <Button 
                 variant="destructive" 
                 size="sm"
-                onClick={handleDeleteSelected}
+                onClick={confirmDeleteSelected}
                 disabled={isDeleting}
                 className="whitespace-nowrap"
               >
@@ -231,6 +251,37 @@ export function ProcessedDocumentsList() {
           </div>
         )}
       </CardContent>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} from the database.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault(); 
+                handleDeleteSelected();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
