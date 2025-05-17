@@ -5,14 +5,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, RefreshCw } from "lucide-react";
-import { fetchProcessedDocuments } from "./utils/documentDbService";
+import { ExternalLink, RefreshCw, Trash2, Check } from "lucide-react";
+import { fetchProcessedDocuments, deleteProcessedDocuments } from "./utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function ProcessedDocumentsList() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
@@ -22,6 +25,9 @@ export function ProcessedDocumentsList() {
       const docs = await fetchProcessedDocuments();
       console.log("Fetched processed documents:", docs);
       setDocuments(docs);
+      
+      // Clear selection when documents are reloaded
+      setSelectedDocuments([]);
     } catch (err: any) {
       console.error("Error fetching processed documents:", err);
       toast({
@@ -56,6 +62,54 @@ export function ProcessedDocumentsList() {
     }
   };
 
+  const handleSelectAll = () => {
+    if (selectedDocuments.length === documents.length) {
+      // If all are selected, deselect all
+      setSelectedDocuments([]);
+    } else {
+      // Select all
+      setSelectedDocuments(documents.map(doc => doc.id));
+    }
+  };
+
+  const toggleDocumentSelection = (documentId: string) => {
+    setSelectedDocuments(prev => 
+      prev.includes(documentId)
+        ? prev.filter(id => id !== documentId)
+        : [...prev, documentId]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedDocuments.length === 0) {
+      toast({
+        title: "No Documents Selected",
+        description: "Please select at least one document to delete.",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteProcessedDocuments(selectedDocuments);
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedDocuments.length} document(s).`,
+      });
+      // Refresh the list
+      await loadProcessedDocuments();
+    } catch (err: any) {
+      console.error("Error deleting documents:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to delete documents."
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -66,20 +120,38 @@ export function ProcessedDocumentsList() {
               Documents that have been processed and stored in the database
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={loadProcessedDocuments} 
-            className="whitespace-nowrap"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
+          <div className="flex gap-2">
+            {selectedDocuments.length > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="whitespace-nowrap"
+              >
+                {isDeleting ? (
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete Selected ({selectedDocuments.length})
+              </Button>
             )}
-            Refresh
-          </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={loadProcessedDocuments} 
+              className="whitespace-nowrap"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         </div>
         
         {isLoading ? (
@@ -99,6 +171,12 @@ export function ProcessedDocumentsList() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox 
+                      checked={selectedDocuments.length === documents.length && documents.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="hidden md:table-cell">Source</TableHead>
@@ -110,6 +188,12 @@ export function ProcessedDocumentsList() {
               <TableBody>
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedDocuments.includes(doc.id)}
+                        onCheckedChange={() => toggleDocumentSelection(doc.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{doc.title}</TableCell>
                     <TableCell>
                       <span className="text-xs whitespace-nowrap">{doc.mime_type}</span>

@@ -32,3 +32,31 @@ export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
     throw err;
   }
 }
+
+/**
+ * Deletes processed documents from the database
+ */
+export async function deleteProcessedDocuments(documentIds: string[]): Promise<void> {
+  try {
+    if (documentIds.length === 0) {
+      return;
+    }
+    
+    console.log("Deleting processed documents:", documentIds);
+    
+    const { error } = await supabase
+      .from("processed_documents")
+      .delete()
+      .in("id", documentIds);
+    
+    if (error) {
+      console.error("Error deleting processed documents:", error);
+      throw new Error(error.message || "Failed to delete processed documents");
+    }
+    
+    console.log("Successfully deleted documents");
+  } catch (err) {
+    console.error("Exception in deleteProcessedDocuments:", err);
+    throw err;
+  }
+}
