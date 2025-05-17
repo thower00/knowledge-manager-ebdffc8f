@@ -71,18 +71,27 @@ export function useProcessedDocuments() {
 
     setIsDeleting(true);
     try {
-      // Store the IDs being deleted for logging
-      const idsToDelete = [...selectedDocuments];
-      console.log("Attempting to delete document IDs:", idsToDelete);
+      // Create a copy of selected IDs before deletion
+      const idsToDelete = [...selectedDocuments]; 
+      console.log("Starting delete operation for IDs:", idsToDelete);
       
       await deleteProcessedDocuments(idsToDelete);
       
+      // Show toast on successful deletion
       toast({
         title: "Success",
         description: `Deleted ${idsToDelete.length} document(s).`,
       });
       
-      // Explicitly refresh the list to see changes
+      // Update the UI by removing deleted documents from state
+      setDocuments(prevDocs => 
+        prevDocs.filter(doc => !idsToDelete.includes(doc.id))
+      );
+      
+      // Clear selected documents after deletion
+      setSelectedDocuments([]);
+      
+      // Also refresh the full list from database
       await loadProcessedDocuments();
     } catch (err: any) {
       console.error("Error deleting documents:", err);

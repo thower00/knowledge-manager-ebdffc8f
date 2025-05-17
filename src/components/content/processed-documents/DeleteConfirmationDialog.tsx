@@ -26,6 +26,15 @@ export function DeleteConfirmationDialog({
   count,
   isDeleting
 }: DeleteConfirmationDialogProps) {
+  const handleConfirm = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      await onConfirm();
+    } catch (error) {
+      console.error("Error in delete confirmation:", error);
+    }
+  };
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -39,10 +48,7 @@ export function DeleteConfirmationDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction 
-            onClick={(e) => {
-              e.preventDefault(); 
-              onConfirm();
-            }}
+            onClick={handleConfirm}
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >

@@ -39,24 +39,25 @@ export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
 export async function deleteProcessedDocuments(documentIds: string[]): Promise<void> {
   try {
     if (documentIds.length === 0) {
+      console.log("No document IDs provided for deletion");
       return;
     }
     
-    console.log("Deleting processed documents:", documentIds);
+    console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Add more detailed debugging to trace the deletion process
-    const response = await supabase
+    // More explicit deletion with improved error checking
+    const { error, data } = await supabase
       .from("processed_documents")
       .delete()
-      .in("id", documentIds);
+      .in("id", documentIds)
+      .select(); // Ask for the deleted data to confirm deletion
     
-    if (response.error) {
-      console.error("Error deleting processed documents:", response.error);
-      throw new Error(response.error.message || "Failed to delete processed documents");
+    if (error) {
+      console.error("Database error when deleting documents:", error);
+      throw new Error(`Failed to delete documents: ${error.message}`);
     }
     
-    console.log("Delete response:", response);
-    console.log("Successfully deleted documents");
+    console.log("Successfully deleted documents. Response data:", data);
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
     throw err;
