@@ -37,9 +37,9 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
       return false;
     }
     
-    console.log("Deleting documents with IDs:", documentIds);
+    console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Fix: Remove the .select("count") that causes the aggregate function error
+    // Execute the delete operation directly without select count
     const { error } = await supabase
       .from("processed_documents")
       .delete()
@@ -50,17 +50,26 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
       throw new Error(`Failed to delete documents: ${error.message}`);
     }
     
-    // Log successful deletion
-    console.log(`Successfully requested deletion for documents with IDs:`, documentIds);
+    // Log successful deletion request
+    console.log(`Deletion operation completed for IDs:`, documentIds);
     
-    // Verify the deletion by checking if documents still exist
-    const { data: remainingDocs } = await supabase
+    // Perform a verification check to confirm documents were deleted
+    const { data: remainingDocs, error: verifyError } = await supabase
       .from("processed_documents")
       .select("id")
       .in("id", documentIds);
     
-    const deletedCount = documentIds.length - (remainingDocs?.length || 0);
-    console.log(`Verification: ${deletedCount} documents were deleted`);
+    if (verifyError) {
+      console.error("Error verifying document deletion:", verifyError);
+    } else {
+      const docsRemaining = remainingDocs?.length || 0;
+      if (docsRemaining > 0) {
+        console.warn(`Warning: ${docsRemaining} documents still exist after deletion attempt`);
+        console.warn("Remaining document IDs:", remainingDocs?.map(doc => doc.id));
+        return false;
+      }
+      console.log(`Verification successful: All ${documentIds.length} documents were deleted`);
+    }
     
     return true;
   } catch (err) {

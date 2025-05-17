@@ -38,6 +38,7 @@ export default function ContentManagement() {
                   <li>Click "Refresh Documents" to retrieve files from the selected source</li>
                   <li>Select files you want to process by checking the boxes</li>
                   <li>Click "Process Selected" to upload the documents to the database</li>
+                  <li>Use the Database Documents section below to view and manage processed documents</li>
                 </ol>
               </CardContent>
             </Card>

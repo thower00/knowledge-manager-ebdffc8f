@@ -92,11 +92,13 @@ export function useProcessedDocuments() {
         setIsDeleteDialogOpen(false);
         
         // Force a database refresh to ensure UI is in sync with database
+        // Use a slightly longer timeout to ensure the database operation completes
         setTimeout(() => {
+          console.log("Refreshing document list after deletion");
           loadProcessedDocuments();
-        }, 1000);
+        }, 1500);
       } else {
-        throw new Error("Failed to delete documents");
+        throw new Error("Failed to delete one or more documents");
       }
     } catch (err: any) {
       console.error("Error deleting documents:", err);
@@ -105,6 +107,11 @@ export function useProcessedDocuments() {
         title: "Error",
         description: err.message || "Failed to delete documents."
       });
+      
+      // Even if there's an error, refresh to get the current state
+      setTimeout(() => {
+        loadProcessedDocuments();
+      }, 1000);
     } finally {
       setIsDeleting(false);
     }
