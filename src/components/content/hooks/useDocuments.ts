@@ -90,7 +90,7 @@ export function useDocuments(
         // Reset selection
         setSelectedDocuments([]);
         
-        // Call the success callback immediately
+        // Call the success callback if provided
         if (onUploadSuccess) {
           console.log("Calling onUploadSuccess callback");
           onUploadSuccess();

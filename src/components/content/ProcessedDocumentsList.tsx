@@ -34,21 +34,12 @@ export function ProcessedDocumentsList() {
     }
   }, [toast]);
 
+  // Load documents on initial render only
   useEffect(() => {
-    // Initial load
     loadProcessedDocuments();
     
-    // Set up a refresh interval (every 2 seconds)
-    const intervalId = setInterval(() => {
-      // Only auto-refresh if there are processing documents
-      if (documents.some(doc => doc.status === 'processing')) {
-        console.log("Auto-refreshing documents list due to processing status");
-        loadProcessedDocuments();
-      }
-    }, 2000); // Reduced interval for more responsive updates
-    
-    return () => clearInterval(intervalId);
-  }, [loadProcessedDocuments, documents]);
+    // No automatic refresh by default
+  }, [loadProcessedDocuments]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

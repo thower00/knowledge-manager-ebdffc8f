@@ -26,16 +26,11 @@ export function DocumentsTab() {
     toggleSelectAll,
     uploadDocuments
   } = useDocuments(documentSource, sourceConfig, () => {
-    // Callback when upload completes to refresh the processed documents list
+    // Callback when upload completes
     console.log("Upload success callback triggered");
-    // Refresh immediately and then again after a delay to catch status changes
-    setRefreshKey(prev => prev + 1);
     
-    // Additional refresh after a short delay to catch status updates
-    setTimeout(() => {
-      console.log("Triggering delayed refresh of processed documents list");
-      setRefreshKey(prev => prev + 1);
-    }, 3000);
+    // Force refresh the processed documents list
+    setRefreshKey(prev => prev + 1);
   });
 
   // Make configuration fetching more robust
@@ -71,7 +66,13 @@ export function DocumentsTab() {
             
             <DocumentActions
               onRefresh={fetchDocuments}
-              onProcess={uploadDocuments}
+              onProcess={async () => {
+                await uploadDocuments();
+                // Force refresh the processed documents list immediately after processing
+                setTimeout(() => {
+                  setRefreshKey(prev => prev + 1);
+                }, 500);
+              }}
               isLoading={isLoading}
               isUploading={isUploading}
               selectedCount={selectedDocuments.length}
