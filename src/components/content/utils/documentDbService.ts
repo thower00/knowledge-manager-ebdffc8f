@@ -39,6 +39,7 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Deleting documents with IDs:", documentIds);
     
+    // Use the `in` filter with the array of IDs
     const { error } = await supabase
       .from("processed_documents")
       .delete()
