@@ -90,6 +90,11 @@ export function useProcessedDocuments() {
         
         // Close dialog
         setIsDeleteDialogOpen(false);
+        
+        // Force a database refresh to ensure UI is in sync with database
+        setTimeout(() => {
+          loadProcessedDocuments();
+        }, 500);
       } else {
         throw new Error("Failed to delete documents");
       }
@@ -103,7 +108,7 @@ export function useProcessedDocuments() {
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedDocuments, toast]);
+  }, [selectedDocuments, toast, loadProcessedDocuments]);
 
   return {
     documents,

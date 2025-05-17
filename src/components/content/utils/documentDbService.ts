@@ -39,18 +39,20 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Deleting documents with IDs:", documentIds);
     
-    // Use the `in` filter with the array of IDs
-    const { error } = await supabase
+    // Make sure we're using the correct table name and query format
+    const { error, count } = await supabase
       .from("processed_documents")
       .delete()
-      .in("id", documentIds);
+      .in("id", documentIds)
+      .select("count");
     
     if (error) {
       console.error("Database error when deleting documents:", error);
       throw new Error(`Failed to delete documents: ${error.message}`);
     }
     
-    console.log("Successfully deleted documents with IDs:", documentIds);
+    // Log deletion count for verification
+    console.log(`Successfully deleted ${count} documents with IDs:`, documentIds);
     return true;
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
