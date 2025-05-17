@@ -78,7 +78,7 @@ export function useProcessedDocuments() {
       const success = await deleteProcessedDocuments(idsToDelete);
       
       if (success) {
-        // Update local state immediately for quick UI feedback
+        // Update local state immediately for UI feedback
         setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
         setSelectedDocuments([]);
         
@@ -90,9 +90,6 @@ export function useProcessedDocuments() {
         
         // Close dialog
         setIsDeleteDialogOpen(false);
-        
-        // Refresh the data from database to ensure we're in sync
-        await loadProcessedDocuments();
       } else {
         throw new Error("Failed to delete documents");
       }
@@ -106,7 +103,7 @@ export function useProcessedDocuments() {
     } finally {
       setIsDeleting(false);
     }
-  }, [loadProcessedDocuments, selectedDocuments, toast]);
+  }, [selectedDocuments, toast]);
 
   return {
     documents,
