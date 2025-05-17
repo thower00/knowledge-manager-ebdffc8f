@@ -1,4 +1,3 @@
-
 import { RefreshCw, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -33,7 +32,7 @@ export function DeleteConfirmationDialog({
     
     try {
       await onConfirm();
-      // onConfirm will handle closing the dialog on success
+      // The onConfirm function will handle closing the dialog on success
     } catch (error) {
       console.error("Error in delete confirmation:", error);
       // Keep dialog open on error so user can try again

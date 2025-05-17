@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,7 +10,6 @@ export function useProcessedDocuments() {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const refreshCounter = useRef(0);
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
@@ -67,35 +66,36 @@ export function useProcessedDocuments() {
 
   const handleDeleteSelected = useCallback(async () => {
     if (selectedDocuments.length === 0) {
+      setIsDeleteDialogOpen(false);
       return;
     }
 
     setIsDeleting(true);
     try {
-      // Create a copy of selected IDs before deletion
-      const idsToDelete = [...selectedDocuments]; 
-      console.log("Starting delete operation for IDs:", idsToDelete);
+      const idsToDelete = [...selectedDocuments];
+      console.log("Attempting to delete IDs:", idsToDelete);
       
-      await deleteProcessedDocuments(idsToDelete);
+      const success = await deleteProcessedDocuments(idsToDelete);
       
-      // Force UI update by incrementing counter
-      refreshCounter.current += 1;
-      
-      // Update local state first for immediate UI feedback
-      setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
-      setSelectedDocuments([]);
-      
-      // Always close dialog on successful deletion
-      setIsDeleteDialogOpen(false);
-      
-      // Show toast on successful deletion
-      toast({
-        title: "Success",
-        description: `Deleted ${idsToDelete.length} document(s).`,
-      });
-      
-      // Then refresh from database to ensure data consistency
-      await loadProcessedDocuments();
+      if (success) {
+        // Update local state immediately for quick UI feedback
+        setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
+        setSelectedDocuments([]);
+        
+        // Show success message
+        toast({
+          title: "Success",
+          description: `Deleted ${idsToDelete.length} document(s).`,
+        });
+        
+        // Close dialog
+        setIsDeleteDialogOpen(false);
+        
+        // Refresh the data from database to ensure we're in sync
+        await loadProcessedDocuments();
+      } else {
+        throw new Error("Failed to delete documents");
+      }
     } catch (err: any) {
       console.error("Error deleting documents:", err);
       toast({
@@ -103,7 +103,6 @@ export function useProcessedDocuments() {
         title: "Error",
         description: err.message || "Failed to delete documents."
       });
-      // Don't close dialog on error
     } finally {
       setIsDeleting(false);
     }
@@ -121,6 +120,5 @@ export function useProcessedDocuments() {
     confirmDeleteSelected,
     handleDeleteSelected,
     setIsDeleteDialogOpen,
-    refreshCounter: refreshCounter.current // Expose the counter to components
   };
 }
