@@ -71,12 +71,18 @@ export function useProcessedDocuments() {
 
     setIsDeleting(true);
     try {
-      await deleteProcessedDocuments(selectedDocuments);
+      // Store the IDs being deleted for logging
+      const idsToDelete = [...selectedDocuments];
+      console.log("Attempting to delete document IDs:", idsToDelete);
+      
+      await deleteProcessedDocuments(idsToDelete);
+      
       toast({
         title: "Success",
-        description: `Deleted ${selectedDocuments.length} document(s).`,
+        description: `Deleted ${idsToDelete.length} document(s).`,
       });
-      // Refresh the list
+      
+      // Explicitly refresh the list to see changes
       await loadProcessedDocuments();
     } catch (err: any) {
       console.error("Error deleting documents:", err);

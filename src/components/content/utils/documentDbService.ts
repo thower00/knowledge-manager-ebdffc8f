@@ -44,17 +44,18 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<v
     
     console.log("Deleting processed documents:", documentIds);
     
-    // Using the "in" filter to delete multiple documents in one go
-    const { error } = await supabase
+    // Add more detailed debugging to trace the deletion process
+    const response = await supabase
       .from("processed_documents")
       .delete()
       .in("id", documentIds);
     
-    if (error) {
-      console.error("Error deleting processed documents:", error);
-      throw new Error(error.message || "Failed to delete processed documents");
+    if (response.error) {
+      console.error("Error deleting processed documents:", response.error);
+      throw new Error(response.error.message || "Failed to delete processed documents");
     }
     
+    console.log("Delete response:", response);
     console.log("Successfully deleted documents");
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
