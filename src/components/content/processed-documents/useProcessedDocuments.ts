@@ -94,7 +94,7 @@ export function useProcessedDocuments() {
         // Force a database refresh to ensure UI is in sync with database
         setTimeout(() => {
           loadProcessedDocuments();
-        }, 500);
+        }, 1000);
       } else {
         throw new Error("Failed to delete documents");
       }
