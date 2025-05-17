@@ -1,3 +1,4 @@
+
 import { RefreshCw, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -27,9 +28,12 @@ export function DeleteConfirmationDialog({
 }: DeleteConfirmationDialogProps) {
   const handleConfirm = async (e: React.MouseEvent) => {
     e.preventDefault();
+    
+    if (isDeleting) return; // Prevent multiple clicks
+    
     try {
       await onConfirm();
-      // Dialog closing is now handled in the onConfirm function (handleDeleteSelected)
+      // onConfirm will handle closing the dialog on success
     } catch (error) {
       console.error("Error in delete confirmation:", error);
       // Keep dialog open on error so user can try again
@@ -37,7 +41,12 @@ export function DeleteConfirmationDialog({
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={(isOpen) => {
+      // Only allow closing if not in the middle of deleting
+      if (!isDeleting || !isOpen) {
+        onOpenChange(isOpen);
+      }
+    }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>

@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentsListHeader } from "./processed-documents/DocumentsListHeader";
 import { DocumentsTable } from "./processed-documents/DocumentsTable";
@@ -9,6 +9,9 @@ import { DeleteConfirmationDialog } from "./processed-documents/DeleteConfirmati
 import { useProcessedDocuments } from "./processed-documents/useProcessedDocuments";
 
 export function ProcessedDocumentsList() {
+  // Add a local state to force re-renders
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
+  
   const {
     documents,
     isLoading,
@@ -20,23 +23,29 @@ export function ProcessedDocumentsList() {
     toggleDocumentSelection,
     confirmDeleteSelected,
     handleDeleteSelected,
-    setIsDeleteDialogOpen
+    setIsDeleteDialogOpen,
+    refreshCounter
   } = useProcessedDocuments();
 
-  // Load documents on initial render only
+  // Handle both initial load and refresh operations
   useEffect(() => {
-    // Immediate load on component mount
+    console.log("Loading documents (effect trigger)");
     loadProcessedDocuments();
-    
-    // No automatic refresh interval by default
-  }, [loadProcessedDocuments]);
+  }, [loadProcessedDocuments, localRefreshKey, refreshCounter]);
+  
+  // Function to force refresh from UI
+  const handleManualRefresh = () => {
+    console.log("Manual refresh triggered");
+    setLocalRefreshKey(prev => prev + 1);
+    loadProcessedDocuments();
+  };
 
   return (
     <Card>
       <CardContent className="p-0">
         <DocumentsListHeader
           selectedCount={selectedDocuments.length}
-          onRefresh={loadProcessedDocuments}
+          onRefresh={handleManualRefresh}
           onDelete={confirmDeleteSelected}
           isLoading={isLoading}
           isDeleting={isDeleting}

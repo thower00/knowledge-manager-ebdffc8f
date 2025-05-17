@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,6 +10,7 @@ export function useProcessedDocuments() {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const refreshCounter = useRef(0);
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
@@ -77,16 +78,21 @@ export function useProcessedDocuments() {
       
       await deleteProcessedDocuments(idsToDelete);
       
+      // Force UI update by incrementing counter
+      refreshCounter.current += 1;
+      
+      // Update local state first for immediate UI feedback
+      setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
+      setSelectedDocuments([]);
+      
+      // Always close dialog on successful deletion
+      setIsDeleteDialogOpen(false);
+      
       // Show toast on successful deletion
       toast({
         title: "Success",
         description: `Deleted ${idsToDelete.length} document(s).`,
       });
-      
-      // Update local state first for immediate UI feedback
-      setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
-      setSelectedDocuments([]);
-      setIsDeleteDialogOpen(false);
       
       // Then refresh from database to ensure data consistency
       await loadProcessedDocuments();
@@ -97,6 +103,7 @@ export function useProcessedDocuments() {
         title: "Error",
         description: err.message || "Failed to delete documents."
       });
+      // Don't close dialog on error
     } finally {
       setIsDeleting(false);
     }
@@ -113,6 +120,7 @@ export function useProcessedDocuments() {
     toggleDocumentSelection,
     confirmDeleteSelected,
     handleDeleteSelected,
-    setIsDeleteDialogOpen
+    setIsDeleteDialogOpen,
+    refreshCounter: refreshCounter.current // Expose the counter to components
   };
 }

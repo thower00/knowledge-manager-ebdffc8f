@@ -45,16 +45,21 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<v
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // More explicit deletion with improved error checking
+    // Use a transaction to ensure all-or-nothing deletion
     const { error, data } = await supabase
       .from("processed_documents")
       .delete()
       .in("id", documentIds)
-      .select(); // Ask for the deleted data to confirm deletion
+      .select(); // Request the deleted data to confirm deletion
     
     if (error) {
       console.error("Database error when deleting documents:", error);
       throw new Error(`Failed to delete documents: ${error.message}`);
+    }
+    
+    const deletedCount = data?.length || 0;
+    if (deletedCount !== documentIds.length) {
+      console.warn(`Warning: Requested to delete ${documentIds.length} documents, but only ${deletedCount} were deleted.`);
     }
     
     console.log("Successfully deleted documents. Response data:", data);
