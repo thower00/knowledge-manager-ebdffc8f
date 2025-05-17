@@ -83,15 +83,12 @@ export function useProcessedDocuments() {
         description: `Deleted ${idsToDelete.length} document(s).`,
       });
       
-      // Update the UI by removing deleted documents from state
-      setDocuments(prevDocs => 
-        prevDocs.filter(doc => !idsToDelete.includes(doc.id))
-      );
-      
-      // Clear selected documents after deletion
+      // Update local state first for immediate UI feedback
+      setDocuments(prevDocs => prevDocs.filter(doc => !idsToDelete.includes(doc.id)));
       setSelectedDocuments([]);
+      setIsDeleteDialogOpen(false);
       
-      // Also refresh the full list from database
+      // Then refresh from database to ensure data consistency
       await loadProcessedDocuments();
     } catch (err: any) {
       console.error("Error deleting documents:", err);
@@ -102,7 +99,6 @@ export function useProcessedDocuments() {
       });
     } finally {
       setIsDeleting(false);
-      setIsDeleteDialogOpen(false);
     }
   }, [loadProcessedDocuments, selectedDocuments, toast]);
 

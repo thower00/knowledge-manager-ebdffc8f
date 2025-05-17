@@ -25,8 +25,10 @@ export function ProcessedDocumentsList() {
 
   // Load documents on initial render only
   useEffect(() => {
+    // Immediate load on component mount
     loadProcessedDocuments();
-    // No automatic refresh by default
+    
+    // No automatic refresh interval by default
   }, [loadProcessedDocuments]);
 
   return (
