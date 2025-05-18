@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
@@ -78,6 +77,9 @@ export function useProcessedDocuments() {
       // Close dialog immediately for better UX
       setIsDeleteDialogOpen(false);
       
+      // Keep track of current docs to restore if needed
+      const previousDocs = [...documents];
+      
       // Optimistically update UI first by removing the selected documents
       setDocuments(prev => prev.filter(doc => !idsToDelete.includes(doc.id)));
       
@@ -93,17 +95,20 @@ export function useProcessedDocuments() {
           description: `Deleted ${idsToDelete.length} document(s).`,
         });
       } else {
-        // Show error and reload to get accurate state
+        // Show error and restore previous state
         toast({
           variant: "destructive",
           title: "Error",
           description: "Failed to delete one or more documents. Please try again."
         });
         
-        // Wait a moment before refreshing to ensure the toast is visible
+        // Restore previous documents state
+        setDocuments(previousDocs);
+        
+        // Reload to get accurate state
         setTimeout(() => {
           loadProcessedDocuments();
-        }, 2000);
+        }, 1000);
       }
     } catch (err: any) {
       console.error("Error deleting documents:", err);
@@ -112,9 +117,6 @@ export function useProcessedDocuments() {
         title: "Error",
         description: err.message || "Failed to delete documents."
       });
-      
-      // Close dialog if there was an exception
-      setIsDeleteDialogOpen(false);
       
       // Reload data to get accurate state
       loadProcessedDocuments();

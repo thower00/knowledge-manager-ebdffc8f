@@ -9,6 +9,7 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import { useRef } from "react";
 
 interface DeleteConfirmationDialogProps {
   open: boolean;
@@ -25,15 +26,24 @@ export function DeleteConfirmationDialog({
   count,
   isDeleting
 }: DeleteConfirmationDialogProps) {
+  const deleteRequestedRef = useRef(false);
+
   const handleConfirm = async () => {
-    if (isDeleting) return; // Prevent multiple clicks
+    // Prevent double-clicks or multiple submissions
+    if (isDeleting || deleteRequestedRef.current) return;
     
     try {
+      deleteRequestedRef.current = true;
       await onConfirm();
       // The dialog will be closed in the onConfirm function
     } catch (error) {
       console.error("Error in delete confirmation:", error);
       // Keep dialog open on error so user can try again
+    } finally {
+      // Reset the flag after completion - delayed to prevent spam clicks
+      setTimeout(() => {
+        deleteRequestedRef.current = false;
+      }, 1000);
     }
   };
 
@@ -42,6 +52,10 @@ export function DeleteConfirmationDialog({
       // Only allow closing if not in the middle of deleting
       if (!isDeleting || !isOpen) {
         onOpenChange(isOpen);
+        // Reset the request flag when dialog closes
+        if (!isOpen) {
+          deleteRequestedRef.current = false;
+        }
       }
     }}>
       <AlertDialogContent>
@@ -56,7 +70,7 @@ export function DeleteConfirmationDialog({
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleConfirm}
-            disabled={isDeleting}
+            disabled={isDeleting || deleteRequestedRef.current}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? (
