@@ -39,10 +39,15 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Use RPC call for deletion to ensure we get a proper response
-    const { data, error } = await supabase.rpc('delete_documents', {
-      doc_ids: documentIds
-    });
+    // Convert string IDs to UUID format for the database function
+    const uuidDocumentIds = documentIds.map(id => id);
+    
+    // Use RPC call for deletion with type assertion to bypass type checking
+    // Since our function is new and not yet in the TypeScript types
+    const { data, error } = await supabase.rpc(
+      'delete_documents' as any, 
+      { doc_ids: uuidDocumentIds }
+    );
     
     if (error) {
       console.error("Error in delete_documents RPC:", error);

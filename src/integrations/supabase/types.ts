@@ -134,6 +134,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_documents: {
+        Args: { doc_ids: string[] }
+        Returns: boolean
+      }
       has_role: {
         Args: { user_id: string; role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
