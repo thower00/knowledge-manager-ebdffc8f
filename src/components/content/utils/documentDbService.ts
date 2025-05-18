@@ -74,8 +74,9 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
         const { error: retryError } = await supabase
           .from("processed_documents")
           .delete()
-          .eq("id", docId)
-          .is("id", docId); // Add additional constraint to ensure deletion
+          .eq("id", docId);
+        
+        // Fixed line - removed the .is(docId) call that was causing the error
         
         if (retryError) {
           console.error(`Error on retry deletion for document ${docId}:`, retryError);
