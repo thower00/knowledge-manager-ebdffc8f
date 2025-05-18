@@ -25,14 +25,12 @@ export function DeleteConfirmationDialog({
   count,
   isDeleting
 }: DeleteConfirmationDialogProps) {
-  const handleConfirm = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    
+  const handleConfirm = async () => {
     if (isDeleting) return; // Prevent multiple clicks
     
     try {
       await onConfirm();
-      // The onConfirm function will handle closing the dialog on success
+      // The dialog will be closed in the onConfirm function
     } catch (error) {
       console.error("Error in delete confirmation:", error);
       // Keep dialog open on error so user can try again
