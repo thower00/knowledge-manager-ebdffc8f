@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,6 +10,7 @@ export function useProcessedDocuments() {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const deleteAttemptRef = useRef(0); // To track delete attempts
   const { toast } = useToast();
 
   const loadProcessedDocuments = useCallback(async () => {
@@ -71,6 +72,9 @@ export function useProcessedDocuments() {
     }
 
     setIsDeleting(true);
+    deleteAttemptRef.current += 1;
+    const currentAttempt = deleteAttemptRef.current;
+    
     try {
       const idsToDelete = [...selectedDocuments];
       console.log("Attempting to delete IDs:", idsToDelete);
@@ -89,6 +93,9 @@ export function useProcessedDocuments() {
       
       // Perform the actual deletion
       const success = await deleteProcessedDocuments(idsToDelete);
+      
+      // If this isn't the most recent deletion attempt, ignore the result
+      if (currentAttempt !== deleteAttemptRef.current) return;
       
       if (success) {
         toast({
@@ -113,6 +120,9 @@ export function useProcessedDocuments() {
         await loadProcessedDocuments();
       }
     } catch (err: any) {
+      // Only handle errors for the current attempt
+      if (currentAttempt !== deleteAttemptRef.current) return;
+      
       console.error("Error deleting documents:", err);
       toast({
         variant: "destructive",
@@ -123,7 +133,9 @@ export function useProcessedDocuments() {
       // Reload data to get accurate state
       await loadProcessedDocuments();
     } finally {
-      setIsDeleting(false);
+      if (currentAttempt === deleteAttemptRef.current) {
+        setIsDeleting(false);
+      }
     }
   }, [selectedDocuments, documents, toast, loadProcessedDocuments]);
 

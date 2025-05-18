@@ -39,18 +39,20 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Direct delete approach with explicit logging
-    const { error } = await supabase
-      .from("processed_documents")
-      .delete()
-      .in("id", documentIds);
+    // Use RPC call for deletion to ensure we get a proper response
+    const { data, error } = await supabase.rpc('delete_documents', {
+      doc_ids: documentIds
+    });
     
     if (error) {
-      console.error("Error deleting documents:", error);
+      console.error("Error in delete_documents RPC:", error);
       return false;
     }
     
-    // Verify the deletion by checking if the documents still exist
+    console.log("RPC delete response:", data);
+    
+    // If the RPC call is successful, we'll assume deletion worked
+    // Let's double-check by querying for the documents anyway
     const { data: remainingDocs } = await supabase
       .from("processed_documents")
       .select("id")
