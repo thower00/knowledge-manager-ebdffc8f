@@ -39,14 +39,11 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Convert string IDs to UUID format for the database function
-    const uuidDocumentIds = documentIds.map(id => id);
-    
-    // Use RPC call for deletion with type assertion to bypass type checking
-    // Since our function is new and not yet in the TypeScript types
+    // Call our database function to delete documents
+    // Type assertion is needed since the function might not be in TypeScript types yet
     const { data, error } = await supabase.rpc(
-      'delete_documents' as any, 
-      { doc_ids: uuidDocumentIds }
+      'delete_documents',
+      { doc_ids: documentIds }
     );
     
     if (error) {
@@ -54,22 +51,16 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
       return false;
     }
     
-    console.log("RPC delete response:", data);
+    console.log("Delete operation response:", data);
     
-    // If the RPC call is successful, we'll assume deletion worked
-    // Let's double-check by querying for the documents anyway
-    const { data: remainingDocs } = await supabase
-      .from("processed_documents")
-      .select("id")
-      .in("id", documentIds);
-    
-    if (remainingDocs && remainingDocs.length > 0) {
-      console.error(`${remainingDocs.length} documents still exist after deletion attempt`);
+    // Verify deletion was successful by checking the returned boolean
+    if (data === true) {
+      console.log(`Successfully deleted ${documentIds.length} documents`);
+      return true;
+    } else {
+      console.error("Delete operation did not report success");
       return false;
     }
-    
-    console.log(`Successfully deleted ${documentIds.length} documents`);
-    return true;
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
     return false;
