@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+
+import { useState, useCallback, useEffect } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
@@ -94,6 +95,9 @@ export function useProcessedDocuments() {
           title: "Success",
           description: `Deleted ${idsToDelete.length} document(s).`,
         });
+        
+        // Ensure we have the latest data
+        await loadProcessedDocuments();
       } else {
         // Show error and restore previous state
         toast({
@@ -106,9 +110,7 @@ export function useProcessedDocuments() {
         setDocuments(previousDocs);
         
         // Reload to get accurate state
-        setTimeout(() => {
-          loadProcessedDocuments();
-        }, 1000);
+        await loadProcessedDocuments();
       }
     } catch (err: any) {
       console.error("Error deleting documents:", err);
@@ -119,7 +121,7 @@ export function useProcessedDocuments() {
       });
       
       // Reload data to get accurate state
-      loadProcessedDocuments();
+      await loadProcessedDocuments();
     } finally {
       setIsDeleting(false);
     }

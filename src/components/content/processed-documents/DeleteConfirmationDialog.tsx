@@ -1,3 +1,4 @@
+
 import { RefreshCw, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -35,15 +36,11 @@ export function DeleteConfirmationDialog({
     try {
       deleteRequestedRef.current = true;
       await onConfirm();
-      // The dialog will be closed in the onConfirm function
+      // Dialog will be closed in the onConfirm function
     } catch (error) {
       console.error("Error in delete confirmation:", error);
-      // Keep dialog open on error so user can try again
-    } finally {
-      // Reset the flag after completion - delayed to prevent spam clicks
-      setTimeout(() => {
-        deleteRequestedRef.current = false;
-      }, 1000);
+      // Reset flag if there's an error
+      deleteRequestedRef.current = false;
     }
   };
 

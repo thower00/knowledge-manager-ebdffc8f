@@ -28,7 +28,7 @@ export async function fetchProcessedDocuments(): Promise<ProcessedDocument[]> {
 }
 
 /**
- * Deletes processed documents from the database with improved reliability
+ * Deletes processed documents from the database
  */
 export async function deleteProcessedDocuments(documentIds: string[]): Promise<boolean> {
   try {
@@ -39,34 +39,25 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Delete documents one by one to ensure better tracing of failures
-    const results = await Promise.all(
-      documentIds.map(async (id) => {
-        try {
-          const { error } = await supabase
-            .from("processed_documents")
-            .delete()
-            .eq("id", id);
-          
-          if (error) {
-            console.error(`Error deleting document ${id}:`, error);
-            return { id, success: false, error: error.message };
-          }
-          
-          return { id, success: true };
-        } catch (err) {
-          console.error(`Exception deleting document ${id}:`, err);
-          return { id, success: false, error: String(err) };
-        }
-      })
-    );
+    // Direct delete approach with explicit logging
+    const { error } = await supabase
+      .from("processed_documents")
+      .delete()
+      .in("id", documentIds);
     
-    // Check results
-    const failures = results.filter(r => !r.success);
+    if (error) {
+      console.error("Error deleting documents:", error);
+      return false;
+    }
     
-    if (failures.length > 0) {
-      const failedIds = failures.map(f => f.id);
-      console.error("Failed to delete documents:", failedIds, failures);
+    // Verify the deletion by checking if the documents still exist
+    const { data: remainingDocs } = await supabase
+      .from("processed_documents")
+      .select("id")
+      .in("id", documentIds);
+    
+    if (remainingDocs && remainingDocs.length > 0) {
+      console.error(`${remainingDocs.length} documents still exist after deletion attempt`);
       return false;
     }
     
