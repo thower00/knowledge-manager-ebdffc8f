@@ -94,13 +94,12 @@ export function useProcessedDocuments() {
         // Clear selection
         setSelectedDocuments([]);
         
-        // Refresh documents list to ensure synchronization with the database
+        // Force refresh to ensure synchronization with the database
         setTimeout(() => {
-          console.log("Refreshing document list after successful deletion");
           loadProcessedDocuments();
-        }, 2000); // Increased timeout to ensure server-side operation completes
+        }, 500); // Shorter timeout since we're using a more efficient delete operation
       } else {
-        // If deletion failed, restore the documents in the UI and show error
+        // If deletion failed, show error and refresh to get current state
         toast({
           variant: "destructive",
           title: "Error",

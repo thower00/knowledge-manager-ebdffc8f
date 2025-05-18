@@ -39,21 +39,15 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     
     console.log("Attempting to delete documents with IDs:", documentIds);
     
-    // Delete each document individually to ensure they're all removed
-    let allSuccessful = true;
+    // Delete all documents at once (more efficient than one-by-one)
+    const { error } = await supabase
+      .from("processed_documents")
+      .delete()
+      .in("id", documentIds);
     
-    for (const id of documentIds) {
-      const { error } = await supabase
-        .from("processed_documents")
-        .delete()
-        .eq("id", id);
-      
-      if (error) {
-        console.error(`Error deleting document ID ${id}:`, error);
-        allSuccessful = false;
-      } else {
-        console.log(`Successfully deleted document ID: ${id}`);
-      }
+    if (error) {
+      console.error("Error deleting documents:", error);
+      return false;
     }
     
     // Perform verification to confirm documents were deleted
@@ -75,7 +69,7 @@ export async function deleteProcessedDocuments(documentIds: string[]): Promise<b
     }
     
     console.log(`Verification successful: All ${documentIds.length} documents were deleted`);
-    return allSuccessful;
+    return true;
   } catch (err) {
     console.error("Exception in deleteProcessedDocuments:", err);
     throw err;
