@@ -23,29 +23,28 @@ export function useChunkingProcessor(documents: ProcessedDocument[]) {
     try {
       // This would call an API to perform the actual chunking
       // For now, we'll simulate the process
+      console.log(`Processing ${selectedDocuments.length} documents for chunking`);
       
-      setTimeout(() => {
-        // Generate mock results
-        const results = selectedDocuments.map(docId => {
-          const doc = documents.find(d => d.id === docId);
-          return {
-            documentId: docId,
-            documentTitle: doc?.title || "Unknown document",
-            chunkCount: Math.floor(Math.random() * 10) + 5,
-            success: true,
-          };
-        });
-        
-        setChunkingResults(results);
-        
-        toast({
-          title: "Chunking Complete",
-          description: `Successfully chunked ${results.length} document(s)`,
-        });
-        
-        setIsProcessing(false);
-      }, 2000);
+      // Simulate API call with delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
+      // Generate mock results
+      const results = selectedDocuments.map(docId => {
+        const doc = documents.find(d => d.id === docId);
+        return {
+          documentId: docId,
+          documentTitle: doc?.title || "Unknown document",
+          chunkCount: Math.floor(Math.random() * 10) + 5,
+          success: true,
+        };
+      });
+      
+      setChunkingResults(results);
+      
+      toast({
+        title: "Chunking Complete",
+        description: `Successfully chunked ${results.length} document(s)`,
+      });
     } catch (err) {
       console.error("Error chunking documents:", err);
       toast({
@@ -53,6 +52,7 @@ export function useChunkingProcessor(documents: ProcessedDocument[]) {
         title: "Chunking Failed",
         description: "An error occurred while chunking documents",
       });
+    } finally {
       setIsProcessing(false);
     }
   };

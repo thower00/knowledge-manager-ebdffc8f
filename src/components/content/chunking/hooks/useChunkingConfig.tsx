@@ -35,6 +35,7 @@ export function useChunkingConfig() {
         console.log("useChunkingConfig - Found configuration:", configValue);
         
         setChunkingConfig({
+          // Ensure we have numbers, not strings for numeric values
           chunkSize: parseInt(configValue.chunkSize) || 1000,
           chunkOverlap: parseInt(configValue.chunkOverlap) || 200,
           chunkStrategy: configValue.chunkStrategy as ChunkingConfig["chunkStrategy"] || "fixed_size",
