@@ -28,17 +28,15 @@ export const useTextExtraction = () => {
     try {
       console.log("Calling pdf-proxy Edge Function with URL:", url);
       
-      // Important: We're using the edge function directly with supabase.functions.invoke
+      // Fix: Remove the responseType option which doesn't exist in FunctionInvokeOptions
+      // and handle the binary response conversion manually
       const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
         body: { 
           url,
           title,
           // Add additional context that might help with debugging
           requestedAt: new Date().toISOString()
-        },
-        // Important: Set responseType to arrayBuffer to handle binary data
-        // This properly handles binary response from the Edge Function
-        responseType: "arrayBuffer"
+        }
       });
 
       // Explicit error checking for Edge Function call
@@ -51,8 +49,17 @@ export const useTextExtraction = () => {
         throw new Error("No data received from proxy");
       }
       
+      // Convert the base64 data to ArrayBuffer
+      // The Edge Function now returns base64 encoded data instead of binary
+      const binaryString = window.atob(data as string);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const arrayBuffer = bytes.buffer;
+      
       setExtractionProgress(30);
-      return data;
+      return arrayBuffer;
     } catch (proxyError) {
       console.error("Proxy fetch failed:", proxyError);
       
