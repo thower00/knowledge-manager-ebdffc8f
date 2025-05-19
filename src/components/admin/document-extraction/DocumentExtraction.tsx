@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { InfoCircle } from "lucide-react";
+import { Info } from "lucide-react";
 
 export function DocumentExtraction() {
   const {
@@ -94,7 +94,7 @@ export function DocumentExtraction() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-6 px-2 py-1">
-                      <InfoCircle className="h-4 w-4" />
+                      <Info className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -109,7 +109,7 @@ export function DocumentExtraction() {
                 size="sm" 
                 onClick={handleCheckConnection} 
                 className="ml-2 h-7 text-xs"
-                disabled={connectionStatus === 'checking'}
+                disabled={isCheckingConnection}
               >
                 Retry Connection
               </Button>
