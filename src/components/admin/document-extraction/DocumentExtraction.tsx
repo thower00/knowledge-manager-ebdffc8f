@@ -18,10 +18,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import * as pdfjsLib from "pdfjs-dist";
 
 // Set worker path - needed for pdf.js to work
@@ -32,6 +33,7 @@ export function DocumentExtraction() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractionProgress, setExtractionProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Fetch processed documents
@@ -56,7 +58,31 @@ export function DocumentExtraction() {
   useEffect(() => {
     setExtractionProgress(0);
     setExtractedText("");
+    setError(null);
   }, [selectedDocumentId]);
+
+  // Utility function to convert Google Drive URLs to direct download links
+  const getDirectDownloadUrl = (url: string): string => {
+    // Handle Google Drive URLs
+    if (url.includes('drive.google.com/file/d/')) {
+      try {
+        // Extract the file ID from Google Drive URL
+        const fileId = url.match(/\/d\/([^/]+)/)?.[1];
+        if (!fileId) {
+          throw new Error("Could not extract Google Drive file ID");
+        }
+        
+        // Use Google Drive's export=download parameter for direct download
+        return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      } catch (error) {
+        console.error("Error processing Google Drive URL:", error);
+        throw new Error(`Invalid Google Drive URL: ${url}`);
+      }
+    }
+    
+    // Return original URL for non-Google Drive links
+    return url;
+  };
 
   // Function to extract text from a PDF document using pdf.js
   const extractTextFromDocument = async (documentId: string) => {
@@ -72,6 +98,7 @@ export function DocumentExtraction() {
     setIsExtracting(true);
     setExtractedText("");
     setExtractionProgress(0);
+    setError(null);
 
     try {
       // Get the selected document to retrieve its URL
@@ -82,27 +109,58 @@ export function DocumentExtraction() {
       }
       
       console.log("Starting extraction for document:", selectedDocument.title);
-      console.log("Document URL:", selectedDocument.url);
+      console.log("Original document URL:", selectedDocument.url);
       
-      // For Google Drive URLs, we need to transform the URL
-      // From: https://drive.google.com/file/d/FILEID/view?usp=drivesdk
-      // To: https://drive.google.com/uc?export=download&id=FILEID
-      let documentUrl = selectedDocument.url;
-      if (documentUrl.includes('drive.google.com/file/d/')) {
-        const fileId = documentUrl.split('/d/')[1].split('/')[0];
-        documentUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      // Convert URL to direct download link if needed
+      let documentUrl;
+      try {
+        documentUrl = getDirectDownloadUrl(selectedDocument.url);
+        console.log("Using download URL:", documentUrl);
+      } catch (urlError) {
+        throw new Error(`URL conversion failed: ${urlError.message}`);
       }
       
-      // Fetch the document as an array buffer
+      // Fetch the document with CORS mode set to no-cors
       setExtractionProgress(10);
-      const response = await fetch(documentUrl);
+      
+      // Create a proxy URL to bypass CORS issues (requires server support)
+      // For testing, we'll try different approaches
+      
+      // Approach 1: Try direct fetch with appropriate headers
+      const fetchOptions = {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+        mode: 'cors' as RequestMode, // Try with standard CORS mode first
+        cache: 'no-cache' as RequestCache
+      };
+      
+      console.log("Attempting to fetch document...");
+      const response = await fetch(documentUrl, fetchOptions);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch document: ${response.status}`);
+        console.error("Fetch failed with status:", response.status);
+        throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
       }
       
       setExtractionProgress(30);
       const arrayBuffer = await response.arrayBuffer();
+      
+      // Check if this looks like a PDF (starts with %PDF-)
+      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+      const isPdfSignature = firstBytes[0] === 0x25 && // %
+                             firstBytes[1] === 0x50 && // P
+                             firstBytes[2] === 0x44 && // D
+                             firstBytes[3] === 0x46 && // F
+                             firstBytes[4] === 0x2D;   // -
+      
+      if (!isPdfSignature) {
+        // First few bytes of the response as text for debugging
+        const decoder = new TextDecoder();
+        const textStart = decoder.decode(arrayBuffer.slice(0, 100));
+        throw new Error(`Response is not a valid PDF. Content starts with: ${textStart.substring(0, 30)}...`);
+      }
       
       // Load the PDF using pdf.js
       setExtractionProgress(40);
@@ -146,14 +204,15 @@ export function DocumentExtraction() {
         // Special handling for common PDF.js errors
         if (error.message.includes("Invalid PDF structure")) {
           errorMessage = "The file is not a valid PDF document.";
-        } else if (error.message.includes("Unexpected server response")) {
-          errorMessage = "Cannot access the document. This might be due to CORS restrictions or the file is not directly downloadable.";
+        } else if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+          errorMessage = "Cannot access the document due to CORS restrictions. The document must be publicly accessible with appropriate CORS headers.";
         } else {
           errorMessage = error.message;
         }
       }
       
-      setExtractedText(`Error: ${errorMessage}`);
+      setError(errorMessage);
+      setExtractedText("");
       toast({
         title: "Extraction failed",
         description: errorMessage,
@@ -228,6 +287,23 @@ export function DocumentExtraction() {
               {extractionProgress}% complete
             </p>
           </div>
+        )}
+
+        {error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Extraction Error</AlertTitle>
+            <AlertDescription>
+              {error}
+              {error.includes("CORS") && (
+                <p className="mt-2">
+                  <strong>Tip:</strong> Make sure the document is publicly accessible. Google Drive 
+                  links often have CORS restrictions for direct downloads. Consider using a different 
+                  file hosting service or implement a server-side proxy.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
         )}
 
         {extractedText && (
