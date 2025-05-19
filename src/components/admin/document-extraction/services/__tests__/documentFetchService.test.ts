@@ -5,12 +5,23 @@ import {
 } from '../documentFetchService';
 import { jest, describe, test, expect, beforeEach } from '../../../../../setupTests';
 
+// Define types for mocked Supabase responses
+type SupabaseFunctionResponse<T> = {
+  data: T | null;
+  error: { message: string } | null;
+};
+
+type SupabaseDatabaseResponse<T> = {
+  data: T | null;
+  error: { message: string } | null;
+};
+
 // Create typed mock for supabase
 const mockSupabaseFrom = jest.fn();
 const mockSupabaseSelect = jest.fn();
 const mockSupabaseEq = jest.fn();
-const mockSupabaseMaybeSingle = jest.fn();
-const mockSupabaseFunctionsInvoke = jest.fn();
+const mockSupabaseMaybeSingle = jest.fn<() => Promise<SupabaseDatabaseResponse<any>>>();
+const mockSupabaseFunctionsInvoke = jest.fn<(functionName: string, options: any) => Promise<SupabaseFunctionResponse<any>>>();
 
 // Mock the supabase client
 jest.mock('@/integrations/supabase/client', () => {
@@ -32,7 +43,7 @@ jest.mock('@/integrations/supabase/client', () => {
 // Mock window.atob with proper typings
 global.atob = jest.fn().mockImplementation(
   (str: string) => Buffer.from(str, 'base64').toString('binary')
-) as jest.MockedFunction<typeof global.atob>;
+) as jest.MockedFunction<typeof atob>;
 
 describe('documentFetchService', () => {
   beforeEach(() => {
@@ -48,7 +59,7 @@ describe('documentFetchService', () => {
       mockSupabaseFunctionsInvoke.mockResolvedValueOnce({
         data: mockBase64Data,
         error: null
-      });
+      } as SupabaseFunctionResponse<string>);
       
       // Call the function
       const result = await fetchDocumentViaProxy('https://example.com/doc.pdf');
@@ -75,7 +86,7 @@ describe('documentFetchService', () => {
       mockSupabaseFunctionsInvoke.mockResolvedValueOnce({
         data: null,
         error: { message: 'Proxy error' }
-      });
+      } as SupabaseFunctionResponse<null>);
       
       // Expect function to throw
       await expect(fetchDocumentViaProxy('https://example.com/doc.pdf')).rejects.toThrow('Proxy service error: Proxy error');
@@ -86,7 +97,7 @@ describe('documentFetchService', () => {
       mockSupabaseFunctionsInvoke.mockResolvedValueOnce({
         data: null,
         error: null
-      });
+      } as SupabaseFunctionResponse<null>);
       
       // Expect function to throw
       await expect(fetchDocumentViaProxy('https://example.com/doc.pdf')).rejects.toThrow('No data received from proxy');
@@ -97,10 +108,10 @@ describe('documentFetchService', () => {
       mockSupabaseFunctionsInvoke.mockResolvedValueOnce({
         data: 'invalid-base64!',
         error: null
-      });
+      } as SupabaseFunctionResponse<string>);
       
       // Mock atob to throw error like it would in the browser
-      (global.atob as jest.MockedFunction<typeof global.atob>).mockImplementationOnce(() => {
+      (global.atob as jest.MockedFunction<typeof atob>).mockImplementationOnce(() => {
         throw new Error('Invalid character');
       });
       
@@ -121,7 +132,7 @@ describe('documentFetchService', () => {
           content_type: 'application/pdf'
         },
         error: null
-      });
+      } as SupabaseDatabaseResponse<{binary_data: string, content_type: string}>);
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');
@@ -132,7 +143,7 @@ describe('documentFetchService', () => {
       
       // Verify result is correct
       expect(result).toBeInstanceOf(ArrayBuffer);
-      expect(result.byteLength).toBe(4);
+      expect(result?.byteLength).toBe(4);
     });
     
     test('should return null when database query returns error', async () => {
@@ -140,7 +151,7 @@ describe('documentFetchService', () => {
       mockSupabaseMaybeSingle.mockResolvedValueOnce({
         data: null,
         error: { message: 'Database error' }
-      });
+      } as SupabaseDatabaseResponse<null>);
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');
@@ -154,7 +165,7 @@ describe('documentFetchService', () => {
       mockSupabaseMaybeSingle.mockResolvedValueOnce({
         data: null,
         error: null
-      });
+      } as SupabaseDatabaseResponse<null>);
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');

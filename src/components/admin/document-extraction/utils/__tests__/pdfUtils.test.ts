@@ -56,7 +56,7 @@ describe('pdfUtils', () => {
         { str: 'content ' },
         { str: 'page ' },
       ],
-    });
+    } as MockTextContent);
 
     mockPdfDoc.getPage.mockResolvedValue(mockPage);
     
@@ -92,7 +92,7 @@ describe('pdfUtils', () => {
     const pdfData = createMockPdfArrayBuffer();
     
     // Mock empty page content
-    mockPage.getTextContent.mockResolvedValue({ items: [] });
+    mockPage.getTextContent.mockResolvedValue({ items: [] } as MockTextContent);
     
     const result = await extractPdfText(pdfData, mockProgressUpdate);
     

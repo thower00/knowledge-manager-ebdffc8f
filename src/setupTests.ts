@@ -26,6 +26,7 @@ const mockedResponse = {
   blob: () => Promise.resolve(new Blob())
 };
 
+// Use type assertion to correctly type the mock function
 global.fetch = jest.fn().mockImplementation(() => 
   Promise.resolve(mockedResponse as Response)
 ) as jest.MockedFunction<typeof fetch>;
@@ -40,6 +41,15 @@ if (typeof window === 'undefined') {
     }
   } as any;
 }
+
+// Mock atob and btoa for tests
+global.atob = jest.fn().mockImplementation(
+  (str: string) => Buffer.from(str, 'base64').toString('binary')
+) as jest.MockedFunction<typeof atob>;
+
+global.btoa = jest.fn().mockImplementation(
+  (str: string) => Buffer.from(str, 'binary').toString('base64')
+) as jest.MockedFunction<typeof btoa>;
 
 // TypeScript augmentations to make jest.MockedFunction available
 declare global {
@@ -80,3 +90,4 @@ export { jest, describe, test, expect, beforeEach, afterEach };
 export const resetMocks = () => {
   jest.clearAllMocks();
 };
+
