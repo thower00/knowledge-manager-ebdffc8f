@@ -15,6 +15,7 @@ jest.mock('pdfjs-dist', () => {
 });
 
 describe('pdfUtils', () => {
+  // Define mockPdfDoc outside beforeEach so it's accessible in all tests
   const mockPdfDoc = {
     numPages: 2,
     getPage: jest.fn(),
@@ -30,20 +31,20 @@ describe('pdfUtils', () => {
   beforeEach(() => {
     resetMocks();
     
-    // Setup PDF.js mock
+    // Setup PDF.js mock with proper type assertions
     mockPage.getTextContent.mockResolvedValue({
       items: [
         { str: 'Test ' },
         { str: 'content ' },
         { str: 'page ' },
       ],
-    });
+    } as any);
 
-    mockPdfDoc.getPage.mockResolvedValue(mockPage);
+    mockPdfDoc.getPage.mockResolvedValue(mockPage as any);
     
-    // @ts-ignore - we're mocking the implementation
-    (pdfjs.getDocument as jest.MockedFunction<any>).mockReturnValue({
-      promise: Promise.resolve(mockPdfDoc)
+    // Use proper type assertion for the mock
+    (pdfjs.getDocument as jest.Mock).mockReturnValue({
+      promise: Promise.resolve(mockPdfDoc as any)
     });
   });
 
@@ -73,7 +74,7 @@ describe('pdfUtils', () => {
     const pdfData = createMockPdfArrayBuffer();
     
     // Mock empty page content
-    mockPage.getTextContent.mockResolvedValue({ items: [] });
+    mockPage.getTextContent.mockResolvedValue({ items: [] } as any);
     
     const result = await extractPdfText(pdfData, mockProgressUpdate);
     
@@ -89,7 +90,7 @@ describe('pdfUtils', () => {
     await extractPdfText(pdfData, mockProgressUpdate);
     
     // Check progress was updated multiple times (at least for start, pdf load, and each page)
-    expect(mockProgressUpdate).toHaveBeenCalledTimes(expect.any(Number));
+    expect(mockProgressUpdate).toHaveBeenCalledTimes(expect.anything() as unknown as number);
     expect(mockProgressUpdate.mock.calls.length).toBeGreaterThan(3);
   });
 });

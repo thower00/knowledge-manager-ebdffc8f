@@ -8,14 +8,14 @@ import '@testing-library/jest-dom';
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 
 // Create a proper typing for mock fetch that returns a promise
-global.fetch = jest.fn().mockImplementation(() => 
+global.fetch = jest.fn(() => 
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({}),
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
     text: () => Promise.resolve(''),
-  })
-) as jest.MockedFunction<typeof fetch>;
+  }) as Response
+) as jest.Mock;
 
 // Mock URL class if needed for Node.js environment
 if (typeof window === 'undefined') {
