@@ -5,7 +5,7 @@ import { fetchDocumentViaProxy, fetchDocumentFromDatabase } from '../../services
 import { extractPdfText } from '../../utils/pdfUtils';
 import { ProcessedDocument } from '@/types/document';
 import { createMockPdfArrayBuffer } from '../../utils/__tests__/testUtils';
-import { jest, describe, test, expect, beforeEach } from '@/src/setupTests';
+import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
 
 // Mock service functions
 jest.mock('../../services/documentFetchService', () => ({
@@ -56,15 +56,15 @@ describe('useTextExtraction Hook', () => {
     
     // Execute
     act(() => {
-      result.current.startExtraction({ url: 'https://example.com/test.pdf' });
+      result.current.extractTextFromDocument('https://example.com/test.pdf');
     });
     
-    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isExtracting).toBe(true);
     expect(result.current.error).toBeNull();
-    expect(result.current.progress).toBe(0);
-    expect(result.current.text).toBe('');
-    expect(result.current.isExtractionComplete).toBe(false);
-    expect(fetchDocumentViaProxy).toHaveBeenCalledWith('https://example.com/test.pdf', expect.any(Function));
+    expect(result.current.extractionProgress).toBe(0);
+    expect(result.current.extractedText).toBe('');
+    expect(result.current.isExtracting).toBe(true);
+    expect(fetchDocumentViaProxy).toHaveBeenCalledWith('https://example.com/test.pdf', undefined, undefined, false);
   });
 
   test('should handle document database extraction successfully', async () => {
@@ -84,11 +84,11 @@ describe('useTextExtraction Hook', () => {
     
     // Execute
     act(() => {
-      result.current.startExtraction({ documentId: mockDocuments[0].id });
+      result.current.extractTextFromDocument(mockDocuments[0].id, mockDocuments);
     });
     
-    expect(result.current.isLoading).toBe(true);
-    expect(fetchDocumentFromDatabase).toHaveBeenCalledWith(mockDocuments[0].id);
+    expect(result.current.isExtracting).toBe(true);
+    expect(fetchDocumentViaProxy).toHaveBeenCalledWith(mockDocuments[0].url, mockDocuments[0].title, mockDocuments[0].id, false);
     
     // Wait for extraction to complete
     await act(async () => {
@@ -96,10 +96,10 @@ describe('useTextExtraction Hook', () => {
     });
     
     expect(extractPdfText).toHaveBeenCalled();
-    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isExtracting).toBe(false);
     expect(result.current.error).toBeNull();
-    expect(result.current.isExtractionComplete).toBe(true);
-    expect(result.current.text).toBe('Extracted text content');
+    expect(result.current.isExtracting).toBe(false);
+    expect(result.current.extractedText).toBe('Extracted text content');
   });
 
   test('should handle extraction errors properly', async () => {
@@ -112,7 +112,7 @@ describe('useTextExtraction Hook', () => {
     
     // Execute with invalid URL
     act(() => {
-      result.current.startExtraction({ url: 'invalid-url' });
+      result.current.extractTextFromDocument('invalid-url');
     });
     
     // Wait for extraction to complete
@@ -120,8 +120,8 @@ describe('useTextExtraction Hook', () => {
       await new Promise(resolve => setTimeout(resolve, 0)); // Flush promises
     });
     
-    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isExtracting).toBe(false);
     expect(result.current.error).not.toBeNull();
-    expect(result.current.text).toBe('');
+    expect(result.current.extractedText).toBe('');
   });
 });

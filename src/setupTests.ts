@@ -7,14 +7,14 @@ import '@testing-library/jest-dom';
 // Make Jest globals available
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 
-// Mock fetch globally if needed
-global.fetch = jest.fn(() => 
+// Create a proper typing for mock fetch that returns a promise
+global.fetch = jest.fn().mockImplementation(() => 
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({}),
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
     text: () => Promise.resolve(''),
-  }) as unknown as Response
+  }) as unknown as Promise<Response>
 );
 
 // Mock URL class if needed for Node.js environment
@@ -30,10 +30,33 @@ if (typeof window === 'undefined') {
 
 // TypeScript augmentations to make jest.MockedFunction available
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace jest {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     interface MockedFunction<T extends (...args: any[]) => any> 
-      extends jest.Mock<ReturnType<T>, Parameters<T>> {}
+      extends Mock<ReturnType<T>, Parameters<T>> {}
+      
+    // Add mock interface to fix typescript errors
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    interface Mock<TReturn = any, TArgs extends any[] = any[]> {
+      new (...args: TArgs): TReturn;
+      (...args: TArgs): TReturn;
+      mockImplementation(fn: (...args: TArgs) => TReturn): this;
+      mockReturnValue(value: TReturn): this;
+      mockResolvedValue(value: Awaited<TReturn>): this;
+      mockRejectedValue(error: unknown): this;
+      mockReturnThis(): this;
+      mockRestore(): void;
+      mockReset(): this;
+      mockClear(): this;
+      getMockName(): string;
+      mock: {
+        calls: TArgs[];
+        instances: TReturn[];
+        invocationCallOrder: number[];
+        results: { type: string; value: TReturn }[];
+      };
+    }
   }
 }
 

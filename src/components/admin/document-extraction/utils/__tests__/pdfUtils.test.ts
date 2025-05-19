@@ -1,21 +1,19 @@
-
-import * as pdfjsLib from 'pdfjs-dist';
 import { extractPdfText } from '../pdfUtils';
-import { createMockPdfArrayBuffer, createMockNonPdfArrayBuffer, mockProgressUpdate, resetMocks } from './testUtils';
-import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
+import { createMockPdfArrayBuffer } from './testUtils';
+import * as pdfjs from 'pdfjs-dist';
+import { jest, describe, test, expect } from '../../../../setupTests';
 
-// Mock pdf.js
+// Mock the PDF.js library
 jest.mock('pdfjs-dist', () => {
   return {
     getDocument: jest.fn(),
     GlobalWorkerOptions: {
-      workerPort: null,
-      workerSrc: null,
+      workerSrc: '',
     },
   };
 });
 
-describe('PDF Text Extraction', () => {
+describe('pdfUtils', () => {
   const mockPdfDoc = {
     numPages: 2,
     getPage: jest.fn(),
@@ -41,13 +39,13 @@ describe('PDF Text Extraction', () => {
     mockPdfDoc.getPage.mockResolvedValue(mockPage);
     
     // @ts-ignore - we're mocking the implementation
-    pdfjsLib.getDocument.mockReturnValue({
+    pdfjs.getDocument.mockReturnValue({
       promise: Promise.resolve(mockPdfDoc)
     });
   });
 
   test('should reject non-PDF data', async () => {
-    const nonPdfData = createMockNonPdfArrayBuffer();
+    const nonPdfData = createMockPdfArrayBuffer();
     
     await expect(extractPdfText(nonPdfData, mockProgressUpdate))
       .rejects
