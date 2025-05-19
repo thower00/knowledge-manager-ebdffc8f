@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChunkingConfig, DocumentChunk, DbDocumentChunk, mapDbChunkToDocumentChunk } from "@/types/chunking";
 import { Eye, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ChunkingPreviewProps {
   documentId: string;
@@ -22,10 +24,22 @@ export function ChunkingPreview({
   const [document, setDocument] = useState<any>(null);
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [activeChunkIndex, setActiveChunkIndex] = useState<number | null>(null);
+  const [hasLoadingError, setHasLoadingError] = useState(false);
+  const { toast } = useToast();
+  
+  // Log component props for debugging
+  useEffect(() => {
+    console.log(`ChunkingPreview mounted for document: ${documentId}`);
+    console.log("Chunking config:", config);
+  }, [documentId, config]);
   
   // Check if chunks already exist in the database for this document
   useEffect(() => {
     const checkExistingChunks = async () => {
+      console.log(`Checking for existing chunks for document: ${documentId}`);
+      setIsLoading(true);
+      setHasLoadingError(false);
+      
       try {
         // Try to fetch chunks from the document_chunks table
         const { data: existingChunks, error } = await supabase
@@ -36,6 +50,7 @@ export function ChunkingPreview({
           
         if (error) {
           console.error("Error fetching chunks:", error);
+          throw error;
         }
         
         // If we found existing chunks, use them
@@ -60,30 +75,37 @@ export function ChunkingPreview({
           
           setChunks(mappedChunks);
           // We still need the document info
-          loadDocument(false);
+          await loadDocument(false);
         } else {
           // Otherwise, load the document and generate chunks
           console.log(`No existing chunks found for document ${documentId}, generating new ones`);
-          loadDocument(true);
+          await loadDocument(true);
         }
       } catch (err) {
         console.error("Error checking for existing chunks:", err);
-        loadDocument(true);
+        setHasLoadingError(true);
+        toast({
+          variant: "destructive",
+          title: "Error loading chunks",
+          description: "Failed to load document chunks. Please try again."
+        });
+        setIsLoading(false);
       }
     };
     
     checkExistingChunks();
-  }, [documentId, config]);
+  }, [documentId, config, toast]);
 
   // Load document and generate preview chunks
   const loadDocument = async (shouldGenerateChunks: boolean) => {
+    console.log(`Loading document: ${documentId}, shouldGenerateChunks: ${shouldGenerateChunks}`);
     setIsLoading(true);
     
     try {
       // Fetch the actual document from the database
       const { data: documentData, error: documentError } = await supabase
         .from('processed_documents')
-        .select('id, title, source_id')
+        .select('id, title, source_id, mime_type')
         .eq('id', documentId)
         .single();
       
@@ -96,6 +118,8 @@ export function ChunkingPreview({
         console.error("No document found with id:", documentId);
         throw new Error("Document not found");
       }
+      
+      console.log("Found document:", documentData);
       
       // Try to fetch binary content
       const { data: binaryData, error: binaryError } = await supabase
@@ -114,12 +138,13 @@ export function ChunkingPreview({
         try {
           // Try to extract text content from binary data
           documentContent = new TextDecoder().decode(base64ToArrayBuffer(binaryData.binary_data));
-          console.log("Successfully decoded document content, length:", documentContent.length);
+          console.log(`Successfully decoded document content, length: ${documentContent.length}`);
         } catch (decodeError) {
           console.error("Error decoding binary data:", decodeError);
           documentContent = "Error: Could not decode document content.";
         }
       } else {
+        console.log("No binary data found for document, using placeholder text");
         // Fallback to a simpler representation for preview purposes
         documentContent = `This is a placeholder for the document content. In a production environment, this would contain the actual text of "${documentData.title}".`;
       }
@@ -138,6 +163,13 @@ export function ChunkingPreview({
       }
     } catch (err) {
       console.error("Error in loadDocument:", err);
+      setHasLoadingError(true);
+      toast({
+        variant: "destructive",
+        title: "Error loading document",
+        description: "Failed to load document content for chunking."
+      });
+      
       // Fallback to mock data
       const mockDoc = {
         id: documentId,
@@ -165,6 +197,15 @@ export function ChunkingPreview({
 
   // Generate chunks based on configuration
   const generateChunks = (text: string) => {
+    console.log(`Generating chunks using strategy: ${config.chunkStrategy}`);
+    console.log(`Text length: ${text.length}, Chunk size: ${config.chunkSize}, Overlap: ${config.chunkOverlap}`);
+    
+    if (!text || text.length === 0) {
+      console.warn("Empty text provided for chunking");
+      setChunks([]);
+      return;
+    }
+    
     const previewChunks: DocumentChunk[] = [];
     
     switch (config.chunkStrategy) {
@@ -175,14 +216,17 @@ export function ChunkingPreview({
         
         while (startIdx < text.length) {
           const endIdx = Math.min(startIdx + config.chunkSize, text.length);
+          const chunkContent = text.substring(startIdx, endIdx);
+          
           previewChunks.push({
-            id: `chunk-${documentId}-${chunkIndex}`, // Use a unique ID including document ID
+            id: `chunk-${documentId}-${chunkIndex}`, 
             documentId: documentId,
-            content: text.substring(startIdx, endIdx),
+            content: chunkContent,
             metadata: {
               index: chunkIndex,
               startPosition: startIdx,
-              endPosition: endIdx
+              endPosition: endIdx,
+              strategy: "fixed_size"
             }
           });
           startIdx = endIdx - config.chunkOverlap;
@@ -205,7 +249,8 @@ export function ChunkingPreview({
               index: paragraphIndex,
               startPosition: position,
               endPosition: position + paragraph.length,
-              type: 'paragraph'
+              type: 'paragraph',
+              strategy: "paragraph"
             }
           });
           position += paragraph.length + 2; // +2 for the newline characters
@@ -228,7 +273,8 @@ export function ChunkingPreview({
               index: sentenceIndex,
               startPosition: sentencePosition,
               endPosition: sentencePosition + sentence.length,
-              type: 'sentence'
+              type: 'sentence',
+              strategy: "sentence"
             }
           });
           sentencePosition += sentence.length;
@@ -247,7 +293,8 @@ export function ChunkingPreview({
               metadata: {
                 index: previewChunks.length,
                 level,
-                size: text.length
+                size: text.length,
+                strategy: "recursive"
               }
             }];
           }
@@ -292,6 +339,7 @@ export function ChunkingPreview({
               index: semIndex,
               type: 'semantic',
               semanticScore: simulatedSemanticScore,
+              strategy: "semantic"
               // In real implementation, would include embedding vector
             }
           });
@@ -354,6 +402,16 @@ export function ChunkingPreview({
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Generating preview...</p>
+            </div>
+          </div>
+        ) : hasLoadingError ? (
+          <div className="h-60 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-destructive font-medium mb-2">Error Loading Document</p>
+              <p className="text-muted-foreground mb-4">Could not load document chunks for preview.</p>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                Reload Page
+              </Button>
             </div>
           </div>
         ) : (

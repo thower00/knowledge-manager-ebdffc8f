@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentSelector } from "./DocumentSelector";
@@ -18,6 +17,7 @@ export function ChunkingTab() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [chunkingResults, setChunkingResults] = useState<any[]>([]);
   const [previewDocument, setPreviewDocument] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
   
   // Default chunking configuration
@@ -29,14 +29,37 @@ export function ChunkingTab() {
 
   // Load documents and configuration when component mounts
   useEffect(() => {
+    console.log("ChunkingTab - Initial mount");
     loadDocuments();
     loadChunkingConfig();
+    
+    // Mark component as initialized after loading
+    const initTimer = setTimeout(() => {
+      setIsInitialized(true);
+      console.log("ChunkingTab fully initialized");
+    }, 1000);
+    
+    return () => clearTimeout(initTimer);
   }, []);
 
+  // Ensure data is loaded when tab becomes visible
+  useEffect(() => {
+    if (isInitialized) {
+      console.log("ChunkingTab is already initialized, ensuring data is loaded");
+      if (documents.length === 0 && !isLoading) {
+        console.log("No documents loaded yet, reloading...");
+        loadDocuments();
+      }
+    }
+  }, [isInitialized, documents.length, isLoading]);
+
   const loadDocuments = async () => {
+    console.log("ChunkingTab - Loading documents");
     setIsLoading(true);
     try {
       const docs = await fetchProcessedDocuments();
+      console.log(`ChunkingTab - Fetched ${docs.length} documents`);
+      
       // Only show completed documents that can be chunked
       const completedDocs = docs.filter(doc => doc.status === 'completed');
       setDocuments(completedDocs);
@@ -49,10 +72,12 @@ export function ChunkingTab() {
       });
     } finally {
       setIsLoading(false);
+      console.log("ChunkingTab - Documents loading complete");
     }
   };
 
   const loadChunkingConfig = async () => {
+    console.log("ChunkingTab - Loading chunking configuration");
     try {
       const { data, error } = await supabase
         .from('configurations')
@@ -67,11 +92,15 @@ export function ChunkingTab() {
 
       if (data?.value) {
         const configValue = data.value as any;
+        console.log("ChunkingTab - Found configuration:", configValue);
+        
         setChunkingConfig({
           chunkSize: parseInt(configValue.chunkSize) || 1000,
           chunkOverlap: parseInt(configValue.chunkOverlap) || 200,
           chunkStrategy: configValue.chunkStrategy as ChunkingConfig["chunkStrategy"] || "fixed_size",
         });
+      } else {
+        console.log("ChunkingTab - No configuration found, using defaults");
       }
     } catch (err) {
       console.error("Error loading chunking configuration:", err);

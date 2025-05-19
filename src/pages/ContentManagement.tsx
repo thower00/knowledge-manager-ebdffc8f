@@ -1,11 +1,39 @@
 
 import { Helmet } from "react-helmet-async";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentsTab } from "@/components/content/DocumentsTab";
 import { ChunkingTab } from "@/components/content/chunking/ChunkingTab";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function ContentManagement() {
+  const [activeTab, setActiveTab] = useState("documents");
+  const { toast } = useToast();
+
+  // Effect to ensure components are loaded
+  useEffect(() => {
+    console.log("ContentManagement component mounted");
+    
+    // Force a refresh of the component state
+    const timer = setTimeout(() => {
+      console.log("Ensuring components are properly rendered");
+      setActiveTab(prev => prev);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    console.log(`Tab changed to: ${value}`);
+    setActiveTab(value);
+    
+    // Notify when chunking tab is selected to ensure it's loaded
+    if (value === "chunking") {
+      console.log("Chunking tab selected");
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -20,7 +48,7 @@ export default function ContentManagement() {
           </p>
         </div>
         
-        <Tabs defaultValue="documents">
+        <Tabs defaultValue="documents" value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-4">
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="chunking">Chunking</TabsTrigger>
@@ -49,7 +77,7 @@ export default function ContentManagement() {
             <DocumentsTab />
           </TabsContent>
           
-          <TabsContent value="chunking" className="space-y-4">
+          <TabsContent value="chunking" className="space-y-4" forceMount>
             <ChunkingTab />
           </TabsContent>
         </Tabs>
