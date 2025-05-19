@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,8 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { validatePdfUrl, convertGoogleDriveUrl } from "@/components/admin/document-extraction/utils/urlUtils";
 
 interface ExtractionTabProps {
   isLoading: boolean;
@@ -26,45 +27,47 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [testUrl, setTestUrl] = useState("");
   const [useTestUrl, setUseTestUrl] = useState(false);
   const [testUrlError, setTestUrlError] = useState<string | null>(null);
+  const [testUrlValid, setTestUrlValid] = useState<boolean>(false);
   const { toast } = useToast();
 
   const validateUrl = (url: string) => {
-    // Reset error state first
+    // Reset error and valid states first
     setTestUrlError(null);
+    setTestUrlValid(false);
     
-    // Basic URL validation
     if (!url) return true;
     
-    try {
-      new URL(url);
-    } catch (e) {
-      setTestUrlError("Please enter a valid URL");
+    // Use our new validation utility
+    const { isValid, message } = validatePdfUrl(url);
+    
+    if (!isValid && message) {
+      setTestUrlError(message);
       return false;
     }
     
-    // Google Drive validation
-    if (url.includes('drive.google.com')) {
-      // Check if it's already in the correct format
-      if (url.includes('/uc?') && url.includes('alt=media')) {
-        return true;
-      }
-      
-      // Not in direct download format
-      if (url.includes('/file/d/')) {
-        const suggestion = url.replace(/\/view.*$/, '') + '/view?alt=media';
-        setTestUrlError(
-          "For Google Drive PDFs, convert to direct download URL format. Try: " + 
-          suggestion
-        );
-        return false;
-      }
-      
-      setTestUrlError("For Google Drive PDFs, make sure the URL contains '?alt=media' for direct download");
-      return false;
+    // URL is valid
+    setTestUrlValid(true);
+    
+    // Check if we can convert Google Drive URL to a better format
+    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
+    if (wasConverted) {
+      setTestUrl(convertedUrl);
+      toast({
+        title: "URL Improved",
+        description: "The Google Drive URL has been converted to direct download format.",
+        variant: "default"
+      });
     }
     
     return true;
   };
+
+  // Validate URL when it changes
+  useEffect(() => {
+    if (testUrl) {
+      validateUrl(testUrl);
+    }
+  }, [testUrl]);
 
   const handleTest = () => {
     if (useTestUrl && testUrl) {
@@ -106,14 +109,28 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               value={testUrl}
               onChange={(e) => {
                 setTestUrl(e.target.value);
-                validateUrl(e.target.value);
+                // Don't immediately validate on every keystroke
+                if (e.target.value.length > 5) {
+                  validateUrl(e.target.value);
+                } else {
+                  setTestUrlValid(false);
+                  setTestUrlError(null);
+                }
               }}
               placeholder="https://example.com/sample.pdf"
+              className={testUrlValid ? "border-green-400 focus-visible:ring-green-400" : ""}
             />
             <p className="text-sm text-muted-foreground flex items-center">
               <Info className="h-4 w-4 mr-1 inline" />
               Enter direct URL to a PDF document (must be publicly accessible)
             </p>
+            
+            {testUrlValid && (
+              <Alert variant="default" className="bg-green-50 border-green-300 text-green-800 mt-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="ml-2">URL appears to be a valid PDF link</AlertDescription>
+              </Alert>
+            )}
             
             {testUrlError && (
               <Alert variant="warning" className="mt-2">
@@ -153,7 +170,10 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </div>
         )}
 
-        <Button onClick={handleTest} disabled={isLoading}>
+        <Button 
+          onClick={handleTest} 
+          disabled={isLoading || (useTestUrl && (!testUrl || !!testUrlError))}
+        >
           {isLoading ? "Running..." : "Run Extraction Test"}
         </Button>
       </CardContent>
