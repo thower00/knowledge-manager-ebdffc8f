@@ -1,4 +1,3 @@
-
 import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
@@ -20,14 +19,23 @@ export const useDocumentExtraction = () => {
     extractedText,
     error,
     retryExtraction,
+    storeInDatabase,
+    setStoreInDatabase
   } = useTextExtraction();
 
   // Wrapper for extractTextFromDocument that handles connection checking
   const extractTextFromDocument = useCallback(async (documentId: string) => {
     console.log("Extract text requested for document:", documentId);
     console.log("Current connection status:", connectionStatus);
+    console.log("Using database storage:", storeInDatabase);
     
-    // Before extraction, verify connection status
+    // If database storage is enabled, we can proceed even if proxy is unavailable
+    if (storeInDatabase) {
+      console.log("Database storage enabled, proceeding with extraction regardless of proxy status");
+      return extractText(documentId, documents);
+    }
+    
+    // Otherwise, verify connection status before extraction
     if (connectionStatus === "error" || connectionStatus === "idle") {
       console.log("Connection status needs verification before extraction");
       
@@ -42,9 +50,9 @@ export const useDocumentExtraction = () => {
       }
     }
     
-    console.log("Connection is good, proceeding with extraction");
+    console.log("Connection is good or database storage is enabled, proceeding with extraction");
     return extractText(documentId, documents);
-  }, [connectionStatus, checkConnection, extractText, documents]);
+  }, [connectionStatus, checkConnection, extractText, documents, storeInDatabase]);
 
   return {
     documents,
@@ -59,5 +67,7 @@ export const useDocumentExtraction = () => {
     retryExtraction,
     connectionStatus,
     checkConnection,
+    storeInDatabase,
+    setStoreInDatabase
   };
 };

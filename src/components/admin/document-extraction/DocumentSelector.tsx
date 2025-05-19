@@ -21,6 +21,7 @@ interface DocumentSelectorProps {
   onExtractClick: () => void;
   isProxyAvailable: boolean;
   isCheckingConnection: boolean;
+  storeInDatabase?: boolean;
 }
 
 export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
@@ -32,7 +33,12 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
   onExtractClick,
   isProxyAvailable,
   isCheckingConnection,
+  storeInDatabase = false,
 }) => {
+  // Determine if the extract button should be enabled
+  // Allow extracting if either proxy is available OR store in database is enabled
+  const canExtract = selectedDocumentId && !isExtracting && (isProxyAvailable || storeInDatabase || isCheckingConnection);
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -70,17 +76,24 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
             </div>
           )}
           
-          {!isCheckingConnection && !isProxyAvailable && (
+          {!isCheckingConnection && !isProxyAvailable && !storeInDatabase && (
             <div className="flex items-center text-sm text-red-600">
               <AlertTriangle className="h-4 w-4 mr-1" />
               <span>Proxy service unavailable</span>
+            </div>
+          )}
+          
+          {!isCheckingConnection && !isProxyAvailable && storeInDatabase && (
+            <div className="flex items-center text-sm text-amber-600">
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              <span>Proxy unavailable, using database storage</span>
             </div>
           )}
         </div>
         
         <Button
           onClick={onExtractClick}
-          disabled={!selectedDocumentId || isExtracting || (!isProxyAvailable && !isCheckingConnection)}
+          disabled={!canExtract}
           className="w-full sm:w-auto"
         >
           {isExtracting ? (

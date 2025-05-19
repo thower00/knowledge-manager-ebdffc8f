@@ -8,12 +8,12 @@ import { ExtractionError } from "./ExtractionError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useTextExtraction } from "./hooks/useTextExtraction";
-import { useProcessedDocumentsFetch } from "./hooks/useProcessedDocumentsFetch";
-import { useProxyConnectionStatus } from "./hooks/useProxyConnectionStatus";
+import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 
 export function DocumentExtraction() {
   const {
+    documents,
+    isLoading,
     selectedDocumentId,
     setSelectedDocumentId,
     extractTextFromDocument,
@@ -22,12 +22,10 @@ export function DocumentExtraction() {
     extractedText,
     error,
     retryExtraction,
+    connectionStatus,
     storeInDatabase,
     setStoreInDatabase
-  } = useTextExtraction();
-
-  const { data: documents, isLoading: isLoadingDocuments } = useProcessedDocumentsFetch();
-  const { connectionStatus, checkConnection } = useProxyConnectionStatus();
+  } = useDocumentExtraction();
   
   // Derived state based on connection status
   const isCheckingConnection = connectionStatus === "checking";
@@ -45,14 +43,9 @@ export function DocumentExtraction() {
     }
   }, [selectedDocumentId, documents]);
 
-  // Function to handle document selection
-  const handleDocumentSelection = (documentId: string) => {
-    setSelectedDocumentId(documentId);
-  };
-
   // Function to handle extraction button click
   const handleExtract = () => {
-    extractTextFromDocument(selectedDocumentId, documents);
+    extractTextFromDocument(selectedDocumentId);
   };
 
   return (
@@ -61,14 +54,15 @@ export function DocumentExtraction() {
       <Card>
         <CardContent className="pt-6">
           <DocumentSelector
-            documents={documents || []}
+            documents={documents}
             selectedDocumentId={selectedDocumentId}
-            setSelectedDocumentId={handleDocumentSelection}
+            setSelectedDocumentId={setSelectedDocumentId}
             onExtractClick={handleExtract}
-            isLoading={isLoadingDocuments}
+            isLoading={isLoading}
             isExtracting={isExtracting}
             isProxyAvailable={isProxyAvailable}
             isCheckingConnection={isCheckingConnection}
+            storeInDatabase={storeInDatabase}
           />
           
           {/* Document Binary Storage Toggle */}
@@ -109,6 +103,7 @@ export function DocumentExtraction() {
       {extractedText && !error && (
         <ExtractedTextDisplay 
           extractedText={extractedText} 
+          documentTitle={selectedDocument?.title}
         />
       )}
     </div>
