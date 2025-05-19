@@ -50,7 +50,7 @@ export async function getDocumentBinaryStats() {
     }
     
     // Calculate total size by summing the file_size values
-    const totalSize = sizeData ? sizeData.reduce((sum, item) => sum + Number(item.file_size), 0) : 0;
+    const totalSize = sizeData ? sizeData.reduce((sum, item) => sum + Number(item.file_size || 0), 0) : 0;
     
     return {
       totalCount: totalCount || 0,

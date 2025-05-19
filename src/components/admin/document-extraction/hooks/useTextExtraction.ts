@@ -31,8 +31,6 @@ export const useTextExtraction = () => {
       console.log("Calling pdf-proxy Edge Function with URL:", url);
       console.log("Store in database:", storeInDatabase);
       
-      // Fix: Remove the responseType option which doesn't exist in FunctionInvokeOptions
-      // and handle the binary response conversion manually
       const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
         body: { 
           url,
@@ -55,7 +53,6 @@ export const useTextExtraction = () => {
       }
       
       // Convert the base64 data to ArrayBuffer
-      // The Edge Function now returns base64 encoded data instead of binary
       const binaryString = window.atob(data as string);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {

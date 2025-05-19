@@ -54,7 +54,7 @@ export function DocumentExtraction() {
       <Card>
         <CardContent className="pt-6">
           <DocumentSelector
-            documents={documents}
+            documents={documents || []}
             selectedDocumentId={selectedDocumentId}
             setSelectedDocumentId={setSelectedDocumentId}
             onExtractClick={handleExtract}
@@ -89,7 +89,7 @@ export function DocumentExtraction() {
       {isExtracting && (
         <ExtractionProgress 
           isExtracting={isExtracting} 
-          extractionProgress={extractionProgress} 
+          progress={extractionProgress} 
         />
       )}
 
@@ -97,12 +97,13 @@ export function DocumentExtraction() {
         <ExtractionError 
           error={error} 
           onRetry={retryExtraction}
+          documentTitle={selectedDocument?.title}
         />
       )}
 
       {extractedText && !error && (
         <ExtractedTextDisplay 
-          extractedText={extractedText} 
+          text={extractedText} 
           documentTitle={selectedDocument?.title}
         />
       )}

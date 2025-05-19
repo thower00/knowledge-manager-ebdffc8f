@@ -32,12 +32,13 @@ serve(async (req) => {
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     try {
-      // Fetch the document
+      // Fetch the document with proper headers for PDF files
       const response = await fetch(url, { 
         signal: controller.signal,
         headers: {
           // Add common headers that might help with certain sources
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'application/pdf,*/*'
         }
       });
       
@@ -50,6 +51,22 @@ serve(async (req) => {
       
       // Get the document data as an ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
+      
+      // Simple validation to check if this looks like a PDF
+      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+      const isPdfSignature = firstBytes[0] === 0x25 && // %
+                             firstBytes[1] === 0x50 && // P
+                             firstBytes[2] === 0x44 && // D
+                             firstBytes[3] === 0x46 && // F
+                             firstBytes[4] === 0x2D;   // -
+      
+      if (!isPdfSignature) {
+        // If not a PDF, log the first part of the response for debugging
+        const textDecoder = new TextDecoder();
+        const textContent = textDecoder.decode(arrayBuffer.slice(0, 200));
+        console.error("Response is not a valid PDF. Content starts with:", textContent);
+        throw new Error("Response is not a valid PDF. The URL might not point to a PDF document.");
+      }
       
       // Store the document in the database if requested and we have a document ID
       if (storeInDatabase && documentId) {
@@ -66,12 +83,13 @@ serve(async (req) => {
             // Store in document_binaries table
             const { error } = await supabase
               .from('document_binaries')
-              .insert({
+              .upsert({
                 document_id: documentId,
                 binary_data: binaryData,
                 content_type: response.headers.get('content-type') || 'application/pdf',
                 file_size: arrayBuffer.byteLength
-              });
+              })
+              .select();
             
             if (error) {
               console.error("Error storing document binary:", error);

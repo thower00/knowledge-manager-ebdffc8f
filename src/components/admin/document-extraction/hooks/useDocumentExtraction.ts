@@ -1,3 +1,4 @@
+
 import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
@@ -29,7 +30,7 @@ export const useDocumentExtraction = () => {
     console.log("Current connection status:", connectionStatus);
     console.log("Using database storage:", storeInDatabase);
     
-    // If database storage is enabled, we can proceed even if proxy is unavailable
+    // If database storage is enabled, we can proceed regardless of connection status
     if (storeInDatabase) {
       console.log("Database storage enabled, proceeding with extraction regardless of proxy status");
       return extractText(documentId, documents);
