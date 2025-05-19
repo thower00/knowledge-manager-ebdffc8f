@@ -89,7 +89,7 @@ export function DocumentExtraction() {
       {isExtracting && (
         <ExtractionProgress 
           isExtracting={isExtracting} 
-          progress={extractionProgress} 
+          extractionProgress={extractionProgress} 
         />
       )}
 
@@ -103,7 +103,7 @@ export function DocumentExtraction() {
 
       {extractedText && !error && (
         <ExtractedTextDisplay 
-          text={extractedText} 
+          extractedText={extractedText} 
           documentTitle={selectedDocument?.title}
         />
       )}
