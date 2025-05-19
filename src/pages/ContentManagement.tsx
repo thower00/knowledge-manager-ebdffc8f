@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentsTab } from "@/components/content/DocumentsTab";
+import { ChunkingTab } from "@/components/content/chunking/ChunkingTab";
 
 export default function ContentManagement() {
   return (
@@ -22,6 +23,7 @@ export default function ContentManagement() {
         <Tabs defaultValue="documents">
           <TabsList className="mb-4">
             <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="chunking">Chunking</TabsTrigger>
           </TabsList>
           
           <TabsContent value="documents" className="space-y-4">
@@ -45,6 +47,10 @@ export default function ContentManagement() {
             </Card>
             
             <DocumentsTab />
+          </TabsContent>
+          
+          <TabsContent value="chunking" className="space-y-4">
+            <ChunkingTab />
           </TabsContent>
         </Tabs>
       </div>
