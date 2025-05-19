@@ -15,7 +15,7 @@ global.fetch = jest.fn().mockImplementation(() =>
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
     text: () => Promise.resolve(''),
   })
-) as jest.Mock;
+) as jest.MockedFunction<typeof fetch>;
 
 // Mock URL class if needed for Node.js environment
 if (typeof window === 'undefined') {

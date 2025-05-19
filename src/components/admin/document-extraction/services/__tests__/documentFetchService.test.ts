@@ -22,7 +22,7 @@ jest.mock('@/integrations/supabase/client', () => {
 });
 
 // Mock window.atob since it's not available in JSDOM
-global.atob = jest.fn(str => Buffer.from(str, 'base64').toString('binary'));
+global.atob = jest.fn((str) => Buffer.from(str, 'base64').toString('binary')) as jest.MockedFunction<typeof global.atob>;
 
 describe('documentFetchService', () => {
   beforeEach(() => {
@@ -94,7 +94,7 @@ describe('documentFetchService', () => {
       });
       
       // Mock atob to throw error like it would in the browser
-      global.atob = jest.fn().mockImplementation(() => {
+      (global.atob as jest.MockedFunction<typeof global.atob>).mockImplementationOnce(() => {
         throw new Error('Invalid character');
       });
       

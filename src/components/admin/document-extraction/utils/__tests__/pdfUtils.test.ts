@@ -29,7 +29,6 @@ describe('pdfUtils', () => {
 
   beforeEach(() => {
     resetMocks();
-    jest.clearAllMocks();
     
     // Setup PDF.js mock
     mockPage.getTextContent.mockResolvedValue({
