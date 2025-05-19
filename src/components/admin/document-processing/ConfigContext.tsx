@@ -8,6 +8,7 @@ export interface ConfigSettings {
   embeddingModel: string;
   chunkSize: string;
   chunkOverlap: string;
+  chunkStrategy: string;
   storagePath: string;
   customConfiguration: string;
   [key: string]: string; // Add index signature to make it compatible with { [key: string]: Json }
@@ -28,6 +29,7 @@ export const DEFAULT_CONFIG: ConfigSettings = {
   embeddingModel: "openai",
   chunkSize: "1000",
   chunkOverlap: "200",
+  chunkStrategy: "fixed_size",
   storagePath: "/data/documents",
   customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
 };

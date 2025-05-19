@@ -38,6 +38,7 @@ export function useConfigLoader(activeTab: string) {
             embeddingModel: configValue.embeddingModel || DEFAULT_CONFIG.embeddingModel,
             chunkSize: configValue.chunkSize || DEFAULT_CONFIG.chunkSize,
             chunkOverlap: configValue.chunkOverlap || DEFAULT_CONFIG.chunkOverlap,
+            chunkStrategy: configValue.chunkStrategy || DEFAULT_CONFIG.chunkStrategy,
             storagePath: configValue.storagePath || DEFAULT_CONFIG.storagePath,
             customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
           });
