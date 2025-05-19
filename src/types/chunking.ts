@@ -11,8 +11,13 @@ export interface DocumentChunk {
   content: string;
   metadata: {
     index: number;
+    startPosition?: number;
+    endPosition?: number;
     location?: string;
     page?: number;
+    level?: number;
+    type?: string;
+    size?: number;
     [key: string]: any;
   };
   embedding?: number[];

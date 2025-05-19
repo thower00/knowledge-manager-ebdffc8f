@@ -9,6 +9,7 @@ import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments } from "../utils/documentDbService";
 import { useToast } from "@/components/ui/use-toast";
 import { ChunkingConfig } from "@/types/chunking";
+import { supabase } from "@/integrations/supabase/client";
 
 export function ChunkingTab() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -26,9 +27,10 @@ export function ChunkingTab() {
     chunkStrategy: "fixed_size",
   });
 
-  // Load documents when component mounts
+  // Load documents and configuration when component mounts
   useEffect(() => {
     loadDocuments();
+    loadChunkingConfig();
   }, []);
 
   const loadDocuments = async () => {
@@ -47,6 +49,32 @@ export function ChunkingTab() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadChunkingConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configurations')
+        .select('value')
+        .eq('key', 'document_processing')
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching configuration:", error);
+        return;
+      }
+
+      if (data?.value) {
+        const configValue = data.value as any;
+        setChunkingConfig({
+          chunkSize: parseInt(configValue.chunkSize) || 1000,
+          chunkOverlap: parseInt(configValue.chunkOverlap) || 200,
+          chunkStrategy: configValue.chunkStrategy as ChunkingConfig["chunkStrategy"] || "fixed_size",
+        });
+      }
+    } catch (err) {
+      console.error("Error loading chunking configuration:", err);
     }
   };
 
@@ -75,8 +103,6 @@ export function ChunkingTab() {
 
   const handlePreviewChunking = (documentId: string) => {
     setPreviewDocument(documentId);
-    // In a real implementation, this would fetch the actual preview
-    // For now, we'll simulate a preview in the ChunkingPreview component
   };
 
   const handleProcessChunking = async () => {
