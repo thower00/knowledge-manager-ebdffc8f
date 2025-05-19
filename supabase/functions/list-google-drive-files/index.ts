@@ -210,10 +210,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 // List files from Google Drive
 async function listGoogleDriveFiles(accessToken: string, folderId?: string): Promise<any[]> {
   try {
+    // Fix the query construction - this was the issue
     let query = "mimeType='application/pdf' or mimeType contains 'text/' or mimeType contains 'document' or mimeType contains 'spreadsheet'";
     
     if (folderId && folderId.trim() !== "") {
-      query += ` and '${folderId}' in parents`;
+      // Important: The correct way is to use a separate query parameter for parents
+      query = `(${query}) and '${folderId}' in parents`;
     }
     
     const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size,createdTime,webViewLink)`;
