@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,68 +93,56 @@ export function ChunkingPreview({
       }
       
       if (!documentData) {
-        // If we don't have actual document data, use mock data
-        const mockDoc = {
-          id: documentId,
-          title: "Sample Document",
-          content: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, 
-          nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl. 
-          Nullam euismod, nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl.
-          
-          Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, 
-          quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-          
-          Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-          Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
-        };
-        setDocument(mockDoc);
-        if (shouldGenerateChunks) {
-          generateChunks(mockDoc.content);
+        console.error("No document found with id:", documentId);
+        throw new Error("Document not found");
+      }
+      
+      // Try to fetch binary content
+      const { data: binaryData, error: binaryError } = await supabase
+        .from('document_binaries')
+        .select('binary_data, content_type')
+        .eq('document_id', documentId)
+        .maybeSingle();
+        
+      if (binaryError) {
+        console.error("Error fetching document binary:", binaryError);
+      }
+      
+      let documentContent = "";
+      
+      if (binaryData?.binary_data) {
+        try {
+          // Try to extract text content from binary data
+          documentContent = new TextDecoder().decode(base64ToArrayBuffer(binaryData.binary_data));
+          console.log("Successfully decoded document content, length:", documentContent.length);
+        } catch (decodeError) {
+          console.error("Error decoding binary data:", decodeError);
+          documentContent = "Error: Could not decode document content.";
         }
       } else {
-        // Try to fetch binary content if available
-        const { data: binaryData, error: binaryError } = await supabase
-          .from('document_binaries')
-          .select('binary_data')
-          .eq('document_id', documentId)
-          .maybeSingle();
-          
-        // Use a mock document with the actual title but mock content
-        const enrichedDoc = {
-          ...documentData,
-          content: binaryData?.binary_data 
-            ? new TextDecoder().decode(base64ToArrayBuffer(binaryData.binary_data)) 
-            : `This is a placeholder content for document "${documentData.title}". 
-               In a production environment, this would contain the actual document content.
-               
-               The chunking preview demonstrates how the document would be split into 
-               smaller, more manageable pieces based on the selected chunking strategy 
-               and configuration parameters.
-
-               Each chunk would then be processed individually and could be used for 
-               operations like semantic search, information extraction, or summarization.`
-        };
-        
-        setDocument(enrichedDoc);
-        if (shouldGenerateChunks) {
-          generateChunks(enrichedDoc.content);
-        }
+        // Fallback to a simpler representation for preview purposes
+        documentContent = `This is a placeholder for the document content. In a production environment, this would contain the actual text of "${documentData.title}".`;
+      }
+      
+      // Enrich document data with content
+      const enrichedDoc = {
+        ...documentData,
+        content: documentContent
+      };
+      
+      setDocument(enrichedDoc);
+      
+      if (shouldGenerateChunks) {
+        console.log("Generating chunks with config:", config);
+        generateChunks(documentContent);
       }
     } catch (err) {
       console.error("Error in loadDocument:", err);
       // Fallback to mock data
       const mockDoc = {
         id: documentId,
-        title: "Sample Document",
-        content: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, 
-        nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl. 
-        Nullam euismod, nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl.
-        
-        Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, 
-        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-        
-        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-        Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
+        title: "Document Not Found",
+        content: "Could not load document content. Please try again later.",
       };
       setDocument(mockDoc);
       if (shouldGenerateChunks) {
@@ -189,7 +176,7 @@ export function ChunkingPreview({
         while (startIdx < text.length) {
           const endIdx = Math.min(startIdx + config.chunkSize, text.length);
           previewChunks.push({
-            id: `chunk-${chunkIndex}`,
+            id: `chunk-${documentId}-${chunkIndex}`, // Use a unique ID including document ID
             documentId: documentId,
             content: text.substring(startIdx, endIdx),
             metadata: {
@@ -211,7 +198,7 @@ export function ChunkingPreview({
         
         for (const paragraph of paragraphs) {
           previewChunks.push({
-            id: `chunk-${paragraphIndex}`,
+            id: `chunk-${documentId}-${paragraphIndex}`,
             documentId: documentId,
             content: paragraph,
             metadata: {
@@ -234,7 +221,7 @@ export function ChunkingPreview({
         
         for (const sentence of sentences) {
           previewChunks.push({
-            id: `chunk-${sentenceIndex}`,
+            id: `chunk-${documentId}-${sentenceIndex}`,
             documentId: documentId,
             content: sentence,
             metadata: {
@@ -254,7 +241,7 @@ export function ChunkingPreview({
         const recursivelyChunk = (text: string, level: number = 0) => {
           if (text.length <= config.chunkSize / 2) {
             return [{
-              id: `chunk-${previewChunks.length}`,
+              id: `chunk-${documentId}-r-${previewChunks.length}`,
               documentId: documentId,
               content: text,
               metadata: {
@@ -287,42 +274,37 @@ export function ChunkingPreview({
         
         previewChunks.push(...recursivelyChunk(text));
         break;
+        
+      case "semantic":
+        // For semantic chunking preview, we'll simulate with paragraphs and add 'semantic score' metadata
+        const semanticParagraphs = text.split(/\n\s*\n/).filter(Boolean);
+        let semIndex = 0;
+        
+        for (const paragraph of semanticParagraphs) {
+          // Simulate semantic relevance score (would be calculated by an embedding model)
+          const simulatedSemanticScore = Math.random().toFixed(2);
+          
+          previewChunks.push({
+            id: `chunk-${documentId}-sem-${semIndex}`,
+            documentId: documentId,
+            content: paragraph,
+            metadata: {
+              index: semIndex,
+              type: 'semantic',
+              semanticScore: simulatedSemanticScore,
+              // In real implementation, would include embedding vector
+            }
+          });
+          semIndex++;
+        }
+        break;
     }
     
+    console.log(`Generated ${previewChunks.length} preview chunks using strategy: ${config.chunkStrategy}`);
     setChunks(previewChunks);
     
-    // In a real implementation, we could save these chunks to the database
+    // In a real implementation, we would save these chunks to the database
     // saveChunksToDatabase(previewChunks);
-  };
-
-  // Optional function to save chunks to the database
-  const saveChunksToDatabase = async (chunks: DocumentChunk[]) => {
-    if (chunks.length === 0) return;
-    
-    try {
-      // Prepare chunks for database insertion
-      const chunksForDb = chunks.map((chunk, index) => ({
-        document_id: documentId,
-        content: chunk.content,
-        chunk_index: index,
-        start_position: chunk.metadata.startPosition,
-        end_position: chunk.metadata.endPosition,
-        metadata: chunk.metadata
-      }));
-      
-      // Insert chunks into the document_chunks table
-      const { data, error } = await supabase
-        .from('document_chunks')
-        .insert(chunksForDb);
-        
-      if (error) {
-        console.error("Error saving chunks to database:", error);
-      } else {
-        console.log(`Successfully saved ${chunks.length} chunks to the database`);
-      }
-    } catch (err) {
-      console.error("Exception in saveChunksToDatabase:", err);
-    }
   };
 
   const viewFullDocument = () => {
@@ -388,28 +370,34 @@ export function ChunkingPreview({
             </div>
             
             <div className="space-y-3 max-h-80 overflow-y-auto p-1">
-              {chunks.map((chunk, index) => (
-                <div 
-                  key={chunk.id} 
-                  className={`p-3 border rounded-md transition-colors ${activeChunkIndex === index ? 'bg-accent/20' : 'hover:bg-accent/10'}`}
-                  onClick={() => setActiveChunkIndex(index === activeChunkIndex ? null : index)}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <Badge variant="outline">Chunk {index + 1}</Badge>
-                    <span className="text-xs text-muted-foreground">{chunk.content.length} chars</span>
-                  </div>
-                  <p className="text-sm">{chunk.content}</p>
-                  
-                  {activeChunkIndex === index && (
-                    <div className="mt-3 pt-3 border-t text-xs">
-                      <h4 className="font-medium mb-1">Metadata:</h4>
-                      <pre className="bg-muted p-2 rounded overflow-x-auto">
-                        {JSON.stringify(chunk.metadata, null, 2)}
-                      </pre>
+              {chunks.length > 0 ? (
+                chunks.map((chunk, index) => (
+                  <div 
+                    key={chunk.id} 
+                    className={`p-3 border rounded-md transition-colors ${activeChunkIndex === index ? 'bg-accent/20' : 'hover:bg-accent/10'}`}
+                    onClick={() => setActiveChunkIndex(index === activeChunkIndex ? null : index)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <Badge variant="outline">Chunk {index + 1}</Badge>
+                      <span className="text-xs text-muted-foreground">{chunk.content.length} chars</span>
                     </div>
-                  )}
+                    <p className="text-sm">{chunk.content}</p>
+                    
+                    {activeChunkIndex === index && (
+                      <div className="mt-3 pt-3 border-t text-xs">
+                        <h4 className="font-medium mb-1">Metadata:</h4>
+                        <pre className="bg-muted p-2 rounded overflow-x-auto">
+                          {JSON.stringify(chunk.metadata, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center border rounded-md text-muted-foreground">
+                  No chunks generated. The document may be empty or the chunking strategy may not be applicable to this document.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
