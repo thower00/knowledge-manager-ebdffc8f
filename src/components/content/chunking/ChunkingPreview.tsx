@@ -42,9 +42,9 @@ export function ChunkingPreview({
         // If we found existing chunks, use them
         if (existingChunks && existingChunks.length > 0) {
           console.log(`Found ${existingChunks.length} existing chunks for document ${documentId}`);
-          // Map database chunks to our app's DocumentChunk format
-          const mappedChunks = existingChunks.map((chunk: DbDocumentChunk) => 
-            mapDbChunkToDocumentChunk(chunk)
+          // Map database chunks to our app's DocumentChunk format - with type assertion
+          const mappedChunks = existingChunks.map((chunk: any) => 
+            mapDbChunkToDocumentChunk(chunk as DbDocumentChunk)
           );
           setChunks(mappedChunks);
           // We still need the document info

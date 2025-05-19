@@ -23,7 +23,7 @@ export interface DocumentChunk {
   embedding?: number[];
 }
 
-// Add interface for the database response structure
+// Update interface for the database response structure to match actual response
 export interface DbDocumentChunk {
   id: string;
   document_id: string;
@@ -31,7 +31,7 @@ export interface DbDocumentChunk {
   chunk_index: number;
   start_position?: number;
   end_position?: number;
-  metadata?: Record<string, any>;
+  metadata?: any; // Changed from Record<string, any> to any to accept Json type
   created_at: string;
 }
 
@@ -45,7 +45,7 @@ export function mapDbChunkToDocumentChunk(dbChunk: DbDocumentChunk): DocumentChu
       index: dbChunk.chunk_index,
       startPosition: dbChunk.start_position,
       endPosition: dbChunk.end_position,
-      ...(dbChunk.metadata || {})
+      ...(typeof dbChunk.metadata === 'object' && dbChunk.metadata !== null ? dbChunk.metadata : {})
     }
   };
 }
