@@ -1,11 +1,10 @@
 
-import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
-import { TestManagement as TestManagementComponent } from "@/components/admin/TestManagement";
+import { TestManagement as TestManagementComponent } from "@/components/admin/test-management/TestManagementContainer";
 
 export default function TestManagement() {
   const { isAdmin, isLoading } = useAuth();
