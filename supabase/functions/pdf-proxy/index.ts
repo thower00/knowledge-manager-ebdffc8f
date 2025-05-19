@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,7 @@ serve(async (req) => {
   }
   
   try {
-    const { url, title } = await req.json();
+    const { url, title, documentId, storeInDatabase } = await req.json();
     
     if (!url) {
       return new Response(
@@ -23,6 +24,8 @@ serve(async (req) => {
     }
     
     console.log(`Fetching document: ${title || url}`);
+    console.log(`Store in database: ${storeInDatabase ? 'yes' : 'no'}`);
+    console.log(`Document ID: ${documentId || 'not provided'}`);
     
     // Set timeout for the fetch operation
     const controller = new AbortController();
@@ -47,6 +50,42 @@ serve(async (req) => {
       
       // Get the document data as an ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
+      
+      // Store the document in the database if requested and we have a document ID
+      if (storeInDatabase && documentId) {
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+          const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+          
+          if (supabaseUrl && supabaseServiceKey) {
+            const supabase = createClient(supabaseUrl, supabaseServiceKey);
+            
+            // Convert ArrayBuffer to Uint8Array for database storage
+            const binaryData = new Uint8Array(arrayBuffer);
+            
+            // Store in document_binaries table
+            const { error } = await supabase
+              .from('document_binaries')
+              .insert({
+                document_id: documentId,
+                binary_data: binaryData,
+                content_type: response.headers.get('content-type') || 'application/pdf',
+                file_size: arrayBuffer.byteLength
+              });
+            
+            if (error) {
+              console.error("Error storing document binary:", error);
+            } else {
+              console.log(`Successfully stored document binary for ID: ${documentId}`);
+            }
+          } else {
+            console.error("Missing Supabase configuration for database storage");
+          }
+        } catch (dbError) {
+          console.error("Error storing document in database:", dbError);
+          // Don't throw, continue to return the document data
+        }
+      }
       
       // Convert ArrayBuffer to base64 for safe transmission
       const bytes = new Uint8Array(arrayBuffer);

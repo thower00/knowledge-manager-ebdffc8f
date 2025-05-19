@@ -14,19 +14,22 @@ export const useTextExtraction = () => {
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [storeInDatabase, setStoreInDatabase] = useState(false);
   const { toast } = useToast();
 
   /**
    * Fetches a document through the proxy service
    * @param url URL of document to fetch
    * @param title Optional document title for better error messages
+   * @param documentId Optional document ID for storing binary in database
    * @returns ArrayBuffer of document data
    */
-  const fetchDocumentViaProxy = async (url: string, title?: string) => {
+  const fetchDocumentViaProxy = async (url: string, title?: string, documentId?: string) => {
     setExtractionProgress(10);
     
     try {
       console.log("Calling pdf-proxy Edge Function with URL:", url);
+      console.log("Store in database:", storeInDatabase);
       
       // Fix: Remove the responseType option which doesn't exist in FunctionInvokeOptions
       // and handle the binary response conversion manually
@@ -34,6 +37,8 @@ export const useTextExtraction = () => {
         body: { 
           url,
           title,
+          documentId: storeInDatabase ? documentId : undefined,
+          storeInDatabase: storeInDatabase,
           // Add additional context that might help with debugging
           requestedAt: new Date().toISOString()
         }
@@ -80,6 +85,50 @@ export const useTextExtraction = () => {
     }
   };
 
+  /**
+   * Fetches document binary directly from database if available
+   */
+  const fetchDocumentFromDatabase = async (documentId: string): Promise<ArrayBuffer | null> => {
+    try {
+      console.log("Attempting to fetch document binary from database for ID:", documentId);
+      setExtractionProgress(5);
+      
+      const { data, error } = await supabase
+        .from('document_binaries')
+        .select('binary_data, content_type')
+        .eq('document_id', documentId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching document from database:", error);
+        return null;
+      }
+      
+      if (!data || !data.binary_data) {
+        console.log("No document binary found in database");
+        return null;
+      }
+      
+      console.log("Found document binary in database:", {
+        contentType: data.content_type,
+        size: data.binary_data.length
+      });
+      
+      // Convert from base64 to ArrayBuffer
+      const binaryString = window.atob(data.binary_data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      setExtractionProgress(20);
+      return bytes.buffer;
+    } catch (error) {
+      console.error("Error in fetchDocumentFromDatabase:", error);
+      return null;
+    }
+  };
+
   // Extract text from a PDF document
   const extractTextFromDocument = async (documentId: string, documents?: ProcessedDocument[]) => {
     if (!documentId) {
@@ -105,13 +154,25 @@ export const useTextExtraction = () => {
       }
       
       console.log("Starting extraction for document:", selectedDocument.title);
-      console.log("Original document URL:", selectedDocument.url);
       
-      // Use the proxy service to fetch the document
-      const documentData = await fetchDocumentViaProxy(
-        selectedDocument.url, 
-        selectedDocument.title
-      );
+      // First try to get the document from the database if enabled
+      let documentData: ArrayBuffer | null = null;
+      
+      if (storeInDatabase) {
+        documentData = await fetchDocumentFromDatabase(documentId);
+      }
+      
+      // If not found in database or database storage not enabled, fetch via proxy
+      if (!documentData) {
+        console.log("Fetching document via proxy:", selectedDocument.url);
+        documentData = await fetchDocumentViaProxy(
+          selectedDocument.url, 
+          selectedDocument.title,
+          documentId
+        );
+      } else {
+        console.log("Using document data from database");
+      }
       
       // Extract text from the PDF data
       const extractedContent = await extractPdfText(documentData, setExtractionProgress);
@@ -169,5 +230,7 @@ export const useTextExtraction = () => {
     extractedText,
     error,
     retryExtraction,
+    storeInDatabase,
+    setStoreInDatabase,
   };
 };
