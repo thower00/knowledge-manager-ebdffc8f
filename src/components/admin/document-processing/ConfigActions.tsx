@@ -1,9 +1,11 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { useConfig } from "./ConfigContext";
+import { getProviderFromModel } from "./utils/modelProviders";
 
 export function ConfigActions() {
   const { config, setConfig, isLoading, isSaving, setIsSaving } = useConfig();
@@ -25,14 +27,19 @@ export function ConfigActions() {
       // If configuration exists, populate the form with its values
       if (data?.value) {
         const configValue = data.value as any;
+        const provider = configValue.provider || getProviderFromModel(configValue.specificModelId || configValue.embeddingModel);
+        
         setConfig({
           apiKey: configValue.apiKey || "",
+          provider: provider,
           embeddingModel: configValue.embeddingModel || "openai",
+          specificModelId: configValue.specificModelId || "text-embedding-ada-002",
           chunkSize: configValue.chunkSize || "1000",
           chunkOverlap: configValue.chunkOverlap || "200",
           chunkStrategy: configValue.chunkStrategy || "fixed_size",
           storagePath: configValue.storagePath || "/data/documents",
           customConfiguration: configValue.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
+          providerApiKeys: configValue.providerApiKeys || {}
         });
         
         toast({
@@ -43,12 +50,15 @@ export function ConfigActions() {
         // Reset to default values if no configuration exists
         setConfig({
           apiKey: "",
+          provider: "openai",
           embeddingModel: "openai",
+          specificModelId: "text-embedding-ada-002",
           chunkSize: "1000",
           chunkOverlap: "200",
           chunkStrategy: "fixed_size",
           storagePath: "/data/documents",
           customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
+          providerApiKeys: {}
         });
         
         toast({
@@ -97,6 +107,15 @@ export function ConfigActions() {
         throw new Error(`Database error: ${fetchError.message}`);
       }
       
+      // Update the provider API keys if the current API key is set
+      const updatedConfig = {...config};
+      if (config.apiKey && config.provider) {
+        updatedConfig.providerApiKeys = {
+          ...config.providerApiKeys,
+          [config.provider]: config.apiKey
+        };
+      }
+      
       let result;
       
       if (existingConfig) {
@@ -104,7 +123,7 @@ export function ConfigActions() {
         result = await supabase
           .from('configurations')
           .update({
-            value: config as unknown as Json,
+            value: updatedConfig as unknown as Json,
             updated_at: new Date().toISOString()
           })
           .eq('key', 'document_processing');
@@ -114,7 +133,7 @@ export function ConfigActions() {
           .from('configurations')
           .insert({
             key: 'document_processing',
-            value: config as unknown as Json,
+            value: updatedConfig as unknown as Json,
             description: 'Document processing configuration'
           });
       }

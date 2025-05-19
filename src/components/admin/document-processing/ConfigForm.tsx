@@ -25,19 +25,17 @@ export function ConfigForm() {
 
   return (
     <div className="space-y-6">
-      <OpenAIKeyField 
-        apiKey={config.apiKey} 
-        onChange={handleSelectChange} 
-        isLoading={isLoading} 
-      />
+      <div className="border-b pb-6">
+        <h3 className="text-lg font-medium mb-4">Provider & Model Settings</h3>
+        
+        <div className="space-y-6">
+          <OpenAIKeyField isLoading={isLoading} />
+          
+          <ModelSelector isLoading={isLoading} />
+        </div>
+      </div>
 
-      <ModelSelector 
-        embeddingModel={config.embeddingModel} 
-        onChange={handleSelectChange} 
-        isLoading={isLoading} 
-      />
-
-      <div className="border-t pt-4">
+      <div className="border-b py-6">
         <h3 className="text-lg font-medium mb-4">Chunking Configuration</h3>
         
         <div className="space-y-4">
@@ -56,7 +54,7 @@ export function ConfigForm() {
         </div>
       </div>
 
-      <div className="border-t pt-4">
+      <div className="border-b py-6">
         <h3 className="text-lg font-medium mb-4">Storage Settings</h3>
         
         <StoragePathField 
@@ -66,7 +64,7 @@ export function ConfigForm() {
         />
       </div>
 
-      <div className="border-t pt-4">
+      <div className="pt-6">
         <h3 className="text-lg font-medium mb-4">Advanced Configuration</h3>
         
         <CustomConfigField 

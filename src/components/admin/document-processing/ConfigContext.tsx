@@ -5,13 +5,18 @@ import { Json } from "@/integrations/supabase/types";
 // Define the ConfigSettings interface with an index signature to make it compatible with Json type
 export interface ConfigSettings {
   apiKey: string;
+  provider: string;
   embeddingModel: string;
+  specificModelId: string;
   chunkSize: string;
   chunkOverlap: string;
-  chunkStrategy: string;
+  chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph";
   storagePath: string;
   customConfiguration: string;
-  [key: string]: string; // Add index signature to make it compatible with { [key: string]: Json }
+  providerApiKeys: {
+    [provider: string]: string;
+  };
+  [key: string]: string | object; // Add index signature to make it compatible with { [key: string]: Json }
 }
 
 interface ConfigContextType {
@@ -26,12 +31,15 @@ interface ConfigContextType {
 // Default configuration settings
 export const DEFAULT_CONFIG: ConfigSettings = {
   apiKey: "",
+  provider: "openai",
   embeddingModel: "openai",
+  specificModelId: "text-embedding-ada-002",
   chunkSize: "1000",
   chunkOverlap: "200",
   chunkStrategy: "fixed_size",
   storagePath: "/data/documents",
   customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
+  providerApiKeys: {}
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

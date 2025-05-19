@@ -1,13 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { VerificationStatusAlert, VerificationButton } from "../VerificationStatus";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfig } from "./ConfigContext";
+import { MODEL_PROVIDERS } from "./utils/modelProviders";
 
 interface OpenAIKeyFieldProps {
-  apiKey: string;
-  onChange: (name: string, value: string) => void;
   isLoading: boolean;
 }
 
@@ -17,23 +17,51 @@ interface VerificationStatus {
   message?: string;
 }
 
-export function OpenAIKeyField({ apiKey, onChange, isLoading }: OpenAIKeyFieldProps) {
-  const [openAIVerification, setOpenAIVerification] = useState<VerificationStatus>({
+export function OpenAIKeyField({ isLoading }: OpenAIKeyFieldProps) {
+  const { config, setConfig } = useConfig();
+  const { apiKey, provider } = config;
+  
+  const [keyVerification, setKeyVerification] = useState<VerificationStatus>({
     isVerifying: false
   });
   
+  // Update the field label and placeholder based on the selected provider
+  const providerConfig = MODEL_PROVIDERS[provider] || MODEL_PROVIDERS.openai;
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.name, e.target.value);
+    setConfig(prev => ({
+      ...prev,
+      apiKey: e.target.value,
+    }));
   };
   
-  const verifyOpenAIKey = async () => {
-    setOpenAIVerification({ isVerifying: true });
+  const verifyApiKey = async () => {
+    setKeyVerification({ isVerifying: true });
     
     try {
-      console.log("Verifying OpenAI API key:", apiKey.substring(0, 5) + "...");
+      console.log(`Verifying ${providerConfig.name} API key:`, apiKey.substring(0, 5) + "...");
       
-      // Call Supabase Edge Function to verify OpenAI API key
-      const { data, error } = await supabase.functions.invoke("verify-openai-key", {
+      // Determine which edge function to call based on the provider
+      let functionName = "verify-openai-key"; // Default
+      
+      if (provider === "cohere") {
+        functionName = "verify-cohere-key";
+      } else if (provider === "huggingface") {
+        functionName = "verify-huggingface-key";
+      }
+      
+      // For local models, no verification is needed
+      if (provider === "local") {
+        setKeyVerification({
+          isVerifying: false,
+          isValid: true,
+          message: "No verification needed for local models"
+        });
+        return;
+      }
+      
+      // Call Supabase Edge Function to verify API key
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: { apiKey },
       });
       
@@ -44,21 +72,30 @@ export function OpenAIKeyField({ apiKey, onChange, isLoading }: OpenAIKeyFieldPr
       }
       
       if (data?.valid) {
-        setOpenAIVerification({ 
+        setKeyVerification({ 
           isVerifying: false, 
           isValid: true, 
-          message: "OpenAI API key is valid" + (data.models ? ` (Available models: ${data.models.join(', ')})` : '')
+          message: `${providerConfig.name} API key is valid` + (data.models ? ` (Available models: ${data.models.slice(0, 3).join(', ')}${data.models.length > 3 ? '...' : ''})` : '')
         });
+        
+        // Save the verified API key to the provider-specific keys
+        setConfig(prev => ({
+          ...prev,
+          providerApiKeys: {
+            ...prev.providerApiKeys,
+            [provider]: apiKey
+          }
+        }));
       } else {
-        setOpenAIVerification({ 
+        setKeyVerification({ 
           isVerifying: false, 
           isValid: false, 
-          message: data?.error || "Invalid OpenAI API key" 
+          message: data?.error || `Invalid ${providerConfig.name} API key`
         });
       }
     } catch (error: any) {
-      console.error("Error verifying OpenAI key:", error);
-      setOpenAIVerification({ 
+      console.error(`Error verifying ${providerConfig.name} key:`, error);
+      setKeyVerification({ 
         isVerifying: false, 
         isValid: false, 
         message: `Verification failed: ${error.message || "Unknown error"}` 
@@ -66,9 +103,25 @@ export function OpenAIKeyField({ apiKey, onChange, isLoading }: OpenAIKeyFieldPr
     }
   };
   
+  // When the provider changes, try to load a saved API key
+  useEffect(() => {
+    const savedKey = config.providerApiKeys[provider] || "";
+    if (savedKey && savedKey !== apiKey) {
+      setConfig(prev => ({
+        ...prev,
+        apiKey: savedKey
+      }));
+      
+      // Clear previous verification
+      setKeyVerification({
+        isVerifying: false
+      });
+    }
+  }, [provider]);
+  
   return (
     <div className="grid gap-2">
-      <Label htmlFor="apiKey">API Key</Label>
+      <Label htmlFor="apiKey">{providerConfig.name} API Key</Label>
       <div className="flex space-x-2">
         <Input
           id="apiKey"
@@ -76,19 +129,19 @@ export function OpenAIKeyField({ apiKey, onChange, isLoading }: OpenAIKeyFieldPr
           type="password"
           value={apiKey}
           onChange={handleChange}
-          placeholder="Enter your API key"
+          placeholder={providerConfig.apiKeyPlaceholder}
           className="flex-grow"
-          disabled={isLoading}
+          disabled={isLoading || provider === "local"}
         />
         <VerificationButton 
-          onClick={verifyOpenAIKey}
-          isVerifying={openAIVerification.isVerifying}
-          disabled={!apiKey || isLoading}
+          onClick={verifyApiKey}
+          isVerifying={keyVerification.isVerifying}
+          disabled={!apiKey || isLoading || provider === "local"}
         />
       </div>
-      <VerificationStatusAlert {...openAIVerification} />
+      <VerificationStatusAlert {...keyVerification} />
       <p className="text-sm text-muted-foreground">
-        API key for external services like OpenAI or Cohere.
+        {providerConfig.apiKeyDescription}
       </p>
     </div>
   );
