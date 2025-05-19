@@ -53,7 +53,7 @@ export const useDocumentExtraction = () => {
       // If URL was converted, show a toast message and update the document URL
       if (wasConverted) {
         toast({
-          variant: "success",
+          variant: "default",  // Changed from "success" to "default" as it's an allowed variant
           title: "URL Converted",
           description: "Google Drive URL automatically converted to direct download format."
         });
