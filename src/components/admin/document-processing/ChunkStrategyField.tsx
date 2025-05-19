@@ -11,12 +11,17 @@ interface ChunkStrategyFieldProps {
 }
 
 export function ChunkStrategyField({ chunkStrategy, onChange, isLoading }: ChunkStrategyFieldProps) {
+  const handleStrategyChange = (value: string) => {
+    console.log(`Changing chunk strategy to: ${value}`);
+    onChange("chunkStrategy", value);
+  };
+
   return (
     <div className="grid gap-2">
       <Label className="text-base">Chunking Strategy</Label>
       <RadioGroup
         value={chunkStrategy}
-        onValueChange={(value) => onChange("chunkStrategy", value)}
+        onValueChange={handleStrategyChange}
         disabled={isLoading}
         className="grid gap-3 pt-2"
       >

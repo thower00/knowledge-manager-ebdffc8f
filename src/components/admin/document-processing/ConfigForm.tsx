@@ -10,18 +10,19 @@ import { CustomConfigField } from "./CustomConfigField";
 import { useConfig } from "./ConfigContext";
 
 export function ConfigForm() {
-  const { config, isLoading } = useConfig();
+  const { config, isLoading, setConfig } = useConfig();
   
   // Handle form field changes
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    useConfig().setConfig(prev => ({ ...prev, [name]: value }));
+    setConfig(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    useConfig().setConfig(prev => ({ ...prev, [name]: value }));
+    console.log(`Setting ${name} to ${value}`);
+    setConfig(prev => ({ ...prev, [name]: value }));
   };
 
   const renderApiKeyField = () => {

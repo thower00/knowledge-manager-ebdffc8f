@@ -11,6 +11,7 @@ import { ConfigProvider } from "./document-processing/ConfigContext";
 import { useConfigLoader } from "./document-processing/useConfigLoader";
 import { ConfigForm } from "./document-processing/ConfigForm";
 import { ConfigActions } from "./document-processing/ConfigActions";
+import { useEffect } from "react";
 
 export function DocumentProcessingSettings({ activeTab }: { activeTab: string }) {
   return (
@@ -21,8 +22,13 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
 }
 
 function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string }) {
-  // Load configuration when component mounts
+  // Load configuration when component mounts or activeTab changes
   useConfigLoader(activeTab);
+  
+  // Debug log to check if component is rendering with the correct activeTab
+  useEffect(() => {
+    console.log(`DocumentProcessingSettings rendered with activeTab: ${activeTab}`);
+  }, [activeTab]);
   
   return (
     <Card>
