@@ -4,6 +4,9 @@
 // Define global Jest types
 import '@testing-library/jest-dom';
 
+// Make Jest globals available
+import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+
 // Mock fetch globally if needed
 global.fetch = jest.fn(() => 
   Promise.resolve({
@@ -24,3 +27,6 @@ if (typeof window === 'undefined') {
     }
   } as any;
 }
+
+// Export Jest globals to be used in test files
+export { jest, describe, test, expect, beforeEach, afterEach };

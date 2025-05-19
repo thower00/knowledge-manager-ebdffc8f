@@ -9,6 +9,7 @@ import { validatePdfUrl, convertGoogleDriveUrl } from '../utils/urlUtils';
 import { fetchDocumentViaProxy } from '../services/documentFetchService';
 import { extractPdfText } from '../utils/pdfUtils';
 import { createMockPdfArrayBuffer } from '../utils/__tests__/testUtils';
+import { jest, describe, test, expect, beforeEach } from '../../../setupTests';
 
 // Mock the fetch service and PDF extraction
 jest.mock('../services/documentFetchService', () => ({
@@ -26,8 +27,8 @@ describe('PDF Extraction E2E Process', () => {
     jest.clearAllMocks();
     
     // Setup default mock behaviors
-    (fetchDocumentViaProxy as jest.Mock).mockResolvedValue(createMockPdfArrayBuffer());
-    (extractPdfText as jest.Mock).mockResolvedValue('Test extracted content');
+    (fetchDocumentViaProxy as jest.MockedFunction<typeof fetchDocumentViaProxy>).mockResolvedValue(createMockPdfArrayBuffer());
+    (extractPdfText as jest.MockedFunction<typeof extractPdfText>).mockResolvedValue('Test extracted content');
   });
   
   test('should process valid direct PDF URL correctly', async () => {

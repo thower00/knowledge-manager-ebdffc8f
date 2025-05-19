@@ -4,6 +4,8 @@ import { useTextExtraction } from '../useTextExtraction';
 import { fetchDocumentViaProxy, fetchDocumentFromDatabase } from '../../services/documentFetchService';
 import { extractPdfText } from '../../utils/pdfUtils';
 import { createMockPdfArrayBuffer } from '../../utils/__tests__/testUtils';
+import { ProcessedDocument } from '@/types/document';
+import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
 
 // Mock dependencies
 jest.mock('../../services/documentFetchService', () => ({
@@ -30,7 +32,7 @@ describe('useTextExtraction Hook', () => {
       source_id: 'src-1',
       source_type: 'google-drive',
       mime_type: 'application/pdf',
-      status: 'completed',
+      status: 'completed' as const,
       created_at: '2023-05-01',
     },
     { 
@@ -40,18 +42,18 @@ describe('useTextExtraction Hook', () => {
       source_id: 'src-2',
       source_type: 'google-drive',
       mime_type: 'application/pdf',
-      status: 'completed',
+      status: 'completed' as const,
       created_at: '2023-05-02',
     },
-  ];
+  ] as ProcessedDocument[];
 
   beforeEach(() => {
     jest.clearAllMocks();
     
     // Setup default mock implementations
-    (fetchDocumentViaProxy as jest.Mock).mockResolvedValue(createMockPdfArrayBuffer());
-    (fetchDocumentFromDatabase as jest.Mock).mockResolvedValue(null);
-    (extractPdfText as jest.Mock).mockResolvedValue('Test extracted content');
+    (fetchDocumentViaProxy as jest.MockedFunction<typeof fetchDocumentViaProxy>).mockResolvedValue(createMockPdfArrayBuffer());
+    (fetchDocumentFromDatabase as jest.MockedFunction<typeof fetchDocumentFromDatabase>).mockResolvedValue(null);
+    (extractPdfText as jest.MockedFunction<typeof extractPdfText>).mockResolvedValue('Test extracted content');
   });
 
   test('should initialize with default state', () => {
@@ -93,7 +95,7 @@ describe('useTextExtraction Hook', () => {
 
   test('should extract text from document in database when storeInDatabase is true', async () => {
     // Mock that document exists in database
-    (fetchDocumentFromDatabase as jest.Mock).mockResolvedValue(createMockPdfArrayBuffer());
+    (fetchDocumentFromDatabase as jest.MockedFunction<typeof fetchDocumentFromDatabase>).mockResolvedValue(createMockPdfArrayBuffer());
     
     const { result } = renderHook(() => useTextExtraction());
     
@@ -124,7 +126,7 @@ describe('useTextExtraction Hook', () => {
 
   test('should fall back to proxy when document not in database', async () => {
     // Mock that document does not exist in database
-    (fetchDocumentFromDatabase as jest.Mock).mockResolvedValue(null);
+    (fetchDocumentFromDatabase as jest.MockedFunction<typeof fetchDocumentFromDatabase>).mockResolvedValue(null);
     
     const { result } = renderHook(() => useTextExtraction());
     
@@ -150,7 +152,7 @@ describe('useTextExtraction Hook', () => {
 
   test('should handle extraction errors', async () => {
     // Mock extraction error
-    (fetchDocumentViaProxy as jest.Mock).mockRejectedValue(new Error('Network error'));
+    (fetchDocumentViaProxy as jest.MockedFunction<typeof fetchDocumentViaProxy>).mockRejectedValue(new Error('Network error'));
     
     const { result } = renderHook(() => useTextExtraction());
     

@@ -2,6 +2,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { extractPdfText } from '../pdfUtils';
 import { createMockPdfArrayBuffer, createMockNonPdfArrayBuffer, mockProgressUpdate, resetMocks } from './testUtils';
+import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
 
 // Mock pdf.js
 jest.mock('pdfjs-dist', () => {

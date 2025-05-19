@@ -2,6 +2,7 @@
 /**
  * Test utilities for PDF extraction tests
  */
+import { jest } from '../../../../setupTests';
 
 /**
  * Creates a simple PDF-like ArrayBuffer for testing

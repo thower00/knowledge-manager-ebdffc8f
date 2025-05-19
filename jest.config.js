@@ -12,6 +12,7 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: 'tsconfig.json',
+        isolatedModules: true,
       },
     ],
   },
@@ -19,4 +20,9 @@ module.exports = {
     '**/__tests__/**/*.test.[jt]s?(x)',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  globals: {
+    'ts-jest': {
+      isolatedModules: true,
+    },
+  },
 };
