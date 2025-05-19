@@ -1,12 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ChunkingConfig } from "@/types/chunking";
+import { ChunkingConfig, DocumentChunk, DbDocumentChunk, mapDbChunkToDocumentChunk } from "@/types/chunking";
 import { Eye, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { DocumentChunk } from "@/types/chunking";
 
 interface ChunkingPreviewProps {
   documentId: string;
@@ -42,7 +42,11 @@ export function ChunkingPreview({
         // If we found existing chunks, use them
         if (existingChunks && existingChunks.length > 0) {
           console.log(`Found ${existingChunks.length} existing chunks for document ${documentId}`);
-          setChunks(existingChunks as DocumentChunk[]);
+          // Map database chunks to our app's DocumentChunk format
+          const mappedChunks = existingChunks.map((chunk: DbDocumentChunk) => 
+            mapDbChunkToDocumentChunk(chunk)
+          );
+          setChunks(mappedChunks);
           // We still need the document info
           loadDocument(false);
         } else {
@@ -107,7 +111,7 @@ export function ChunkingPreview({
         const enrichedDoc = {
           ...documentData,
           content: binaryData?.binary_data 
-            ? new TextDecoder().decode(new Uint8Array(binaryData.binary_data)) 
+            ? new TextDecoder().decode(base64ToArrayBuffer(binaryData.binary_data)) 
             : `This is a placeholder content for document "${documentData.title}". 
                In a production environment, this would contain the actual document content.
                
@@ -147,6 +151,16 @@ export function ChunkingPreview({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to convert base64 to ArrayBuffer
+  const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    const binaryString = window.atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
   };
 
   // Generate chunks based on configuration
