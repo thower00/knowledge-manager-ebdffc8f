@@ -1,6 +1,7 @@
 
 import React from "react";
 import { OpenAIKeyField } from "./OpenAIKeyField";
+import { CohereKeyField } from "./CohereKeyField";
 import { ModelSelector } from "./ModelSelector";
 import { ChunkSettings } from "./ChunkSettings";
 import { ChunkStrategyField } from "./ChunkStrategyField";
@@ -23,13 +24,24 @@ export function ConfigForm() {
     useConfig().setConfig(prev => ({ ...prev, [name]: value }));
   };
 
+  const renderApiKeyField = () => {
+    switch(config.provider) {
+      case "openai":
+        return <OpenAIKeyField isLoading={isLoading} />;
+      case "cohere":
+        return <CohereKeyField isLoading={isLoading} />;
+      default:
+        return <OpenAIKeyField isLoading={isLoading} />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="border-b pb-6">
         <h3 className="text-lg font-medium mb-4">Provider & Model Settings</h3>
         
         <div className="space-y-6">
-          <OpenAIKeyField isLoading={isLoading} />
+          {renderApiKeyField()}
           
           <ModelSelector isLoading={isLoading} />
         </div>
