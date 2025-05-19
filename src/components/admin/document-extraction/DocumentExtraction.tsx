@@ -61,27 +61,47 @@ export function DocumentExtraction() {
     setError(null);
   }, [selectedDocumentId]);
 
-  // Utility function to convert Google Drive URLs to direct download links
-  const getDirectDownloadUrl = (url: string): string => {
-    // Handle Google Drive URLs
-    if (url.includes('drive.google.com/file/d/')) {
-      try {
-        // Extract the file ID from Google Drive URL
-        const fileId = url.match(/\/d\/([^/]+)/)?.[1];
-        if (!fileId) {
-          throw new Error("Could not extract Google Drive file ID");
-        }
-        
-        // Use Google Drive's export=download parameter for direct download
-        return `https://drive.google.com/uc?export=download&id=${fileId}`;
-      } catch (error) {
-        console.error("Error processing Google Drive URL:", error);
-        throw new Error(`Invalid Google Drive URL: ${url}`);
+  // Fetch document via proxy service
+  const fetchDocumentViaProxy = async (url: string): Promise<ArrayBuffer> => {
+    try {
+      console.log("Fetching document via proxy:", url);
+      setExtractionProgress(15);
+      
+      const { data, error } = await supabase.functions.invoke("pdf-proxy", {
+        body: { url },
+      });
+
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(`Proxy service error: ${error.message}`);
       }
+      
+      if (data?.error) {
+        throw new Error(`Proxy service error: ${data.error}`);
+      }
+      
+      // The data should be the binary file
+      if (!data) {
+        throw new Error("No data received from proxy");
+      }
+      
+      // Convert base64 to array buffer if needed
+      if (typeof data === 'string') {
+        // Handle base64 encoding if the server returns it that way
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+      
+      // Return the binary data
+      return data;
+    } catch (error) {
+      console.error("Error fetching document via proxy:", error);
+      throw error;
     }
-    
-    // Return original URL for non-Google Drive links
-    return url;
   };
 
   // Function to extract text from a PDF document using pdf.js
@@ -111,44 +131,21 @@ export function DocumentExtraction() {
       console.log("Starting extraction for document:", selectedDocument.title);
       console.log("Original document URL:", selectedDocument.url);
       
-      // Convert URL to direct download link if needed
-      let documentUrl;
-      try {
-        documentUrl = getDirectDownloadUrl(selectedDocument.url);
-        console.log("Using download URL:", documentUrl);
-      } catch (urlError) {
-        throw new Error(`URL conversion failed: ${urlError.message}`);
-      }
-      
-      // Fetch the document with CORS mode set to no-cors
+      // Use the proxy service to fetch the document
       setExtractionProgress(10);
+      let pdfData;
       
-      // Create a proxy URL to bypass CORS issues (requires server support)
-      // For testing, we'll try different approaches
-      
-      // Approach 1: Try direct fetch with appropriate headers
-      const fetchOptions = {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-        },
-        mode: 'cors' as RequestMode, // Try with standard CORS mode first
-        cache: 'no-cache' as RequestCache
-      };
-      
-      console.log("Attempting to fetch document...");
-      const response = await fetch(documentUrl, fetchOptions);
-      
-      if (!response.ok) {
-        console.error("Fetch failed with status:", response.status);
-        throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+      try {
+        // Attempt to fetch document through our proxy service
+        pdfData = await fetchDocumentViaProxy(selectedDocument.url);
+        setExtractionProgress(30);
+      } catch (proxyError) {
+        console.error("Proxy fetch failed:", proxyError);
+        throw new Error(`Failed to fetch document through proxy: ${proxyError.message}`);
       }
-      
-      setExtractionProgress(30);
-      const arrayBuffer = await response.arrayBuffer();
       
       // Check if this looks like a PDF (starts with %PDF-)
-      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+      const firstBytes = new Uint8Array(pdfData.slice(0, 5));
       const isPdfSignature = firstBytes[0] === 0x25 && // %
                              firstBytes[1] === 0x50 && // P
                              firstBytes[2] === 0x44 && // D
@@ -158,13 +155,13 @@ export function DocumentExtraction() {
       if (!isPdfSignature) {
         // First few bytes of the response as text for debugging
         const decoder = new TextDecoder();
-        const textStart = decoder.decode(arrayBuffer.slice(0, 100));
+        const textStart = decoder.decode(pdfData.slice(0, 100));
         throw new Error(`Response is not a valid PDF. Content starts with: ${textStart.substring(0, 30)}...`);
       }
       
       // Load the PDF using pdf.js
       setExtractionProgress(40);
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       
       let extractedContent = `PDF document loaded. Total pages: ${pdf.numPages}\n\n`;
       
@@ -205,7 +202,7 @@ export function DocumentExtraction() {
         if (error.message.includes("Invalid PDF structure")) {
           errorMessage = "The file is not a valid PDF document.";
         } else if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
-          errorMessage = "Cannot access the document due to CORS restrictions. The document must be publicly accessible with appropriate CORS headers.";
+          errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
         } else {
           errorMessage = error.message;
         }
@@ -228,7 +225,7 @@ export function DocumentExtraction() {
       <CardHeader>
         <CardTitle>PDF to Text Extraction</CardTitle>
         <CardDescription>
-          Extract text content from uploaded PDF documents using PDF.js
+          Extract text content from uploaded PDF documents using PDF.js and a server-side proxy
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -295,11 +292,11 @@ export function DocumentExtraction() {
             <AlertTitle>Extraction Error</AlertTitle>
             <AlertDescription>
               {error}
-              {error.includes("CORS") && (
+              {error.includes("proxy") && (
                 <p className="mt-2">
-                  <strong>Tip:</strong> Make sure the document is publicly accessible. Google Drive 
-                  links often have CORS restrictions for direct downloads. Consider using a different 
-                  file hosting service or implement a server-side proxy.
+                  <strong>Tip:</strong> The server-side proxy encountered an issue 
+                  accessing the document. This approach should bypass CORS restrictions,
+                  but there might be other access limitations on the document.
                 </p>
               )}
             </AlertDescription>
