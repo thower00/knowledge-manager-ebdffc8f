@@ -36,6 +36,7 @@ export default function ContentManagement() {
                 <ol className="list-decimal pl-5 space-y-2">
                   <li>Select a document source from the dropdown (currently Google Drive)</li>
                   <li>Click "Refresh Documents" to retrieve files from the selected source</li>
+                  <li>If you've configured a specific Google Drive folder ID in settings, only files from that folder will be retrieved</li>
                   <li>Select files you want to process by checking the boxes</li>
                   <li>Click "Process Selected" to upload the documents to the database</li>
                   <li>Use the Database Documents section below to view and manage processed documents</li>
