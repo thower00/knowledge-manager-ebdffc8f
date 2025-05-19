@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ export const useDocumentExtraction = () => {
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "checking" | "connected" | "error">("idle");
   const { toast } = useToast();
 
   // Fetch processed documents
@@ -31,6 +32,33 @@ export const useDocumentExtraction = () => {
       return data as ProcessedDocument[];
     },
   });
+
+  // Check proxy service connection on mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        setConnectionStatus("checking");
+        
+        // Simple connectivity check - just to see if we can reach the function
+        const { data, error } = await supabase.functions.invoke("pdf-proxy", {
+          body: { action: "connection_test" },
+        });
+        
+        if (error) {
+          console.log("Connection test failed:", error);
+          setConnectionStatus("error");
+          return;
+        }
+        
+        setConnectionStatus("connected");
+      } catch (err) {
+        console.error("Connection test error:", err);
+        setConnectionStatus("error");
+      }
+    };
+    
+    checkConnection();
+  }, []);
 
   // Extract text from a PDF document
   const extractTextFromDocument = async (documentId: string) => {
@@ -65,8 +93,14 @@ export const useDocumentExtraction = () => {
       try {
         // Set a longer timeout for the function call
         const { data, error } = await supabase.functions.invoke("pdf-proxy", {
-          body: { url: selectedDocument.url },
-          headers: { 'Cache-Control': 'no-cache' } // Avoid caching issues
+          body: { 
+            url: selectedDocument.url,
+            title: selectedDocument.title,
+            // Add additional context that might help with debugging
+            docType: selectedDocument.mime_type,
+            requestedAt: new Date().toISOString()
+          },
+          headers: { 'Cache-Control': 'no-cache' }, // Avoid caching issues
         });
 
         if (error) {
@@ -112,6 +146,8 @@ export const useDocumentExtraction = () => {
           errorMessage = "The file is not a valid PDF document.";
         } else if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
           errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
+        } else if (error.message.includes("timeout") || error.message.includes("timed out")) {
+          errorMessage = "The request timed out. The document may be too large or the server is not responding.";
         } else {
           errorMessage = error.message;
         }
@@ -130,11 +166,11 @@ export const useDocumentExtraction = () => {
   };
 
   // Retry the extraction
-  const retryExtraction = () => {
+  const retryExtraction = useCallback(() => {
     if (selectedDocumentId) {
       extractTextFromDocument(selectedDocumentId);
     }
-  };
+  }, [selectedDocumentId]);
 
   return {
     documents,
@@ -147,5 +183,6 @@ export const useDocumentExtraction = () => {
     extractedText,
     error,
     retryExtraction,
+    connectionStatus,
   };
 };

@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ExtractionErrorProps {
@@ -29,10 +29,10 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Connection Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
-              <li>The server-side proxy encountered an issue accessing the document.</li>
-              <li>Check that the document URL is accessible and publicly shared.</li>
-              <li>For Google Drive links, ensure the file is publicly shared with "Anyone with the link" access.</li>
-              {onRetry && <li>Try again in a few moments - the server might be temporarily unavailable.</li>}
+              <li>Check your internet connection and try again</li>
+              <li>The Supabase Edge Function might be temporarily unavailable</li>
+              <li>For Google Drive links, ensure the file is publicly shared with "Anyone with the link" access</li>
+              <li>If using a corporate network, check if there are firewall restrictions</li>
             </ul>
           </div>
         )}
@@ -41,8 +41,9 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Timeout Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
-              <li>The document may be too large for processing in the allocated time.</li>
-              <li>Try with a smaller document or one with fewer pages.</li>
+              <li>The document may be too large for processing in the allocated time</li>
+              <li>Try with a smaller document or one with fewer pages</li>
+              <li>The server might be experiencing high load</li>
             </ul>
           </div>
         )}
@@ -51,22 +52,30 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Access Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
-              <li>This document requires special permissions that the proxy cannot provide.</li>
-              <li>For Google Drive links, check that the file is shared with "Anyone with the link" access.</li>
-              <li>For secured PDFs, try with a non-password-protected document.</li>
+              <li>This document requires special permissions that the proxy cannot provide</li>
+              <li>For Google Drive links, check that the file is shared with "Anyone with the link" access</li>
+              <li>For secured PDFs, try with a non-password-protected document</li>
             </ul>
           </div>
         )}
         
         {onRetry && (
-          <div className="mt-3">
+          <div className="mt-3 flex space-x-2">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={onRetry}
-              className="bg-red-50 hover:bg-red-100 text-red-900 border-red-300"
+              className="bg-red-50 hover:bg-red-100 text-red-900 border-red-300 flex items-center"
             >
-              Retry Extraction
+              <RefreshCw className="h-4 w-4 mr-2" /> Retry Extraction
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => window.open('https://docs.lovable.dev/tips-tricks/troubleshooting', '_blank')}
+              className="text-red-600"
+            >
+              View Troubleshooting Guide
             </Button>
           </div>
         )}
