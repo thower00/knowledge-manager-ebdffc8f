@@ -28,5 +28,14 @@ if (typeof window === 'undefined') {
   } as any;
 }
 
+// TypeScript augmentations to make jest.MockedFunction available
+declare global {
+  namespace jest {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    interface MockedFunction<T extends (...args: any[]) => any> 
+      extends jest.Mock<ReturnType<T>, Parameters<T>> {}
+  }
+}
+
 // Export Jest globals to be used in test files
 export { jest, describe, test, expect, beforeEach, afterEach };

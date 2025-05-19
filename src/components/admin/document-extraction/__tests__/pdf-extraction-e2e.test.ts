@@ -9,7 +9,7 @@ import { validatePdfUrl, convertGoogleDriveUrl } from '../utils/urlUtils';
 import { fetchDocumentViaProxy } from '../services/documentFetchService';
 import { extractPdfText } from '../utils/pdfUtils';
 import { createMockPdfArrayBuffer } from '../utils/__tests__/testUtils';
-import { jest, describe, test, expect, beforeEach } from '../../../setupTests';
+import { jest, describe, test, expect, beforeEach } from '@/src/setupTests';
 
 // Mock the fetch service and PDF extraction
 jest.mock('../services/documentFetchService', () => ({
