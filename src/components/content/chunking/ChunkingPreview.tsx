@@ -33,8 +33,8 @@ export function ChunkingPreview({
       try {
         // Fetch the actual document from the database
         const { data: documentData, error: documentError } = await supabase
-          .from('documents')
-          .select('id, title, content, metadata')
+          .from('processed_documents')
+          .select('id, title, source_id')
           .eq('id', documentId)
           .single();
         
@@ -61,8 +61,31 @@ export function ChunkingPreview({
           setDocument(mockDoc);
           generateChunks(mockDoc.content);
         } else {
-          setDocument(documentData);
-          generateChunks(documentData.content || "");
+          // Try to fetch binary content if available
+          const { data: binaryData, error: binaryError } = await supabase
+            .from('document_binaries')
+            .select('binary_data')
+            .eq('document_id', documentId)
+            .maybeSingle();
+            
+          // Use a mock document with the actual title but mock content
+          const enrichedDoc = {
+            ...documentData,
+            content: binaryData?.binary_data 
+              ? new TextDecoder().decode(binaryData.binary_data) 
+              : `This is a placeholder content for document "${documentData.title}". 
+                 In a production environment, this would contain the actual document content.
+                 
+                 The chunking preview demonstrates how the document would be split into 
+                 smaller, more manageable pieces based on the selected chunking strategy 
+                 and configuration parameters.
+
+                 Each chunk would then be processed individually and could be used for 
+                 operations like semantic search, information extraction, or summarization.`
+          };
+          
+          setDocument(enrichedDoc);
+          generateChunks(enrichedDoc.content);
         }
       } catch (err) {
         console.error("Error in loadDocument:", err);
