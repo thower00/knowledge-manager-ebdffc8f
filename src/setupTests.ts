@@ -1,6 +1,9 @@
 
 // Jest setup file
 
+// Define global Jest types
+import '@testing-library/jest-dom';
+
 // Mock fetch globally if needed
 global.fetch = jest.fn(() => 
   Promise.resolve({
@@ -8,7 +11,7 @@ global.fetch = jest.fn(() =>
     json: () => Promise.resolve({}),
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
     text: () => Promise.resolve(''),
-  }) as any
+  }) as unknown as Response
 );
 
 // Mock URL class if needed for Node.js environment
@@ -21,6 +24,3 @@ if (typeof window === 'undefined') {
     }
   } as any;
 }
-
-// Add testing library matchers
-import '@testing-library/jest-dom';

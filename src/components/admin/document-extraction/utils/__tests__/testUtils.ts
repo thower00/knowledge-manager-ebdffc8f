@@ -30,6 +30,6 @@ export const mockProgressUpdate = jest.fn();
 /**
  * Reset all mocks between tests
  */
-export const resetMocks = () => {
+export const resetMocks = (): void => {
   mockProgressUpdate.mockReset();
 };
