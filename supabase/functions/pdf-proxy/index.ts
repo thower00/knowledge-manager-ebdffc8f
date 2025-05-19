@@ -13,6 +13,7 @@ serve(async (req) => {
     
     // Handle connection test requests (just to check if the function is reachable)
     if (requestData.action === "connection_test") {
+      console.log("Connection test received and successful");
       return new Response(
         JSON.stringify({ status: "ok", message: "Proxy service is reachable" }),
         {
@@ -78,6 +79,8 @@ serve(async (req) => {
     const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
     
     try {
+      console.log("Attempting to fetch document from:", directUrl);
+      
       // Fetch the document with timeout
       const response = await fetch(directUrl, {
         headers: {
@@ -91,6 +94,8 @@ serve(async (req) => {
       });
       
       clearTimeout(timeoutId); // Clear the timeout if fetch completes
+      
+      console.log(`Fetch response received: Status ${response.status}`);
       
       if (!response.ok) {
         console.error(`Failed to fetch file: ${response.status} ${response.statusText}`);
@@ -157,6 +162,8 @@ serve(async (req) => {
         }
       }
       
+      console.log("Successfully fetched document, returning binary data");
+      
       // Return the binary data with appropriate headers
       return new Response(fileData, {
         headers: {
@@ -167,6 +174,8 @@ serve(async (req) => {
       });
     } catch (fetchError) {
       clearTimeout(timeoutId); // Clear the timeout on error
+      
+      console.error(`Fetch operation failed: ${fetchError.message}`);
       
       if (fetchError.name === 'AbortError') {
         console.error('Fetch operation timed out');

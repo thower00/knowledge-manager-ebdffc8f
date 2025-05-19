@@ -33,19 +33,12 @@ export function DocumentExtraction() {
 
   const [showHelp, setShowHelp] = React.useState(false);
 
-  // Only show warning button if error occurs during an actual extraction attempt
-  const showServiceWarning = error !== null && 
-    (error.includes("network") || 
-     error.includes("Failed to fetch") || 
-     error.includes("connect") ||
-     connectionStatus === "error");
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>PDF to Text Extraction</span>
-          {showServiceWarning && (
+          {connectionStatus === "error" && (
             <Button 
               variant="ghost" 
               size="sm" 

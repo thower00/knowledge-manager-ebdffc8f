@@ -33,29 +33,43 @@ export const useDocumentExtraction = () => {
     },
   });
 
-  // Check proxy service connection only when needed
-  const checkConnection = useCallback(async () => {
-    try {
-      setConnectionStatus("checking");
-      
-      // Simple connectivity check - just to see if we can reach the function
-      const { data, error } = await supabase.functions.invoke("pdf-proxy", {
-        body: { action: "connection_test" },
-      });
-      
-      if (error) {
-        console.log("Connection test failed:", error);
+  // Check proxy service connection on mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        setConnectionStatus("checking");
+        
+        // Simple connectivity check with longer timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+          const { data, error } = await supabase.functions.invoke("pdf-proxy", {
+            body: { action: "connection_test" },
+            headers: { 'Cache-Control': 'no-cache' },
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (error || controller.signal.aborted) {
+            console.log("Connection test failed:", error);
+            setConnectionStatus("error");
+            return;
+          }
+          
+          setConnectionStatus("connected");
+        } catch (err) {
+          clearTimeout(timeoutId);
+          console.error("Connection test error:", err);
+          setConnectionStatus("error");
+        }
+      } catch (err) {
+        console.error("Connection test outer error:", err);
         setConnectionStatus("error");
-        return false;
       }
-      
-      setConnectionStatus("connected");
-      return true;
-    } catch (err) {
-      console.error("Connection test error:", err);
-      setConnectionStatus("error");
-      return false;
-    }
+    };
+    
+    checkConnection();
   }, []);
 
   // Extract text from a PDF document
@@ -73,20 +87,6 @@ export const useDocumentExtraction = () => {
     setExtractedText("");
     setExtractionProgress(0);
     setError(null);
-
-    // Check connection first before proceeding with extraction
-    const isConnected = await checkConnection();
-    
-    if (!isConnected) {
-      setIsExtracting(false);
-      setError("Network error: Unable to connect to the proxy service. Please check your internet connection and try again.");
-      toast({
-        title: "Connection Error",
-        description: "Cannot reach the PDF proxy service. Please try again later.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       // Get the selected document to retrieve its URL
