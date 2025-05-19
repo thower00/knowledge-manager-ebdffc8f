@@ -12,6 +12,9 @@ interface DocumentInfoPanelProps {
 }
 
 export function DocumentInfoPanel({ document, chunksCount, onViewFullDocument }: DocumentInfoPanelProps) {
+  // Calculate content length for display
+  const contentLength = document?.content?.length || 0;
+  
   return (
     <div className="p-4 border rounded-md bg-muted/30">
       <div className="flex items-center justify-between mb-2">
@@ -21,7 +24,10 @@ export function DocumentInfoPanel({ document, chunksCount, onViewFullDocument }:
           View Full Document
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground mb-2">Generated {chunksCount} chunks</p>
+      <div className="flex flex-col space-y-1">
+        <p className="text-sm text-muted-foreground">Generated {chunksCount} chunks</p>
+        <p className="text-sm text-muted-foreground">Document length: {contentLength} characters</p>
+      </div>
     </div>
   );
 }

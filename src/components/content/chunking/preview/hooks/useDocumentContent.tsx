@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { fetchDocumentFromDatabase } from "@/components/admin/document-extraction/services/documentFetchService";
+import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
 
 export function useDocumentContent(documentId: string) {
   const [document, setDocument] = useState<any>(null);
@@ -33,32 +35,34 @@ export function useDocumentContent(documentId: string) {
         }
         
         // Fetch document binary content
-        const { data: binaryData, error: binaryError } = await supabase
-          .from('document_binaries')
-          .select('binary_data, content_type')
-          .eq('document_id', documentId)
-          .maybeSingle();
-          
-        if (binaryError) {
-          console.error("Error fetching document binary:", binaryError);
-        }
+        const binaryData = await fetchDocumentFromDatabase(documentId);
         
         let documentContent = "";
         
-        if (binaryData?.binary_data) {
+        if (binaryData) {
           try {
-            // Try to extract text content from binary data
-            documentContent = new TextDecoder().decode(base64ToArrayBuffer(binaryData.binary_data));
-            console.log(`Successfully decoded document content, length: ${documentContent.length}`);
-          } catch (decodeError) {
-            console.error("Error decoding binary data:", decodeError);
-            documentContent = "Error: Could not decode document content.";
+            console.log("Successfully retrieved document binary data, extracting text...");
+            
+            // Extract text based on mime type
+            if (documentData.mime_type.includes('pdf')) {
+              documentContent = await extractPdfText(binaryData, progress => {
+                console.log(`PDF extraction progress: ${progress}%`);
+              });
+            } else {
+              // For non-PDF files, attempt to decode as text
+              documentContent = new TextDecoder().decode(binaryData);
+            }
+            
+            console.log(`Successfully extracted document content, length: ${documentContent.length}`);
+          } catch (extractError) {
+            console.error("Error extracting document content:", extractError);
+            documentContent = `Error extracting content: ${extractError.message}`;
+            throw new Error(`Failed to extract document content: ${extractError.message}`);
           }
         } else {
-          // Fallback to loading content via a separate API call
-          // This would be a good place to implement additional content loading methods
-          documentContent = `This is a placeholder for the document content. In a production environment, this would contain the actual text of "${documentData.title}".`;
-          console.log("No binary data found, using placeholder text");
+          // No binary data found - this should now trigger an error
+          console.error("No binary data found for document ID:", documentId);
+          throw new Error("Document content not available. The document binary may not exist in the database.");
         }
         
         // Enrich document data with content
@@ -72,7 +76,7 @@ export function useDocumentContent(documentId: string) {
         toast({
           variant: "destructive",
           title: "Error loading document",
-          description: "Failed to load document content for chunking."
+          description: err instanceof Error ? err.message : "Failed to load document content for chunking."
         });
       } finally {
         setIsLoading(false);
@@ -105,16 +109,6 @@ export function useDocumentContent(documentId: string) {
       `);
       newWindow.document.close();
     }
-  };
-
-  // Helper function to convert base64 to ArrayBuffer
-  const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-    const binaryString = window.atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
   };
 
   return {

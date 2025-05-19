@@ -22,17 +22,34 @@ export function ChunkingPreviewContent({ documentId, config }: ChunkingPreviewCo
   const isLoading = isLoadingDocument || isLoadingChunks;
   const error = documentError || chunksError;
 
+  // Function to reload the page when retry is clicked
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
   if (isLoading) {
-    return <CardContent><LoadingState /></CardContent>;
+    return <CardContent><LoadingState message={isLoadingDocument ? "Loading document..." : "Generating chunks..."} /></CardContent>;
   }
 
   if (error) {
     return (
       <CardContent>
         <ErrorState 
-          message="Error Loading Document"
+          message={documentError ? "Error Loading Document" : "Error Generating Chunks"}
           description={error.message || "Could not load document chunks for preview."}
-          onRetry={() => window.location.reload()}
+          onRetry={handleRetry}
+        />
+      </CardContent>
+    );
+  }
+
+  if (!document?.content) {
+    return (
+      <CardContent>
+        <ErrorState 
+          message="Document Content Unavailable"
+          description="The document content could not be retrieved. It may not be stored in the database."
+          onRetry={handleRetry}
         />
       </CardContent>
     );
