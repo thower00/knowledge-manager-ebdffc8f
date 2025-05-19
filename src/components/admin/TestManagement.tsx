@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DocumentExtraction } from "./document-extraction/DocumentExtraction";
 
 export function TestManagement() {
   const [activeTab, setActiveTab] = useState("extraction");
@@ -90,10 +91,11 @@ Text successfully embedded into vector representation.
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3">
+        <TabsList className="grid grid-cols-4">
           <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
           <TabsTrigger value="processing">Text Processing</TabsTrigger>
           <TabsTrigger value="embeddings">Vector Embeddings</TabsTrigger>
+          <TabsTrigger value="pdf-extraction">PDF Extraction</TabsTrigger>
         </TabsList>
 
         <TabsContent value="extraction" className="mt-4 space-y-4">
@@ -242,6 +244,10 @@ Text successfully embedded into vector representation.
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="pdf-extraction" className="mt-4 space-y-4">
+          <DocumentExtraction />
         </TabsContent>
       </Tabs>
 
