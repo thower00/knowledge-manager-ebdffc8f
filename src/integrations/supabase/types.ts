@@ -71,6 +71,47 @@ export type Database = {
           },
         ]
       }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          document_id: string
+          end_position: number | null
+          id: string
+          metadata: Json | null
+          start_position: number | null
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          document_id: string
+          end_position?: number | null
+          id?: string
+          metadata?: Json | null
+          start_position?: number | null
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          document_id?: string
+          end_position?: number | null
+          id?: string
+          metadata?: Json | null
+          start_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "processed_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processed_documents: {
         Row: {
           created_at: string

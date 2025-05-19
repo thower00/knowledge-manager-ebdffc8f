@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,71 +24,60 @@ export function ChunkingPreview({
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [activeChunkIndex, setActiveChunkIndex] = useState<number | null>(null);
   
-  // Load document and generate preview chunks
+  // Check if chunks already exist in the database for this document
   useEffect(() => {
-    const loadDocument = async () => {
-      setIsLoading(true);
-      
+    const checkExistingChunks = async () => {
       try {
-        // Fetch the actual document from the database
-        const { data: documentData, error: documentError } = await supabase
-          .from('processed_documents')
-          .select('id, title, source_id')
-          .eq('id', documentId)
-          .single();
-        
-        if (documentError) {
-          console.error("Error fetching document:", documentError);
-          throw documentError;
+        // Try to fetch chunks from the document_chunks table
+        const { data: existingChunks, error } = await supabase
+          .from('document_chunks')
+          .select('*')
+          .eq('document_id', documentId)
+          .order('chunk_index');
+          
+        if (error) {
+          console.error("Error fetching chunks:", error);
         }
         
-        if (!documentData) {
-          // If we don't have actual document data, use mock data
-          const mockDoc = {
-            id: documentId,
-            title: "Sample Document",
-            content: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, 
-            nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl. 
-            Nullam euismod, nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl.
-            
-            Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, 
-            quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-            
-            Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-            Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
-          };
-          setDocument(mockDoc);
-          generateChunks(mockDoc.content);
+        // If we found existing chunks, use them
+        if (existingChunks && existingChunks.length > 0) {
+          console.log(`Found ${existingChunks.length} existing chunks for document ${documentId}`);
+          setChunks(existingChunks as DocumentChunk[]);
+          // We still need the document info
+          loadDocument(false);
         } else {
-          // Try to fetch binary content if available
-          const { data: binaryData, error: binaryError } = await supabase
-            .from('document_binaries')
-            .select('binary_data')
-            .eq('document_id', documentId)
-            .maybeSingle();
-            
-          // Use a mock document with the actual title but mock content
-          const enrichedDoc = {
-            ...documentData,
-            content: binaryData?.binary_data 
-              ? new TextDecoder().decode(binaryData.binary_data) 
-              : `This is a placeholder content for document "${documentData.title}". 
-                 In a production environment, this would contain the actual document content.
-                 
-                 The chunking preview demonstrates how the document would be split into 
-                 smaller, more manageable pieces based on the selected chunking strategy 
-                 and configuration parameters.
-
-                 Each chunk would then be processed individually and could be used for 
-                 operations like semantic search, information extraction, or summarization.`
-          };
-          
-          setDocument(enrichedDoc);
-          generateChunks(enrichedDoc.content);
+          // Otherwise, load the document and generate chunks
+          console.log(`No existing chunks found for document ${documentId}, generating new ones`);
+          loadDocument(true);
         }
       } catch (err) {
-        console.error("Error in loadDocument:", err);
-        // Fallback to mock data
+        console.error("Error checking for existing chunks:", err);
+        loadDocument(true);
+      }
+    };
+    
+    checkExistingChunks();
+  }, [documentId, config]);
+
+  // Load document and generate preview chunks
+  const loadDocument = async (shouldGenerateChunks: boolean) => {
+    setIsLoading(true);
+    
+    try {
+      // Fetch the actual document from the database
+      const { data: documentData, error: documentError } = await supabase
+        .from('processed_documents')
+        .select('id, title, source_id')
+        .eq('id', documentId)
+        .single();
+      
+      if (documentError) {
+        console.error("Error fetching document:", documentError);
+        throw documentError;
+      }
+      
+      if (!documentData) {
+        // If we don't have actual document data, use mock data
         const mockDoc = {
           id: documentId,
           title: "Sample Document",
@@ -104,14 +92,62 @@ export function ChunkingPreview({
           Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
         };
         setDocument(mockDoc);
-        generateChunks(mockDoc.content);
-      } finally {
-        setIsLoading(false);
+        if (shouldGenerateChunks) {
+          generateChunks(mockDoc.content);
+        }
+      } else {
+        // Try to fetch binary content if available
+        const { data: binaryData, error: binaryError } = await supabase
+          .from('document_binaries')
+          .select('binary_data')
+          .eq('document_id', documentId)
+          .maybeSingle();
+          
+        // Use a mock document with the actual title but mock content
+        const enrichedDoc = {
+          ...documentData,
+          content: binaryData?.binary_data 
+            ? new TextDecoder().decode(new Uint8Array(binaryData.binary_data)) 
+            : `This is a placeholder content for document "${documentData.title}". 
+               In a production environment, this would contain the actual document content.
+               
+               The chunking preview demonstrates how the document would be split into 
+               smaller, more manageable pieces based on the selected chunking strategy 
+               and configuration parameters.
+
+               Each chunk would then be processed individually and could be used for 
+               operations like semantic search, information extraction, or summarization.`
+        };
+        
+        setDocument(enrichedDoc);
+        if (shouldGenerateChunks) {
+          generateChunks(enrichedDoc.content);
+        }
       }
-    };
-    
-    loadDocument();
-  }, [documentId, config]);
+    } catch (err) {
+      console.error("Error in loadDocument:", err);
+      // Fallback to mock data
+      const mockDoc = {
+        id: documentId,
+        title: "Sample Document",
+        content: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, 
+        nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl. 
+        Nullam euismod, nisi vel consectetur euismod, nisi nisl consectetur nisl, euismod nisi nisl euismod nisl.
+        
+        Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, 
+        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+        
+        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+        Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
+      };
+      setDocument(mockDoc);
+      if (shouldGenerateChunks) {
+        generateChunks(mockDoc.content);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Generate chunks based on configuration
   const generateChunks = (text: string) => {
@@ -227,6 +263,39 @@ export function ChunkingPreview({
     }
     
     setChunks(previewChunks);
+    
+    // In a real implementation, we could save these chunks to the database
+    // saveChunksToDatabase(previewChunks);
+  };
+
+  // Optional function to save chunks to the database
+  const saveChunksToDatabase = async (chunks: DocumentChunk[]) => {
+    if (chunks.length === 0) return;
+    
+    try {
+      // Prepare chunks for database insertion
+      const chunksForDb = chunks.map((chunk, index) => ({
+        document_id: documentId,
+        content: chunk.content,
+        chunk_index: index,
+        start_position: chunk.metadata.startPosition,
+        end_position: chunk.metadata.endPosition,
+        metadata: chunk.metadata
+      }));
+      
+      // Insert chunks into the document_chunks table
+      const { data, error } = await supabase
+        .from('document_chunks')
+        .insert(chunksForDb);
+        
+      if (error) {
+        console.error("Error saving chunks to database:", error);
+      } else {
+        console.log(`Successfully saved ${chunks.length} chunks to the database`);
+      }
+    } catch (err) {
+      console.error("Exception in saveChunksToDatabase:", err);
+    }
   };
 
   const viewFullDocument = () => {
