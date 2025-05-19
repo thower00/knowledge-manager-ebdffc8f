@@ -3,7 +3,41 @@ import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
 import { useCallback } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+
+// Helper function to check and convert Google Drive URLs
+function checkAndFormatGoogleDriveUrl(url: string): { url: string, warning: string | null } {
+  if (!url || !url.includes('drive.google.com')) {
+    return { url, warning: null };
+  }
+  
+  // Already in the correct format
+  if (url.includes('alt=media')) {
+    return { url, warning: null };
+  }
+  
+  // File view format that needs to be converted
+  if (url.includes('/file/d/')) {
+    // Extract file ID and create direct download URL
+    const filePattern = /\/file\/d\/([^/]+)/;
+    const fileMatch = url.match(filePattern);
+    
+    if (fileMatch && fileMatch[1]) {
+      const fileId = fileMatch[1];
+      const newUrl = `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+      return { 
+        url: newUrl,
+        warning: "URL automatically converted to Google Drive direct download format."
+      };
+    }
+  }
+  
+  // Any other Google Drive URL that might not work
+  return { 
+    url, 
+    warning: "This Google Drive URL may not work. Use the direct download format with '?alt=media'."
+  };
+}
 
 /**
  * Main hook that composes all document extraction functionality
@@ -43,14 +77,22 @@ export const useDocumentExtraction = () => {
       return;
     }
 
-    // Check URL format for Google Drive documents
+    // Check and potentially convert Google Drive URL
     const url = selectedDocument.url || '';
-    if (url.includes('drive.google.com') && !url.includes('alt=media')) {
-      toast({
-        variant: "warning",
-        title: "Google Drive URL Format",
-        description: "For Google Drive documents, ensure the URL ends with '?alt=media' for direct download."
-      });
+    if (url) {
+      const { url: formattedUrl, warning } = checkAndFormatGoogleDriveUrl(url);
+      
+      // If URL was converted, show a toast message
+      if (warning) {
+        toast({
+          variant: "warning",
+          title: "Google Drive URL Notice",
+          description: warning
+        });
+        
+        // Update the URL in the document object before extraction
+        selectedDocument.url = formattedUrl;
+      }
     }
     
     // If database storage is enabled, we can proceed regardless of connection status

@@ -18,8 +18,9 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
                          error.includes("Failed to fetch") || error.includes("proxy");
   const isTimeoutError = error.includes("timeout") || error.includes("timed out");
   const isAccessError = error.includes("403") || error.includes("401") || error.includes("access") || 
-                       error.includes("permission");
+                       error.includes("permission") || error.includes("denied");
   const isPdfError = error.includes("PDF") || error.includes("document format");
+  const isGoogleDriveError = error.includes("Google Drive") || error.includes("drive.google");
   
   return (
     <Alert variant="destructive" className="mt-4">
@@ -32,13 +33,25 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
           <p className="font-medium">Document: {documentTitle}</p>
         )}
         
-        {isNetworkError && (
+        {isGoogleDriveError && (
+          <div className="mt-2 p-3 bg-red-50 rounded-md">
+            <p className="font-semibold">Google Drive URL Issue:</p>
+            <ul className="list-disc ml-5 mt-1 text-sm">
+              <li>Make sure the Google Drive file is shared with "Anyone with the link" access</li>
+              <li>For Google Drive files, use the direct download URL format: 
+                <code className="px-1 bg-red-100 ml-1">https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</code>
+              </li>
+              <li>Or simply add <code className="px-1 bg-red-100">?alt=media</code> at the end of the view URL</li>
+            </ul>
+          </div>
+        )}
+        
+        {isNetworkError && !isGoogleDriveError && (
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Connection Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
               <li>Check your internet connection and try again</li>
               <li>The Supabase Edge Function might be temporarily unavailable</li>
-              <li>For Google Drive links, ensure the file is publicly shared with "Anyone with the link" access</li>
               <li>If using a corporate network, check if there are firewall restrictions</li>
             </ul>
           </div>
@@ -51,24 +64,22 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
               <li>The document may be too large for processing in the allocated time</li>
               <li>Try with a smaller document or one with fewer pages</li>
               <li>The server might be experiencing high load</li>
-              <li>Try again later when the service might be less busy</li>
             </ul>
           </div>
         )}
         
-        {isAccessError && (
+        {isAccessError && !isGoogleDriveError && (
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Access Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
               <li>This document requires special permissions that the proxy cannot provide</li>
-              <li>For Google Drive links, check that the file is shared with "Anyone with the link" access</li>
               <li>For secured PDFs, try with a non-password-protected document</li>
               <li>Some corporate documents may have DRM protection that blocks extraction</li>
             </ul>
           </div>
         )}
 
-        {isPdfError && (
+        {isPdfError && !isGoogleDriveError && (
           <div className="mt-2 p-3 bg-red-50 rounded-md">
             <p className="font-semibold">Document Format Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">

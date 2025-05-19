@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -28,18 +28,47 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [testUrlError, setTestUrlError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const validateGoogleDriveUrl = (url: string) => {
-    if (url.includes('drive.google.com') && !url.includes('alt=media')) {
+  const validateUrl = (url: string) => {
+    // Reset error state first
+    setTestUrlError(null);
+    
+    // Basic URL validation
+    if (!url) return true;
+    
+    try {
+      new URL(url);
+    } catch (e) {
+      setTestUrlError("Please enter a valid URL");
+      return false;
+    }
+    
+    // Google Drive validation
+    if (url.includes('drive.google.com')) {
+      // Check if it's already in the correct format
+      if (url.includes('/uc?') && url.includes('alt=media')) {
+        return true;
+      }
+      
+      // Not in direct download format
+      if (url.includes('/file/d/')) {
+        const suggestion = url.replace(/\/view.*$/, '') + '/view?alt=media';
+        setTestUrlError(
+          "For Google Drive PDFs, convert to direct download URL format. Try: " + 
+          suggestion
+        );
+        return false;
+      }
+      
       setTestUrlError("For Google Drive PDFs, make sure the URL contains '?alt=media' for direct download");
       return false;
     }
-    setTestUrlError(null);
+    
     return true;
   };
 
   const handleTest = () => {
     if (useTestUrl && testUrl) {
-      if (!validateGoogleDriveUrl(testUrl)) {
+      if (!validateUrl(testUrl)) {
         return;
       }
     }
@@ -77,7 +106,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               value={testUrl}
               onChange={(e) => {
                 setTestUrl(e.target.value);
-                validateGoogleDriveUrl(e.target.value);
+                validateUrl(e.target.value);
               }}
               placeholder="https://example.com/sample.pdf"
             />
@@ -96,8 +125,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             <div className="mt-2 p-3 bg-blue-50 text-blue-800 rounded-md">
               <p className="font-medium">Google Drive URL Tips:</p>
               <ul className="list-disc ml-5 mt-1 text-sm">
-                <li>For Google Drive PDFs, make sure the URL ends with "?alt=media" for direct download</li>
-                <li>Example format: https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</li>
+                <li>For Google Drive PDFs, use URL format: <code className="px-1 bg-blue-100">https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</code></li>
+                <li>Change <code className="px-1 bg-blue-100">.../file/d/FILE_ID/view</code> to <code className="px-1 bg-blue-100">.../file/d/FILE_ID/view?alt=media</code></li>
                 <li>File must be shared with "Anyone with the link"</li>
               </ul>
             </div>

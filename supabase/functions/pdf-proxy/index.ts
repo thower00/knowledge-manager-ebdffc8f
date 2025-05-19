@@ -3,6 +3,46 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Helper function to convert Google Drive view URLs to direct download URLs
+function convertGoogleDriveUrl(url: string): string {
+  if (!url.includes('drive.google.com')) {
+    return url; // Not a Google Drive URL, return unchanged
+  }
+  
+  // Check if it's already a direct download URL
+  if (url.includes('alt=media')) {
+    return url; // Already formatted correctly
+  }
+  
+  console.log("Converting Google Drive URL:", url);
+  
+  // Extract file ID from various Google Drive URL formats
+  let fileId = '';
+  
+  // Format: drive.google.com/file/d/FILE_ID/view
+  const filePattern = /\/file\/d\/([^/]+)/;
+  const fileMatch = url.match(filePattern);
+  
+  if (fileMatch && fileMatch[1]) {
+    fileId = fileMatch[1];
+    console.log("Extracted file ID:", fileId);
+    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+  }
+  
+  // Format: drive.google.com/open?id=FILE_ID
+  const openPattern = /\?id=([^&]+)/;
+  const openMatch = url.match(openPattern);
+  
+  if (openMatch && openMatch[1]) {
+    fileId = openMatch[1];
+    console.log("Extracted file ID from open URL:", fileId);
+    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+  }
+  
+  console.log("Could not extract file ID from Google Drive URL, using original URL");
+  return url;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -35,8 +75,16 @@ serve(async (req) => {
     console.log(`Store in database: ${storeInDatabase ? 'yes' : 'no'}`);
     console.log(`Document ID: ${documentId || 'not provided'}`);
     
+    // Convert Google Drive URLs to direct download format
+    const processedUrl = convertGoogleDriveUrl(url);
+    
+    // Log if URL was changed
+    if (processedUrl !== url) {
+      console.log(`Converted URL to direct download format: ${processedUrl}`);
+    }
+    
     // Log full URL for debugging
-    console.log(`Full URL being processed: ${url}`);
+    console.log(`Full URL being processed: ${processedUrl}`);
     
     // Set timeout for the fetch operation
     const controller = new AbortController();
@@ -44,7 +92,7 @@ serve(async (req) => {
     
     try {
       // Fetch the document with proper headers for PDF files
-      const response = await fetch(url, { 
+      const response = await fetch(processedUrl, { 
         signal: controller.signal,
         headers: {
           // Add common headers that might help with certain sources
@@ -62,6 +110,12 @@ serve(async (req) => {
       
       if (!response.ok) {
         console.error(`Fetch failed with status: ${response.status} ${response.statusText}`);
+        
+        // Special handling for Google Drive unauthorized access
+        if (url.includes('drive.google.com') && (response.status === 401 || response.status === 403)) {
+          throw new Error("Google Drive access denied. Make sure the file is shared with 'Anyone with the link' access permission.");
+        }
+        
         throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
       }
       
@@ -71,9 +125,24 @@ serve(async (req) => {
       
       if (contentType && !contentType.includes('pdf') && !contentType.includes('octet-stream') && !contentType.includes('application/binary')) {
         console.error(`Unexpected content type: ${contentType}`);
-        // Log the first part of the response for debugging
-        const text = await response.text();
-        console.error(`Response starts with: ${text.substring(0, 500)}`);
+        
+        // Special error message for HTML responses that likely indicate Google Drive viewer
+        if (contentType.includes('text/html')) {
+          // Check the start of the response for Google Drive patterns
+          const text = await response.text();
+          console.error(`Response starts with: ${text.substring(0, 500)}`);
+          
+          if (text.includes('drive.google.com') || text.includes('docs.google.com')) {
+            throw new Error(
+              "The URL returned a Google Drive viewer page instead of the PDF file directly. " +
+              "For Google Drive files, use a direct download URL format: " +
+              "https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media"
+            );
+          }
+          
+          throw new Error(`Server returned HTML instead of a PDF file. The URL might not be a direct link to a PDF.`);
+        }
+        
         throw new Error(`Server returned non-PDF content type: ${contentType}. This URL might not be a direct link to a PDF file.`);
       }
       
@@ -94,7 +163,7 @@ serve(async (req) => {
         const contentStart = textDecoder.decode(arrayBuffer.slice(0, 500));
         console.error("Response is not a valid PDF. Content starts with:", contentStart);
         
-        throw new Error("The URL doesn't point to a valid PDF file. If using Google Drive, make sure to use the direct download link (ends with /view?alt=media).");
+        throw new Error("The file doesn't appear to be a valid PDF. If using Google Drive, make sure to use the direct download link (ends with /view?alt=media).");
       }
       
       // Store the document in the database if requested and we have a document ID
