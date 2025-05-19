@@ -1,7 +1,8 @@
+
 import { extractPdfText } from '../pdfUtils';
 import { createMockPdfArrayBuffer } from './testUtils';
 import * as pdfjs from 'pdfjs-dist';
-import { jest, describe, test, expect } from '../../../../setupTests';
+import { jest, describe, test, expect, beforeEach, resetMocks } from '../../../../../setupTests';
 
 // Mock the PDF.js library
 jest.mock('pdfjs-dist', () => {
@@ -22,6 +23,9 @@ describe('pdfUtils', () => {
   const mockPage = {
     getTextContent: jest.fn(),
   };
+
+  // Define mockProgressUpdate function
+  const mockProgressUpdate = jest.fn();
 
   beforeEach(() => {
     resetMocks();

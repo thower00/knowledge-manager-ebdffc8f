@@ -14,8 +14,8 @@ global.fetch = jest.fn().mockImplementation(() =>
     json: () => Promise.resolve({}),
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(10)),
     text: () => Promise.resolve(''),
-  }) as unknown as Promise<Response>
-);
+  })
+) as jest.Mock;
 
 // Mock URL class if needed for Node.js environment
 if (typeof window === 'undefined') {
@@ -62,3 +62,8 @@ declare global {
 
 // Export Jest globals to be used in test files
 export { jest, describe, test, expect, beforeEach, afterEach };
+
+// Export a resetMocks helper function for tests
+export const resetMocks = () => {
+  jest.clearAllMocks();
+};

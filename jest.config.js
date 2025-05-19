@@ -8,6 +8,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '@/src/setupTests': '<rootDir>/src/setupTests',
     '../../../../setupTests': '<rootDir>/src/setupTests',
+    '../../../../../setupTests': '<rootDir>/src/setupTests',
   },
   transform: {
     '^.+\\.tsx?$': [

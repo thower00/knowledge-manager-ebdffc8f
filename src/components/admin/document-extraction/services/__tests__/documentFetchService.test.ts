@@ -3,7 +3,7 @@ import {
   fetchDocumentViaProxy,
   fetchDocumentFromDatabase
 } from '../documentFetchService';
-import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
+import { jest, describe, test, expect, beforeEach } from '../../../../../setupTests';
 
 // Mock the supabase client
 jest.mock('@/integrations/supabase/client', () => {

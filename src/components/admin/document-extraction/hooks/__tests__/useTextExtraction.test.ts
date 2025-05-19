@@ -1,11 +1,10 @@
-
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useTextExtraction } from '../useTextExtraction';
 import { fetchDocumentViaProxy, fetchDocumentFromDatabase } from '../../services/documentFetchService';
 import { extractPdfText } from '../../utils/pdfUtils';
 import { ProcessedDocument } from '@/types/document';
 import { createMockPdfArrayBuffer } from '../../utils/__tests__/testUtils';
-import { jest, describe, test, expect, beforeEach } from '../../../../setupTests';
+import { jest, describe, test, expect, beforeEach } from '../../../../../setupTests';
 
 // Mock service functions
 jest.mock('../../services/documentFetchService', () => ({
@@ -15,6 +14,13 @@ jest.mock('../../services/documentFetchService', () => ({
 
 jest.mock('../../utils/pdfUtils', () => ({
   extractPdfText: jest.fn(),
+}));
+
+jest.mock('@/hooks/use-toast', () => ({
+  toast: jest.fn(),
+  useToast: () => ({
+    toast: jest.fn(),
+  }),
 }));
 
 jest.mock('@/integrations/supabase/client', () => ({

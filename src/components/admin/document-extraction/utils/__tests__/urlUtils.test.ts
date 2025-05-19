@@ -1,5 +1,5 @@
 import { validatePdfUrl, convertGoogleDriveUrl } from '../urlUtils';
-import { jest, describe, test, expect } from '../../../../setupTests';
+import { jest, describe, test, expect } from '../../../../../setupTests';
 
 describe('urlUtils', () => {
   describe('validatePdfUrl', () => {
