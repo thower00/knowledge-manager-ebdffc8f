@@ -22,7 +22,7 @@ jest.mock('@/integrations/supabase/client', () => {
 });
 
 // Mock window.atob since it's not available in JSDOM
-global.atob = jest.fn((str) => Buffer.from(str, 'base64').toString('binary')) as jest.MockedFunction<typeof global.atob>;
+global.atob = jest.fn((str: string) => Buffer.from(str, 'base64').toString('binary')) as jest.MockedFunction<typeof global.atob>;
 
 describe('documentFetchService', () => {
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('documentFetchService', () => {
     test('should successfully fetch and decode document data', async () => {
       // Mock successful response with base64 data
       const supabaseFunctions = require('@/integrations/supabase/client').supabase.functions;
-      (supabaseFunctions.invoke as jest.MockedFunction<typeof supabaseFunctions.invoke>).mockResolvedValue({
+      (supabaseFunctions.invoke as jest.MockedFunction<any>).mockResolvedValue({
         data: mockBase64Data,
         error: null
       });
@@ -64,7 +64,7 @@ describe('documentFetchService', () => {
     test('should throw error when proxy function returns error', async () => {
       // Mock error response from edge function
       const supabaseFunctions = require('@/integrations/supabase/client').supabase.functions;
-      (supabaseFunctions.invoke as jest.MockedFunction<typeof supabaseFunctions.invoke>).mockResolvedValue({
+      (supabaseFunctions.invoke as jest.MockedFunction<any>).mockResolvedValue({
         data: null,
         error: { message: 'Proxy error' }
       });
@@ -76,7 +76,7 @@ describe('documentFetchService', () => {
     test('should throw error when no data is returned', async () => {
       // Mock response with no data
       const supabaseFunctions = require('@/integrations/supabase/client').supabase.functions;
-      (supabaseFunctions.invoke as jest.MockedFunction<typeof supabaseFunctions.invoke>).mockResolvedValue({
+      (supabaseFunctions.invoke as jest.MockedFunction<any>).mockResolvedValue({
         data: null,
         error: null
       });
@@ -88,7 +88,7 @@ describe('documentFetchService', () => {
     test('should handle base64 decoding errors', async () => {
       // Mock invalid base64 data
       const supabaseFunctions = require('@/integrations/supabase/client').supabase.functions;
-      (supabaseFunctions.invoke as jest.MockedFunction<typeof supabaseFunctions.invoke>).mockResolvedValue({
+      (supabaseFunctions.invoke as jest.MockedFunction<any>).mockResolvedValue({
         data: 'invalid-base64!',
         error: null
       });
@@ -118,7 +118,7 @@ describe('documentFetchService', () => {
         error: null
       });
       
-      supabaseFrom().select().eq().maybeSingle = mockMaybeSingle;
+      (supabaseFrom().select().eq().maybeSingle as jest.MockedFunction<any>) = mockMaybeSingle;
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');
@@ -140,7 +140,7 @@ describe('documentFetchService', () => {
         error: { message: 'Database error' }
       });
       
-      supabaseFrom().select().eq().maybeSingle = mockMaybeSingle;
+      (supabaseFrom().select().eq().maybeSingle as jest.MockedFunction<any>) = mockMaybeSingle;
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');
@@ -157,7 +157,7 @@ describe('documentFetchService', () => {
         error: null
       });
       
-      supabaseFrom().select().eq().maybeSingle = mockMaybeSingle;
+      (supabaseFrom().select().eq().maybeSingle as jest.MockedFunction<any>) = mockMaybeSingle;
       
       // Call the function
       const result = await fetchDocumentFromDatabase('doc123');

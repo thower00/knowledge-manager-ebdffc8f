@@ -42,7 +42,7 @@ describe('pdfUtils', () => {
     mockPdfDoc.getPage.mockResolvedValue(mockPage);
     
     // @ts-ignore - we're mocking the implementation
-    pdfjs.getDocument.mockReturnValue({
+    (pdfjs.getDocument as jest.MockedFunction<any>).mockReturnValue({
       promise: Promise.resolve(mockPdfDoc)
     });
   });
