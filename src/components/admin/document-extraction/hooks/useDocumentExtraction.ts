@@ -8,7 +8,7 @@ import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
  */
 export const useDocumentExtraction = () => {
   const { data: documents, isLoading } = useProcessedDocumentsFetch();
-  const { connectionStatus } = useProxyConnectionStatus();
+  const { connectionStatus, checkConnection } = useProxyConnectionStatus();
   
   const {
     selectedDocumentId,
@@ -23,6 +23,12 @@ export const useDocumentExtraction = () => {
 
   // Wrapper for extractTextFromDocument that passes the documents
   const extractTextFromDocument = async (documentId: string) => {
+    // Before extraction, verify connection status
+    if (connectionStatus === "error") {
+      // Try reconnecting before extraction
+      await checkConnection(true);
+    }
+    
     return extractText(documentId, documents);
   };
 
@@ -38,5 +44,6 @@ export const useDocumentExtraction = () => {
     error,
     retryExtraction,
     connectionStatus,
+    checkConnection,
   };
 };

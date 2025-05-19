@@ -16,6 +16,48 @@ export const useTextExtraction = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  /**
+   * Fetches a document through the proxy service
+   * @param url URL of document to fetch
+   * @param title Optional document title for better error messages
+   * @returns ArrayBuffer of document data
+   */
+  const fetchDocumentViaProxy = async (url: string, title?: string) => {
+    setExtractionProgress(10);
+    
+    try {
+      // Set a longer timeout for the function call
+      const { data, error } = await supabase.functions.invoke("pdf-proxy", {
+        body: { 
+          url,
+          title,
+          // Add additional context that might help with debugging
+          requestedAt: new Date().toISOString()
+        },
+        headers: { 'Cache-Control': 'no-cache' }, // Avoid caching issues
+      });
+
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(`Proxy service error: ${error.message}`);
+      }
+      
+      if (data?.error) {
+        throw new Error(`${data.error}`);
+      }
+      
+      if (!data) {
+        throw new Error("No data received from proxy");
+      }
+      
+      setExtractionProgress(30);
+      return data;
+    } catch (proxyError) {
+      console.error("Proxy fetch failed:", proxyError);
+      throw new Error(`Failed to fetch document through proxy: ${proxyError.message}`);
+    }
+  };
+
   // Extract text from a PDF document
   const extractTextFromDocument = async (documentId: string, documents?: ProcessedDocument[]) => {
     if (!documentId) {
@@ -44,54 +86,22 @@ export const useTextExtraction = () => {
       console.log("Original document URL:", selectedDocument.url);
       
       // Use the proxy service to fetch the document
-      setExtractionProgress(10);
+      const documentData = await fetchDocumentViaProxy(
+        selectedDocument.url, 
+        selectedDocument.title
+      );
       
-      try {
-        // Set a longer timeout for the function call
-        const { data, error } = await supabase.functions.invoke("pdf-proxy", {
-          body: { 
-            url: selectedDocument.url,
-            title: selectedDocument.title,
-            // Add additional context that might help with debugging
-            docType: selectedDocument.mime_type,
-            requestedAt: new Date().toISOString()
-          },
-          headers: { 'Cache-Control': 'no-cache' }, // Avoid caching issues
+      // Extract text from the PDF data
+      const extractedContent = await extractPdfText(documentData, setExtractionProgress);
+      
+      setTimeout(() => {
+        setExtractedText(extractedContent);
+        setExtractionProgress(100);
+        toast({
+          title: "Text extraction completed",
+          description: `Successfully extracted text from "${selectedDocument.title}"`,
         });
-
-        if (error) {
-          console.error("Edge function error:", error);
-          throw new Error(`Proxy service error: ${error.message}`);
-        }
-        
-        if (data?.error) {
-          throw new Error(`${data.error}`);
-        }
-        
-        // The data should be the binary file
-        if (!data) {
-          throw new Error("No data received from proxy");
-        }
-        
-        setExtractionProgress(30);
-        
-        // Extract text from the PDF data
-        const extractedContent = await extractPdfText(data, setExtractionProgress);
-        
-        setTimeout(() => {
-          setExtractedText(extractedContent);
-          setExtractionProgress(100);
-          toast({
-            title: "Text extraction completed",
-            description: `Successfully extracted text from "${selectedDocument.title}"`,
-          });
-        }, 500);
-        
-      } catch (proxyError) {
-        console.error("Proxy fetch failed:", proxyError);
-        throw new Error(`Failed to fetch document through proxy: ${proxyError.message}`);
-      }
-      
+      }, 500);
     } catch (error) {
       console.error("Error extracting text:", error);
       
