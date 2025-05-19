@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 export type ConnectionStatus = "idle" | "checking" | "connected" | "error";
 
@@ -11,7 +12,9 @@ export const useProxyConnectionStatus = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const MAX_RETRIES = 2;
+  const { toast } = useToast();
 
   // Check proxy service connection
   const checkConnection = useCallback(async (forceCheck = false) => {
@@ -23,6 +26,7 @@ export const useProxyConnectionStatus = () => {
     
     try {
       setConnectionStatus("checking");
+      setConnectionError(null);
       console.log("Checking proxy service connection...");
       
       // Add a timeout for the connection check
@@ -47,6 +51,7 @@ export const useProxyConnectionStatus = () => {
       if (error) {
         console.error("Connection test failed with error:", error);
         setConnectionStatus("error");
+        setConnectionError(error.message || "Unknown connection error");
         
         // Implement automatic retry logic (up to MAX_RETRIES)
         if (retryCount < MAX_RETRIES) {
@@ -54,6 +59,11 @@ export const useProxyConnectionStatus = () => {
           setRetryCount(prev => prev + 1);
           setTimeout(() => checkConnection(true), 2000);
         } else {
+          toast({
+            title: "Proxy Service Unavailable",
+            description: "The document extraction service is currently unreachable. You can still use the database storage option.",
+            variant: "destructive",
+          });
           setRetryCount(0);
         }
         
@@ -67,6 +77,7 @@ export const useProxyConnectionStatus = () => {
     } catch (err) {
       console.error("Connection test error:", err);
       setConnectionStatus("error");
+      setConnectionError(err.message || "Unknown error occurred");
       
       // Implement automatic retry logic (up to MAX_RETRIES)
       if (retryCount < MAX_RETRIES) {
@@ -74,6 +85,11 @@ export const useProxyConnectionStatus = () => {
         setRetryCount(prev => prev + 1);
         setTimeout(() => checkConnection(true), 2000);
       } else {
+        toast({
+          title: "Proxy Service Unavailable",
+          description: "The document extraction service is currently unreachable. You can still use the database storage option.",
+          variant: "destructive",
+        });
         setRetryCount(0);
       }
       
@@ -81,12 +97,16 @@ export const useProxyConnectionStatus = () => {
     } finally {
       setLastChecked(new Date());
     }
-  }, [lastChecked, connectionStatus, retryCount]);
+  }, [lastChecked, connectionStatus, retryCount, toast]);
     
   // Check connection on mount
   useEffect(() => {
     checkConnection();
   }, [checkConnection]);
 
-  return { connectionStatus, checkConnection };
+  return { 
+    connectionStatus, 
+    connectionError,
+    checkConnection 
+  };
 };

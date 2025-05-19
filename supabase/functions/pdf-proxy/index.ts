@@ -1,11 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -14,7 +10,19 @@ serve(async (req) => {
   }
   
   try {
-    const { url, title, documentId, storeInDatabase } = await req.json();
+    // Parse request body
+    const requestData = await req.json();
+    
+    // Handle connection test request
+    if (requestData.action === "connection_test") {
+      console.log("Connection test received");
+      return new Response(
+        JSON.stringify({ status: "connected", timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { url, title, documentId, storeInDatabase } = requestData;
     
     if (!url) {
       return new Response(
@@ -63,8 +71,14 @@ serve(async (req) => {
       if (!isPdfSignature) {
         // If not a PDF, log the first part of the response for debugging
         const textDecoder = new TextDecoder();
-        const textContent = textDecoder.decode(arrayBuffer.slice(0, 200));
-        console.error("Response is not a valid PDF. Content starts with:", textContent);
+        const contentStart = textDecoder.decode(arrayBuffer.slice(0, 200));
+        console.error("Response is not a valid PDF. Content starts with:", contentStart);
+        
+        // Log full content for deeper inspection (limited to avoid excessive logs)
+        if (arrayBuffer.byteLength < 5000) {
+          console.error("Full content:", textDecoder.decode(arrayBuffer));
+        }
+        
         throw new Error("Response is not a valid PDF. The URL might not point to a PDF document.");
       }
       
@@ -74,34 +88,41 @@ serve(async (req) => {
           const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
           const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
           
-          if (supabaseUrl && supabaseServiceKey) {
-            const supabase = createClient(supabaseUrl, supabaseServiceKey);
-            
-            // Convert ArrayBuffer to Uint8Array for database storage
-            const binaryData = new Uint8Array(arrayBuffer);
-            
-            // Store in document_binaries table
-            const { error } = await supabase
-              .from('document_binaries')
-              .upsert({
-                document_id: documentId,
-                binary_data: binaryData,
-                content_type: response.headers.get('content-type') || 'application/pdf',
-                file_size: arrayBuffer.byteLength
-              })
-              .select();
-            
-            if (error) {
-              console.error("Error storing document binary:", error);
-            } else {
-              console.log(`Successfully stored document binary for ID: ${documentId}`);
-            }
-          } else {
+          if (!supabaseUrl || !supabaseServiceKey) {
             console.error("Missing Supabase configuration for database storage");
+            throw new Error("Server configuration error: Missing Supabase credentials");
+          }
+          
+          const supabase = createClient(supabaseUrl, supabaseServiceKey);
+          
+          // Convert ArrayBuffer to base64 for database storage
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < uint8Array.byteLength; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64Data = btoa(binary);
+          
+          // Store in document_binaries table with proper error handling
+          const { data, error } = await supabase
+            .from('document_binaries')
+            .upsert({
+              document_id: documentId,
+              binary_data: base64Data,
+              content_type: response.headers.get('content-type') || 'application/pdf',
+              file_size: arrayBuffer.byteLength
+            })
+            .select();
+          
+          if (error) {
+            console.error("Error storing document binary:", error);
+            throw new Error(`Database error: ${error.message}`);
+          } else {
+            console.log(`Successfully stored document binary for ID: ${documentId}`);
           }
         } catch (dbError) {
           console.error("Error storing document in database:", dbError);
-          // Don't throw, continue to return the document data
+          throw new Error(`Database operation failed: ${dbError.message || "Unknown database error"}`);
         }
       }
       
@@ -116,7 +137,10 @@ serve(async (req) => {
       // Return the base64 encoded data as JSON
       return new Response(
         JSON.stringify(base64Data),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
       );
     } catch (error) {
       clearTimeout(timeoutId);
@@ -128,9 +152,19 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in proxy service:", error.message);
     
+    // Create a more detailed error response
+    const errorResponse = {
+      error: error.message || "Unknown error occurred",
+      timestamp: new Date().toISOString(),
+      details: error.stack ? error.stack.split("\n").slice(0, 3).join("\n") : "No stack trace"
+    };
+    
     return new Response(
-      JSON.stringify({ error: error.message || "Unknown error occurred" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify(errorResponse),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
   }
 });

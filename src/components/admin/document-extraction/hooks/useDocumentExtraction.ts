@@ -9,7 +9,7 @@ import { useCallback } from "react";
  */
 export const useDocumentExtraction = () => {
   const { data: documents, isLoading } = useProcessedDocumentsFetch();
-  const { connectionStatus, checkConnection } = useProxyConnectionStatus();
+  const { connectionStatus, connectionError, checkConnection } = useProxyConnectionStatus();
   
   const {
     selectedDocumentId,
@@ -67,6 +67,7 @@ export const useDocumentExtraction = () => {
     error,
     retryExtraction,
     connectionStatus,
+    connectionError,
     checkConnection,
     storeInDatabase,
     setStoreInDatabase

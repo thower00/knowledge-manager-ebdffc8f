@@ -9,6 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoCircle } from "lucide-react";
 
 export function DocumentExtraction() {
   const {
@@ -23,6 +26,8 @@ export function DocumentExtraction() {
     error,
     retryExtraction,
     connectionStatus,
+    connectionError,
+    checkConnection,
     storeInDatabase,
     setStoreInDatabase
   } = useDocumentExtraction();
@@ -47,6 +52,11 @@ export function DocumentExtraction() {
   const handleExtract = () => {
     extractTextFromDocument(selectedDocumentId);
   };
+  
+  // Function to manually check connection
+  const handleCheckConnection = () => {
+    checkConnection(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -64,6 +74,47 @@ export function DocumentExtraction() {
             isCheckingConnection={isCheckingConnection}
             storeInDatabase={storeInDatabase}
           />
+          
+          {/* Connection status indicator */}
+          <div className="mt-4 flex items-center space-x-2">
+            <span className={`h-2 w-2 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' : 
+              connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' : 
+              'bg-red-500'
+            }`}></span>
+            <span className="text-sm text-muted-foreground">
+              Proxy Service: {
+                connectionStatus === 'connected' ? 'Available' : 
+                connectionStatus === 'checking' ? 'Checking...' : 
+                'Unavailable'
+              }
+            </span>
+            {connectionStatus === 'error' && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 py-1">
+                      <InfoCircle className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-xs">{connectionError || "Could not connect to proxy service"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {connectionStatus === 'error' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCheckConnection} 
+                className="ml-2 h-7 text-xs"
+                disabled={connectionStatus === 'checking'}
+              >
+                Retry Connection
+              </Button>
+            )}
+          </div>
           
           {/* Document Binary Storage Toggle */}
           <div className="mt-4 flex items-center space-x-2">
