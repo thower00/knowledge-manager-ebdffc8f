@@ -1,3 +1,4 @@
+
 import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
@@ -26,7 +27,7 @@ export const useDocumentExtraction = () => {
     setStoreInDatabase
   } = useTextExtraction();
 
-  // Wrapper for extractTextFromDocument that handles connection checking
+  // Wrapper for extractTextFromDocument that handles connection checking and URL conversion
   const extractTextFromDocument = useCallback(async (documentId: string) => {
     console.log("Extract text requested for document:", documentId);
     console.log("Current connection status:", connectionStatus);
@@ -43,11 +44,26 @@ export const useDocumentExtraction = () => {
       return;
     }
 
-    // Validate and potentially convert Google Drive URL
+    // Handle URL validation and conversion
     const url = selectedDocument.url || '';
     if (url) {
-      // First validate the URL
-      const { isValid, message } = validatePdfUrl(url);
+      // Check if it's a Google Drive URL that needs conversion
+      const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
+      
+      // If URL was converted, show a toast message and update the document URL
+      if (wasConverted) {
+        toast({
+          variant: "success",
+          title: "URL Converted",
+          description: "Google Drive URL automatically converted to direct download format."
+        });
+        
+        // Update the document object with the converted URL
+        selectedDocument.url = convertedUrl;
+      }
+      
+      // Validate the (possibly converted) URL
+      const { isValid, message } = validatePdfUrl(selectedDocument.url);
       if (!isValid) {
         toast({
           variant: "destructive",
@@ -55,21 +71,6 @@ export const useDocumentExtraction = () => {
           description: message || "The document URL appears to be invalid."
         });
         return;
-      }
-      
-      // Then check if we can convert to a better format
-      const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
-      
-      // If URL was converted, show a toast message
-      if (wasConverted) {
-        toast({
-          variant: "warning",
-          title: "Google Drive URL Notice",
-          description: "URL automatically converted to Google Drive direct download format."
-        });
-        
-        // Update the URL in the document object before extraction
-        selectedDocument.url = convertedUrl;
       }
     }
     

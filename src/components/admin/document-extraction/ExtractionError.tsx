@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
@@ -38,10 +37,17 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
             <p className="font-semibold">Google Drive URL Issue:</p>
             <ul className="list-disc ml-5 mt-1 text-sm">
               <li>Make sure the Google Drive file is shared with "Anyone with the link" access</li>
-              <li>For Google Drive files, use the direct download URL format: 
-                <code className="px-1 bg-red-100 ml-1">https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</code>
+              <li>For Google Drive files, use one of these URL formats:
+                <ul className="list-disc ml-5 mt-1 text-xs">
+                  <li>Add <code className="px-1 bg-red-100">?alt=media</code> at the end of the view URL: 
+                    <code className="px-1 bg-red-100 text-xs block mt-1">https://drive.google.com/file/d/YOUR_FILE_ID/view?alt=media</code>
+                  </li>
+                  <li>Or use the direct download format:
+                    <code className="px-1 bg-red-100 text-xs block mt-1">https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</code>
+                  </li>
+                </ul>
               </li>
-              <li>Or simply add <code className="px-1 bg-red-100">?alt=media</code> at the end of the view URL</li>
+              <li>The system will try to automatically convert your URLs, but manual sharing settings adjustment may still be needed</li>
             </ul>
           </div>
         )}

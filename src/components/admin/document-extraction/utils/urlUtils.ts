@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for URL validation and processing
  */
@@ -23,15 +22,20 @@ export const validatePdfUrl = (url: string): {
     return { isValid: false, message: "Invalid URL format" };
   }
 
-  // Check if it's a Google Drive URL
+  // Automatically attempt to convert Google Drive URLs to direct download format
   if (url.includes('drive.google.com')) {
-    // Check if it's in direct download format (contains 'alt=media')
-    if (!url.includes('alt=media')) {
+    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
+    
+    // If the URL wasn't converted and doesn't have alt=media, it's not valid
+    if (!convertedUrl.includes('alt=media') && !wasConverted) {
       return { 
         isValid: false, 
         message: "Google Drive URL must be in direct download format (include '?alt=media')"
       };
     }
+    
+    // If it was successfully converted or already has alt=media, it's valid
+    return { isValid: true, message: null };
   }
   
   // Check for common PDF extensions in the URL
@@ -39,8 +43,8 @@ export const validatePdfUrl = (url: string): {
   const isPdfContentType = url.toLowerCase().includes('pdf') || 
                            url.includes('application/pdf');
   
-  // For Google Drive or URLs with known content type, we can be more lenient
-  if (url.includes('drive.google.com') || isPdfContentType) {
+  // For URLs with known content type, we can be more lenient
+  if (isPdfContentType) {
     return { isValid: true, message: null };
   }
   
@@ -57,8 +61,9 @@ export const validatePdfUrl = (url: string): {
 
 /**
  * Convert Google Drive view URLs to direct download URLs
+ * This function handles various Google Drive URL formats and returns a direct download URL
  * @param url Original Google Drive URL
- * @returns Converted URL for direct download
+ * @returns Object with converted URL and status flag
  */
 export const convertGoogleDriveUrl = (url: string): { 
   url: string; 
@@ -82,6 +87,21 @@ export const convertGoogleDriveUrl = (url: string): {
   
   if (fileMatch && fileMatch[1]) {
     fileId = fileMatch[1];
+    
+    // If URL already ends with /view?alt=media, don't modify it
+    if (url.endsWith('/view?alt=media')) {
+      return { url, wasConverted: false };
+    }
+    
+    // If URL ends with /view, append ?alt=media
+    if (url.endsWith('/view')) {
+      return { 
+        url: `${url}?alt=media`,
+        wasConverted: true 
+      };
+    }
+    
+    // Otherwise create a proper direct download URL
     return { 
       url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 
@@ -94,6 +114,18 @@ export const convertGoogleDriveUrl = (url: string): {
   
   if (openMatch && openMatch[1]) {
     fileId = openMatch[1];
+    return { 
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      wasConverted: true 
+    };
+  }
+  
+  // Additional format: docs.google.com/document/d/FILE_ID/edit
+  const docsPattern = /document\/d\/([^/]+)/;
+  const docsMatch = url.match(docsPattern);
+  
+  if (docsMatch && docsMatch[1]) {
+    fileId = docsMatch[1];
     return { 
       url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 

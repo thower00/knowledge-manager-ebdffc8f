@@ -41,34 +41,38 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
   const [urlStatus, setUrlStatus] = useState<{
     isValid: boolean;
     message: string | null;
-  }>({ isValid: true, message: null });
+    canAutoFix: boolean;
+  }>({ isValid: true, message: null, canAutoFix: false });
   
   // Check URL validity whenever the selected document changes
   useEffect(() => {
     if (!selectedDocumentId || !documents) {
-      setUrlStatus({ isValid: true, message: null });
+      setUrlStatus({ isValid: true, message: null, canAutoFix: false });
       return;
     }
     
     const selectedDoc = documents.find(doc => doc.id === selectedDocumentId);
     if (!selectedDoc || !selectedDoc.url) {
-      setUrlStatus({ isValid: true, message: null });
+      setUrlStatus({ isValid: true, message: null, canAutoFix: false });
       return;
     }
     
     // Validate the document URL
     const result = validatePdfUrl(selectedDoc.url);
-    setUrlStatus(result);
+    
+    // Check if this is a Google Drive URL that could be auto-fixed
+    const canAutoFix = selectedDoc.url.includes('drive.google.com') && !result.isValid;
+    
+    setUrlStatus({
+      ...result,
+      canAutoFix
+    });
   }, [selectedDocumentId, documents]);
 
   // Determine if the extract button should be enabled
-  // Allow extracting if selected document is valid AND either:
-  // 1. Proxy is available, OR
-  // 2. Store in database is enabled, OR
-  // 3. Connection check is in progress
   const canExtract = selectedDocumentId && 
                     !isExtracting && 
-                    urlStatus.isValid && 
+                    (urlStatus.isValid || urlStatus.canAutoFix) && 
                     (isProxyAvailable || storeInDatabase || isCheckingConnection);
 
   return (
@@ -86,15 +90,18 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
               </SelectItem>
             ) : documents && documents.length > 0 ? (
               documents.map((doc) => {
-                const isValidUrl = doc.url ? validatePdfUrl(doc.url).isValid : true;
+                const urlValidation = doc.url ? validatePdfUrl(doc.url) : { isValid: true };
+                const canAutoFix = doc.url?.includes('drive.google.com') && !urlValidation.isValid;
+                
                 return (
                   <SelectItem 
                     key={doc.id} 
                     value={doc.id}
-                    className={!isValidUrl ? "text-amber-600" : ""}
+                    className={!urlValidation.isValid ? (canAutoFix ? "text-amber-600" : "text-red-600") : ""}
                   >
                     {doc.title}
-                    {!isValidUrl && " (URL format issue)"}
+                    {!urlValidation.isValid && canAutoFix && " (needs URL format fix)"}
+                    {!urlValidation.isValid && !canAutoFix && " (invalid URL)"}
                   </SelectItem>
                 );
               })
@@ -107,9 +114,12 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
         </Select>
         
         {selectedDocumentId && !urlStatus.isValid && (
-          <div className="text-sm text-amber-600 flex items-center mt-1">
+          <div className={`text-sm flex items-center mt-1 ${urlStatus.canAutoFix ? 'text-amber-600' : 'text-red-600'}`}>
             <AlertTriangle className="h-4 w-4 mr-1" />
-            <span>{urlStatus.message}</span>
+            <span>
+              {urlStatus.message} 
+              {urlStatus.canAutoFix && ' (Will be auto-fixed during extraction)'}
+            </span>
           </div>
         )}
       </div>

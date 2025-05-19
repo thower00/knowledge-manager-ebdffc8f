@@ -1,9 +1,8 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// Helper function to convert Google Drive view URLs to direct download URLs
+// Enhanced helper function to convert Google Drive view URLs to direct download URLs
 function convertGoogleDriveUrl(url: string): string {
   if (!url.includes('drive.google.com')) {
     return url; // Not a Google Drive URL, return unchanged
@@ -26,6 +25,13 @@ function convertGoogleDriveUrl(url: string): string {
   if (fileMatch && fileMatch[1]) {
     fileId = fileMatch[1];
     console.log("Extracted file ID:", fileId);
+    
+    // If URL ends with /view, append ?alt=media
+    if (url.endsWith('/view')) {
+      return `${url}?alt=media`;
+    }
+    
+    // Otherwise use the export=download format
     return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
   }
   
@@ -36,6 +42,16 @@ function convertGoogleDriveUrl(url: string): string {
   if (openMatch && openMatch[1]) {
     fileId = openMatch[1];
     console.log("Extracted file ID from open URL:", fileId);
+    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+  }
+  
+  // Additional format: docs.google.com/document/d/FILE_ID/edit
+  const docsPattern = /document\/d\/([^/]+)/;
+  const docsMatch = url.match(docsPattern);
+  
+  if (docsMatch && docsMatch[1]) {
+    fileId = docsMatch[1];
+    console.log("Extracted file ID from docs URL:", fileId);
     return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
   }
   
