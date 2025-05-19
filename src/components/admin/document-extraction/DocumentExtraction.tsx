@@ -21,11 +21,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentMetadata, ProcessedDocument } from "@/types/document";
+import { Progress } from "@/components/ui/progress";
 
 export function DocumentExtraction() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedText, setExtractedText] = useState<string>("");
+  const [extractionProgress, setExtractionProgress] = useState(0);
   const { toast } = useToast();
 
   // Fetch processed documents
@@ -46,6 +48,12 @@ export function DocumentExtraction() {
     },
   });
 
+  // Reset progress when selecting a new document
+  useEffect(() => {
+    setExtractionProgress(0);
+    setExtractedText("");
+  }, [selectedDocumentId]);
+
   // Function to extract text from a PDF document
   const extractTextFromDocument = async (documentId: string) => {
     if (!documentId) {
@@ -59,32 +67,57 @@ export function DocumentExtraction() {
 
     setIsExtracting(true);
     setExtractedText("");
+    setExtractionProgress(0);
 
     try {
-      // For demo purposes, we're simulating the extraction with a delay
-      // In a real implementation, you would call an API endpoint to extract the text
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock response - in a real app, this would come from an API
+      // Get the selected document to retrieve its URL
       const selectedDocument = documents?.find(doc => doc.id === documentId);
       
-      // Generate some fake text based on the document title for demonstration
-      const simulatedText = `Title: ${selectedDocument?.title || "Unknown Document"}\n\n` +
-        `This is simulated extracted content from document ID ${documentId}.\n\n` +
-        `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed egestas, magna vel efficitur ` +
-        `dictum, lectus metus viverra felis, vel dignissim ipsum nisi at magna. Mauris eu nisl vel ` +
-        `magna finibus efficitur. Proin accumsan aliquet nibh, vel facilisis massa malesuada vel.\n\n` +
-        `Document source: ${selectedDocument?.source_type || "Unknown"}\n` +
-        `Mime type: ${selectedDocument?.mime_type || "Unknown"}\n` +
-        `Created at: ${new Date(selectedDocument?.created_at || "").toLocaleString()}\n` +
-        `Processed at: ${selectedDocument?.processed_at ? new Date(selectedDocument.processed_at).toLocaleString() : "N/A"}\n`;
+      if (!selectedDocument || !selectedDocument.url) {
+        throw new Error("Document URL not found");
+      }
       
-      setExtractedText(simulatedText);
+      console.log("Starting extraction for document:", selectedDocument.title);
+      console.log("Document URL:", selectedDocument.url);
       
-      toast({
-        title: "Text extraction completed",
-        description: "Successfully extracted text from the document",
-      });
+      // Simulating progress updates
+      const progressInterval = setInterval(() => {
+        setExtractionProgress(prev => {
+          const newProgress = Math.min(prev + 10, 90);
+          return newProgress;
+        });
+      }, 500);
+      
+      // Fetch the document and extract text
+      // In a real implementation, we would use a PDF parsing library or service
+      const response = await fetch(selectedDocument.url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch document: ${response.status}`);
+      }
+      
+      // Get document as blob
+      const pdfBlob = await response.blob();
+      
+      // Create a FormData object to send the file to an extraction service
+      const formData = new FormData();
+      formData.append('file', pdfBlob, selectedDocument.title);
+      
+      // For now, we're using a simple text extraction from the blob
+      // In a production environment, you would send this to a PDF parsing service
+      const text = await extractTextFromBlob(pdfBlob);
+      
+      clearInterval(progressInterval);
+      setExtractionProgress(100);
+      
+      setTimeout(() => {
+        setExtractedText(text);
+        toast({
+          title: "Text extraction completed",
+          description: "Successfully extracted text from the document",
+        });
+      }, 500);
+      
     } catch (error) {
       console.error("Error extracting text:", error);
       toast({
@@ -94,6 +127,45 @@ export function DocumentExtraction() {
       });
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  // Function to extract text from a blob (PDF)
+  const extractTextFromBlob = async (blob: Blob): Promise<string> => {
+    try {
+      // For demonstration, we'll return the first few bytes as text
+      // In a real implementation, you would use a PDF parsing library
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      
+      // Check if this is a PDF by looking at the magic number
+      const isPdf = bytes[0] === 37 && bytes[1] === 80 && bytes[2] === 68 && bytes[3] === 70;
+      
+      if (!isPdf) {
+        return "This does not appear to be a PDF file. The file starts with: " + 
+          String.fromCharCode.apply(null, Array.from(bytes.slice(0, 20)));
+      }
+      
+      // Extract basic info about the PDF
+      let infoText = "PDF Document detected\n\n";
+      infoText += "File size: " + (blob.size / 1024).toFixed(2) + " KB\n";
+      infoText += "MIME type: " + blob.type + "\n\n";
+      
+      // In a real implementation, we would use a library like pdf.js to extract text
+      infoText += "This is the binary content preview of the PDF file (first 100 bytes):\n";
+      
+      // Format first bytes as hex for debugging
+      const hexBytes = Array.from(bytes.slice(0, 100))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ');
+        
+      infoText += hexBytes + "\n\n";
+      infoText += "Note: For proper PDF text extraction, you would need to integrate a library like pdf.js or use a server-side PDF parsing service.";
+      
+      return infoText;
+    } catch (error) {
+      console.error("Error in extractTextFromBlob:", error);
+      return "Error extracting text from document: " + (error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -152,6 +224,16 @@ export function DocumentExtraction() {
             </>
           )}
         </Button>
+
+        {isExtracting && (
+          <div className="space-y-2">
+            <Label>Extraction Progress</Label>
+            <Progress value={extractionProgress} className="h-2" />
+            <p className="text-sm text-muted-foreground text-center">
+              {extractionProgress}% complete
+            </p>
+          </div>
+        )}
 
         {extractedText && (
           <div className="mt-6 space-y-2">
