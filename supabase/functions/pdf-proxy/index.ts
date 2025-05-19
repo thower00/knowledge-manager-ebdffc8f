@@ -35,6 +35,9 @@ serve(async (req) => {
     console.log(`Store in database: ${storeInDatabase ? 'yes' : 'no'}`);
     console.log(`Document ID: ${documentId || 'not provided'}`);
     
+    // Log full URL for debugging
+    console.log(`Full URL being processed: ${url}`);
+    
     // Set timeout for the fetch operation
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -46,15 +49,32 @@ serve(async (req) => {
         headers: {
           // Add common headers that might help with certain sources
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'application/pdf,*/*'
-        }
+          'Accept': 'application/pdf,*/*',
+          // Try to force download rather than view in browser
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive'
+        },
+        redirect: 'follow' // Follow redirects automatically
       });
       
       // Clear the timeout since the fetch completed
       clearTimeout(timeoutId);
       
       if (!response.ok) {
+        console.error(`Fetch failed with status: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+      }
+      
+      // Check content type to ensure we're getting a PDF
+      const contentType = response.headers.get('content-type');
+      console.log(`Response content type: ${contentType}`);
+      
+      if (contentType && !contentType.includes('pdf') && !contentType.includes('octet-stream') && !contentType.includes('application/binary')) {
+        console.error(`Unexpected content type: ${contentType}`);
+        // Log the first part of the response for debugging
+        const text = await response.text();
+        console.error(`Response starts with: ${text.substring(0, 500)}`);
+        throw new Error(`Server returned non-PDF content type: ${contentType}. This URL might not be a direct link to a PDF file.`);
       }
       
       // Get the document data as an ArrayBuffer
@@ -71,15 +91,10 @@ serve(async (req) => {
       if (!isPdfSignature) {
         // If not a PDF, log the first part of the response for debugging
         const textDecoder = new TextDecoder();
-        const contentStart = textDecoder.decode(arrayBuffer.slice(0, 200));
+        const contentStart = textDecoder.decode(arrayBuffer.slice(0, 500));
         console.error("Response is not a valid PDF. Content starts with:", contentStart);
         
-        // Log full content for deeper inspection (limited to avoid excessive logs)
-        if (arrayBuffer.byteLength < 5000) {
-          console.error("Full content:", textDecoder.decode(arrayBuffer));
-        }
-        
-        throw new Error("Response is not a valid PDF. The URL might not point to a PDF document.");
+        throw new Error("The URL doesn't point to a valid PDF file. If using Google Drive, make sure to use the direct download link (ends with /view?alt=media).");
       }
       
       // Store the document in the database if requested and we have a document ID
@@ -102,6 +117,9 @@ serve(async (req) => {
             binary += String.fromCharCode(uint8Array[i]);
           }
           const base64Data = btoa(binary);
+          
+          console.log(`Storing document binary for ID: ${documentId}`);
+          console.log(`Binary data size: ${base64Data.length} characters`);
           
           // Store in document_binaries table with proper error handling
           const { data, error } = await supabase

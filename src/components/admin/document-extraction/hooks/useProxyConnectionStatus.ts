@@ -3,110 +3,97 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-export type ConnectionStatus = "idle" | "checking" | "connected" | "error";
-
 /**
- * Hook to check connection status with the proxy service
+ * Hook to check and monitor the proxy connection status
  */
 export const useProxyConnectionStatus = () => {
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const MAX_RETRIES = 2;
   const { toast } = useToast();
 
-  // Check proxy service connection
-  const checkConnection = useCallback(async (forceCheck = false) => {
-    // Only check if we haven't checked in the last 30 seconds (to avoid excessive calls)
-    // Unless forceCheck is true
-    if (!forceCheck && lastChecked && (new Date().getTime() - lastChecked.getTime() < 30000)) {
-      return connectionStatus;
+  /**
+   * Check the connection to the proxy service
+   * @param forceCheck Force a new check even if already connected
+   * @returns Connection status after checking
+   */
+  const checkConnection = useCallback(async (forceCheck = false): Promise<'connected' | 'error'> => {
+    // Don't check if already connected unless forced
+    if (connectionStatus === 'connected' && !forceCheck) {
+      return 'connected';
     }
+
+    setConnectionStatus('checking');
+    console.log("Checking proxy service connection...");
     
-    try {
-      setConnectionStatus("checking");
-      setConnectionError(null);
-      console.log("Checking proxy service connection...");
-      
-      // Add a timeout for the connection check
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Connection test timed out")), 8000);
-      });
-      
-      // Actual connection check
-      const connectionPromise = supabase.functions.invoke("pdf-proxy", {
-        body: { action: "connection_test" },
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      
-      // Race between the timeout and the actual request
-      const { data, error } = await Promise.race([
-        connectionPromise,
-        timeoutPromise.then(() => {
-          throw new Error("Connection test timed out");
-        })
-      ]) as any;
-      
-      if (error) {
-        console.error("Connection test failed with error:", error);
-        setConnectionStatus("error");
-        setConnectionError(error.message || "Unknown connection error");
-        
-        // Implement automatic retry logic (up to MAX_RETRIES)
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}...`);
-          setRetryCount(prev => prev + 1);
-          setTimeout(() => checkConnection(true), 2000);
-        } else {
-          toast({
-            title: "Proxy Service Unavailable",
-            description: "The document extraction service is currently unreachable. You can still use the database storage option.",
-            variant: "destructive",
-          });
-          setRetryCount(0);
-        }
-        
-        return "error";
-      }
-      
-      console.log("Connection test succeeded:", data);
-      setConnectionStatus("connected");
-      setRetryCount(0);
-      return "connected";
-    } catch (err) {
-      console.error("Connection test error:", err);
-      setConnectionStatus("error");
-      setConnectionError(err.message || "Unknown error occurred");
-      
-      // Implement automatic retry logic (up to MAX_RETRIES)
-      if (retryCount < MAX_RETRIES) {
-        console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}...`);
-        setRetryCount(prev => prev + 1);
-        setTimeout(() => checkConnection(true), 2000);
-      } else {
-        toast({
-          title: "Proxy Service Unavailable",
-          description: "The document extraction service is currently unreachable. You can still use the database storage option.",
-          variant: "destructive",
+    let retries = 2;
+    let currentRetry = 0;
+    
+    while (currentRetry <= retries) {
+      try {
+        const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
+          body: { action: "connection_test" }
         });
-        setRetryCount(0);
+
+        if (functionError) {
+          throw functionError;
+        }
+
+        if (data && data.status === "connected") {
+          setConnectionStatus('connected');
+          setConnectionError(null);
+          return 'connected';
+        } else {
+          throw new Error("Invalid response from proxy service");
+        }
+      } catch (error) {
+        console.error("Connection test failed with error:", error);
+        
+        if (currentRetry < retries) {
+          currentRetry++;
+          console.log(`Retry attempt ${currentRetry} of ${retries}...`);
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          let errorMessage = "Failed to connect to proxy service";
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+          
+          setConnectionStatus('error');
+          setConnectionError(errorMessage);
+          
+          if (forceCheck) {
+            toast({
+              variant: "destructive",
+              title: "Connection Failed",
+              description: "Unable to connect to the PDF proxy service"
+            });
+          }
+          
+          return 'error';
+        }
       }
-      
-      return "error";
-    } finally {
-      setLastChecked(new Date());
     }
-  }, [lastChecked, connectionStatus, retryCount, toast]);
     
-  // Check connection on mount
+    // This should never be reached due to the returns above, but TypeScript requires it
+    return 'error';
+  }, [connectionStatus, toast]);
+
+  // Initial connection check on mount
   useEffect(() => {
     checkConnection();
+    
+    // Check connection every 5 minutes to ensure it's still available
+    const intervalId = setInterval(() => {
+      checkConnection(true);
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(intervalId);
   }, [checkConnection]);
 
-  return { 
-    connectionStatus, 
+  return {
+    connectionStatus,
     connectionError,
-    checkConnection 
+    checkConnection
   };
 };

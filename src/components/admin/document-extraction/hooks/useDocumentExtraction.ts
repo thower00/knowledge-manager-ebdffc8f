@@ -3,6 +3,7 @@ import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
 import { useCallback } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 /**
  * Main hook that composes all document extraction functionality
@@ -10,6 +11,7 @@ import { useCallback } from "react";
 export const useDocumentExtraction = () => {
   const { data: documents, isLoading } = useProcessedDocumentsFetch();
   const { connectionStatus, connectionError, checkConnection } = useProxyConnectionStatus();
+  const { toast } = useToast();
   
   const {
     selectedDocumentId,
@@ -30,6 +32,27 @@ export const useDocumentExtraction = () => {
     console.log("Current connection status:", connectionStatus);
     console.log("Using database storage:", storeInDatabase);
     
+    // Select the document from the list
+    const selectedDocument = documents?.find(doc => doc.id === documentId);
+    if (!selectedDocument) {
+      toast({
+        variant: "destructive",
+        title: "Document not found",
+        description: "The selected document could not be found."
+      });
+      return;
+    }
+
+    // Check URL format for Google Drive documents
+    const url = selectedDocument.url || '';
+    if (url.includes('drive.google.com') && !url.includes('alt=media')) {
+      toast({
+        variant: "warning",
+        title: "Google Drive URL Format",
+        description: "For Google Drive documents, ensure the URL ends with '?alt=media' for direct download."
+      });
+    }
+    
     // If database storage is enabled, we can proceed regardless of connection status
     if (storeInDatabase) {
       console.log("Database storage enabled, proceeding with extraction regardless of proxy status");
@@ -47,13 +70,18 @@ export const useDocumentExtraction = () => {
       // If still error, don't proceed with extraction
       if (status === "error") {
         console.error("Connection still unavailable, cannot proceed with extraction");
+        toast({
+          variant: "destructive",
+          title: "Connection Unavailable",
+          description: "Cannot connect to the proxy service. Please try again later or enable database storage."
+        });
         return;
       }
     }
     
     console.log("Connection is good or database storage is enabled, proceeding with extraction");
     return extractText(documentId, documents);
-  }, [connectionStatus, checkConnection, extractText, documents, storeInDatabase]);
+  }, [connectionStatus, checkConnection, extractText, documents, storeInDatabase, toast]);
 
   return {
     documents,

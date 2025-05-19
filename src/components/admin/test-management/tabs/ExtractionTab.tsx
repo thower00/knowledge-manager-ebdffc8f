@@ -13,7 +13,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Info } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ExtractionTabProps {
   isLoading: boolean;
@@ -24,9 +25,25 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [extractionText, setExtractionText] = useState("");
   const [testUrl, setTestUrl] = useState("");
   const [useTestUrl, setUseTestUrl] = useState(false);
+  const [testUrlError, setTestUrlError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const validateGoogleDriveUrl = (url: string) => {
+    if (url.includes('drive.google.com') && !url.includes('alt=media')) {
+      setTestUrlError("For Google Drive PDFs, make sure the URL contains '?alt=media' for direct download");
+      return false;
+    }
+    setTestUrlError(null);
+    return true;
+  };
+
   const handleTest = () => {
+    if (useTestUrl && testUrl) {
+      if (!validateGoogleDriveUrl(testUrl)) {
+        return;
+      }
+    }
+    
     onRunTest({ extractionText });
     toast({
       title: "Test completed",
@@ -58,13 +75,32 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             <Input
               type="url"
               value={testUrl}
-              onChange={(e) => setTestUrl(e.target.value)}
+              onChange={(e) => {
+                setTestUrl(e.target.value);
+                validateGoogleDriveUrl(e.target.value);
+              }}
               placeholder="https://example.com/sample.pdf"
             />
             <p className="text-sm text-muted-foreground flex items-center">
               <Info className="h-4 w-4 mr-1 inline" />
               Enter direct URL to a PDF document (must be publicly accessible)
             </p>
+            
+            {testUrlError && (
+              <Alert variant="warning" className="mt-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="ml-2">{testUrlError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="mt-2 p-3 bg-blue-50 text-blue-800 rounded-md">
+              <p className="font-medium">Google Drive URL Tips:</p>
+              <ul className="list-disc ml-5 mt-1 text-sm">
+                <li>For Google Drive PDFs, make sure the URL ends with "?alt=media" for direct download</li>
+                <li>Example format: https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</li>
+                <li>File must be shared with "Anyone with the link"</li>
+              </ul>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
