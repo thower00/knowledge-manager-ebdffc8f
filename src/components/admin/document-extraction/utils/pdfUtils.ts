@@ -1,8 +1,17 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 
-// Set worker path - needed for pdf.js to work
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Instead of using external CDN, we'll create a local worker
+const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.mjs");
+if (typeof window !== 'undefined' && 'Worker' in window) {
+  pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(
+    new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url),
+    { type: "module" }
+  );
+} else {
+  // Fallback for environments where Workers are not available
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+}
 
 /**
  * Fetches a document through the proxy service

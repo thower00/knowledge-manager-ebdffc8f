@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { extractPdfText } from "../utils/pdfUtils";
@@ -52,16 +52,25 @@ export const useTextExtraction = () => {
         throw new Error("No data received from proxy");
       }
       
-      // Convert the base64 data to ArrayBuffer
-      const binaryString = window.atob(data as string);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const arrayBuffer = bytes.buffer;
+      console.log("Received data from proxy service, processing...");
       
-      setExtractionProgress(30);
-      return arrayBuffer;
+      // Convert the base64 data to ArrayBuffer
+      try {
+        const binaryString = window.atob(data as string);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        console.log("Successfully converted base64 to ArrayBuffer, size:", bytes.length);
+        
+        const arrayBuffer = bytes.buffer;
+        setExtractionProgress(30);
+        return arrayBuffer;
+      } catch (decodeError) {
+        console.error("Error decoding base64 data:", decodeError);
+        throw new Error(`Failed to decode document data: ${decodeError.message}`);
+      }
     } catch (proxyError) {
       console.error("Proxy fetch failed:", proxyError);
       
@@ -111,15 +120,22 @@ export const useTextExtraction = () => {
         size: data.binary_data.length
       });
       
-      // Convert from base64 to ArrayBuffer
-      const binaryString = window.atob(data.binary_data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      try {
+        // Convert from base64 to ArrayBuffer
+        const binaryString = window.atob(data.binary_data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        console.log("Successfully converted database binary to ArrayBuffer, size:", bytes.length);
+        
+        setExtractionProgress(20);
+        return bytes.buffer;
+      } catch (decodeError) {
+        console.error("Error converting database binary to ArrayBuffer:", decodeError);
+        throw new Error(`Failed to decode document from database: ${decodeError.message}`);
       }
-      
-      setExtractionProgress(20);
-      return bytes.buffer;
     } catch (error) {
       console.error("Error in fetchDocumentFromDatabase:", error);
       return null;
@@ -194,6 +210,8 @@ export const useTextExtraction = () => {
           errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
         } else if (error.message.includes("timeout") || error.message.includes("timed out")) {
           errorMessage = "The request timed out. The document may be too large or the server is not responding.";
+        } else if (error.message.includes("Failed to decode")) {
+          errorMessage = "Failed to decode the document data. The file might be corrupted or in an unsupported format.";
         } else {
           errorMessage = error.message;
         }

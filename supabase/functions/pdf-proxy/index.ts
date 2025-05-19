@@ -57,8 +57,19 @@ serve(async (req) => {
     if (requestData.action === "connection_test") {
       console.log("Connection test received");
       return new Response(
-        JSON.stringify({ status: "connected", timestamp: new Date().toISOString() }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          status: "connected", 
+          timestamp: new Date().toISOString(),
+          message: "Connection successful"
+        }),
+        { 
+          status: 200, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          } 
+        }
       );
     }
     
@@ -148,6 +159,7 @@ serve(async (req) => {
       
       // Get the document data as an ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
+      console.log(`Successfully fetched document, size: ${arrayBuffer.byteLength} bytes`);
       
       // Simple validation to check if this looks like a PDF
       const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
@@ -221,11 +233,17 @@ serve(async (req) => {
       }
       const base64Data = btoa(binary);
       
+      console.log(`Successfully encoded document as base64, length: ${base64Data.length}`);
+      
       // Return the base64 encoded data as JSON
       return new Response(
         JSON.stringify(base64Data),
         { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          },
           status: 200
         }
       );
@@ -250,7 +268,11 @@ serve(async (req) => {
       JSON.stringify(errorResponse),
       { 
         status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
       }
     );
   }
