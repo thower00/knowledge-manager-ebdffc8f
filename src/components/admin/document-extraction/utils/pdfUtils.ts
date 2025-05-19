@@ -14,43 +14,6 @@ if (typeof window !== 'undefined' && 'Worker' in window) {
 }
 
 /**
- * Fetches a document through the proxy service
- * @param url URL of the document to fetch
- * @returns ArrayBuffer containing the document data
- */
-export const fetchDocumentViaProxy = async (url: string): Promise<ArrayBuffer> => {
-  try {
-    console.log("Fetching document via proxy:", url);
-    return await makeProxyRequest(url);
-  } catch (error) {
-    console.error("Error fetching document via proxy:", error);
-    throw error;
-  }
-};
-
-/**
- * Makes the actual request to the proxy service
- * @param url URL to fetch
- * @returns ArrayBuffer of response data
- */
-const makeProxyRequest = async (url: string): Promise<ArrayBuffer> => {
-  const response = await fetch("/api/pdf-proxy", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ url }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Proxy service error: ${response.status} ${response.statusText}`);
-  }
-  
-  // Get the binary data as array buffer
-  return await response.arrayBuffer();
-};
-
-/**
  * Checks if the provided data is a valid PDF by checking signature bytes
  * @param pdfData ArrayBuffer containing PDF data
  * @returns Error message if invalid or null if valid
