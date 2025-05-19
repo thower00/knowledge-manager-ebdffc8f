@@ -5,7 +5,7 @@ export interface ModelOption {
   description?: string;
   defaultChunkSize: string;
   defaultChunkOverlap: string;
-  defaultChunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph";
+  defaultChunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph" | "sentence";
 }
 
 export interface ProviderConfig {
@@ -143,7 +143,7 @@ export function getProviderFromModel(modelId: string): string {
 export function getModelDefaults(providerId: string, modelId: string): {
   chunkSize: string;
   chunkOverlap: string;
-  chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph";
+  chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph" | "sentence";
 } {
   const provider = MODEL_PROVIDERS[providerId];
   if (!provider) return {

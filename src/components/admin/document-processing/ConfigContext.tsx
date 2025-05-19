@@ -10,7 +10,7 @@ export interface ConfigSettings {
   specificModelId: string;
   chunkSize: string;
   chunkOverlap: string;
-  chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph";
+  chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph" | "sentence";
   storagePath: string;
   customConfiguration: string;
   providerApiKeys: {

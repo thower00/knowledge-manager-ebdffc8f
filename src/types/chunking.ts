@@ -2,7 +2,7 @@
 export interface ChunkingConfig {
   chunkSize: number;
   chunkOverlap: number;
-  chunkStrategy: "fixed_size" | "paragraph" | "sentence" | "recursive";
+  chunkStrategy: "fixed_size" | "paragraph" | "sentence" | "recursive" | "semantic";
 }
 
 export interface DocumentChunk {

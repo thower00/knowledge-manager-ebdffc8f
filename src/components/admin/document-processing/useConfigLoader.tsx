@@ -33,6 +33,7 @@ export function useConfigLoader(activeTab: string) {
         
         // If configuration exists, populate the form
         if (data?.value) {
+          console.log("Loaded configuration:", data.value);
           const configValue = data.value as any;
           
           // Determine the provider based on the model or specificModelId
@@ -52,6 +53,9 @@ export function useConfigLoader(activeTab: string) {
             customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
             providerApiKeys: configValue.providerApiKeys || {}
           });
+        } else {
+          // Reset to default config if nothing is found
+          setConfig(DEFAULT_CONFIG);
         }
       } catch (err: any) {
         console.error("Error in fetchConfig:", err);

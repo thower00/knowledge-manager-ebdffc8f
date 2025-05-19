@@ -16,6 +16,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   
   const applyModelDefaults = (providerId: string, modelId: string) => {
     const defaults = getModelDefaults(providerId, modelId);
+    console.log(`Applying defaults for ${providerId}/${modelId}:`, defaults);
     
     setConfig(prev => ({
       ...prev,
@@ -26,6 +27,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleProviderChange = (newProvider: string) => {
+    console.log(`Changing provider to: ${newProvider}`);
     // Get the first model from the selected provider
     const firstModel = MODEL_PROVIDERS[newProvider]?.models[0]?.id || "";
     
@@ -44,6 +46,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleModelChange = (modelId: string) => {
+    console.log(`Changing model to: ${modelId}`);
     setConfig(prev => ({
       ...prev,
       specificModelId: modelId,
