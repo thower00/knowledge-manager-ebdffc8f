@@ -26,6 +26,7 @@ export function DocumentExtraction() {
     extractionProgress,
     extractedText,
     error,
+    retryExtraction,
   } = useDocumentExtraction();
 
   return (
@@ -67,7 +68,10 @@ export function DocumentExtraction() {
           extractionProgress={extractionProgress}
         />
 
-        <ExtractionError error={error} />
+        <ExtractionError 
+          error={error} 
+          onRetry={retryExtraction}
+        />
 
         <ExtractedTextDisplay extractedText={extractedText} />
       </CardContent>

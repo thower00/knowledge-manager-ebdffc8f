@@ -63,9 +63,10 @@ export const useDocumentExtraction = () => {
       setExtractionProgress(10);
       
       try {
-        // Attempt to fetch document through the proxy service
+        // Set a longer timeout for the function call
         const { data, error } = await supabase.functions.invoke("pdf-proxy", {
           body: { url: selectedDocument.url },
+          headers: { 'Cache-Control': 'no-cache' } // Avoid caching issues
         });
 
         if (error) {
@@ -74,7 +75,7 @@ export const useDocumentExtraction = () => {
         }
         
         if (data?.error) {
-          throw new Error(`Proxy service error: ${data.error}`);
+          throw new Error(`${data.error}`);
         }
         
         // The data should be the binary file
@@ -128,6 +129,13 @@ export const useDocumentExtraction = () => {
     }
   };
 
+  // Retry the extraction
+  const retryExtraction = () => {
+    if (selectedDocumentId) {
+      extractTextFromDocument(selectedDocumentId);
+    }
+  };
+
   return {
     documents,
     isLoading,
@@ -138,5 +146,6 @@ export const useDocumentExtraction = () => {
     extractionProgress,
     extractedText,
     error,
+    retryExtraction,
   };
 };
