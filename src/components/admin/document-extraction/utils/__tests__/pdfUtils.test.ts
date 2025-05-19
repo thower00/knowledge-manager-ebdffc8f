@@ -4,6 +4,24 @@ import { createMockPdfArrayBuffer } from './testUtils';
 import * as pdfjs from 'pdfjs-dist';
 import { jest, describe, test, expect, beforeEach, resetMocks } from '../../../../../setupTests';
 
+// Define interfaces for mocks to help with TypeScript
+interface MockTextItem {
+  str: string;
+}
+
+interface MockTextContent {
+  items: MockTextItem[];
+}
+
+interface MockPdfPage {
+  getTextContent: jest.MockedFunction<() => Promise<MockTextContent>>;
+}
+
+interface MockPdfDoc {
+  numPages: number;
+  getPage: jest.MockedFunction<(pageNum: number) => Promise<MockPdfPage>>;
+}
+
 // Mock the PDF.js library
 jest.mock('pdfjs-dist', () => {
   return {
@@ -16,12 +34,12 @@ jest.mock('pdfjs-dist', () => {
 
 describe('pdfUtils', () => {
   // Define mockPdfDoc outside beforeEach so it's accessible in all tests
-  const mockPdfDoc = {
+  const mockPdfDoc: MockPdfDoc = {
     numPages: 2,
     getPage: jest.fn(),
   };
 
-  const mockPage = {
+  const mockPage: MockPdfPage = {
     getTextContent: jest.fn(),
   };
 
@@ -38,13 +56,13 @@ describe('pdfUtils', () => {
         { str: 'content ' },
         { str: 'page ' },
       ],
-    } as any);
+    });
 
-    mockPdfDoc.getPage.mockResolvedValue(mockPage as any);
+    mockPdfDoc.getPage.mockResolvedValue(mockPage);
     
     // Use proper type assertion for the mock
     (pdfjs.getDocument as jest.Mock).mockReturnValue({
-      promise: Promise.resolve(mockPdfDoc as any)
+      promise: Promise.resolve(mockPdfDoc)
     });
   });
 
@@ -74,7 +92,7 @@ describe('pdfUtils', () => {
     const pdfData = createMockPdfArrayBuffer();
     
     // Mock empty page content
-    mockPage.getTextContent.mockResolvedValue({ items: [] } as any);
+    mockPage.getTextContent.mockResolvedValue({ items: [] });
     
     const result = await extractPdfText(pdfData, mockProgressUpdate);
     
@@ -90,7 +108,6 @@ describe('pdfUtils', () => {
     await extractPdfText(pdfData, mockProgressUpdate);
     
     // Check progress was updated multiple times (at least for start, pdf load, and each page)
-    expect(mockProgressUpdate).toHaveBeenCalledTimes(expect.anything() as unknown as number);
     expect(mockProgressUpdate.mock.calls.length).toBeGreaterThan(3);
   });
 });
