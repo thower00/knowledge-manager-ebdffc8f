@@ -16,6 +16,7 @@ import UserManagement from "./pages/UserManagement";
 import ConfigurationManagement from "./pages/ConfigurationManagement";
 import TestManagement from "./pages/TestManagement";
 import ContentManagement from "./pages/ContentManagement";
+import Documents from "./pages/Documents";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
 
@@ -84,6 +85,11 @@ const App = () => (
                         <Route path="/profile" element={
                           <ProtectedRoute>
                             <Profile />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/documents" element={
+                          <ProtectedRoute>
+                            <Documents />
                           </ProtectedRoute>
                         } />
                         <Route path="/user-management" element={

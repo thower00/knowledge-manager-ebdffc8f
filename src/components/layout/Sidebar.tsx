@@ -17,7 +17,8 @@ import {
   Users, 
   ListChecks,
   FileText,
-  LogOut
+  LogOut,
+  Files
 } from "lucide-react";
 
 export default function AppSidebar() {
@@ -54,6 +55,15 @@ export default function AppSidebar() {
               <Link to="/profile">
                 <Users />
                 <span>Profile</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive("/documents")} tooltip="Documents">
+              <Link to="/documents">
+                <Files />
+                <span>Documents</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
