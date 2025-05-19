@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -31,6 +30,7 @@ export function ConfigActions() {
           embeddingModel: configValue.embeddingModel || "openai",
           chunkSize: configValue.chunkSize || "1000",
           chunkOverlap: configValue.chunkOverlap || "200",
+          chunkStrategy: configValue.chunkStrategy || "fixed_size",
           storagePath: configValue.storagePath || "/data/documents",
           customConfiguration: configValue.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
         });
@@ -46,6 +46,7 @@ export function ConfigActions() {
           embeddingModel: "openai",
           chunkSize: "1000",
           chunkOverlap: "200",
+          chunkStrategy: "fixed_size",
           storagePath: "/data/documents",
           customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
         });
