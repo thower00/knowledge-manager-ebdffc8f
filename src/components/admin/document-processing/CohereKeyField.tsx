@@ -58,6 +58,15 @@ export function CohereKeyField({ isLoading }: { isLoading: boolean }) {
           console.log("Received Cohere models:", data.models);
           // This could be used to dynamically update available models in the future
         }
+        
+        // Save the verified API key to the provider-specific keys
+        setConfig(prev => ({
+          ...prev,
+          providerApiKeys: {
+            ...prev.providerApiKeys,
+            cohere: config.apiKey
+          }
+        }));
       } else {
         setIsValid(false);
         toast({

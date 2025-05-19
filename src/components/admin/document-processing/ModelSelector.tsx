@@ -35,7 +35,6 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
     setConfig(prev => ({
       ...prev,
       provider: newProvider,
-      embeddingModel: newProvider, // Keep for backward compatibility
       specificModelId: firstModel,
       apiKey: savedApiKey,
     }));

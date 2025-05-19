@@ -30,6 +30,14 @@ export function ConfigForm() {
         return <OpenAIKeyField isLoading={isLoading} />;
       case "cohere":
         return <CohereKeyField isLoading={isLoading} />;
+      case "huggingface":
+        return <OpenAIKeyField isLoading={isLoading} />;
+      case "local":
+        return (
+          <div className="text-sm text-muted-foreground">
+            No API key needed for local models.
+          </div>
+        );
       default:
         return <OpenAIKeyField isLoading={isLoading} />;
     }
@@ -41,9 +49,9 @@ export function ConfigForm() {
         <h3 className="text-lg font-medium mb-4">Provider & Model Settings</h3>
         
         <div className="space-y-6">
-          {renderApiKeyField()}
-          
           <ModelSelector isLoading={isLoading} />
+          
+          {renderApiKeyField()}
         </div>
       </div>
 
