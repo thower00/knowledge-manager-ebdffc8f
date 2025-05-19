@@ -26,8 +26,12 @@ export function DocumentExtraction() {
     setStoreInDatabase
   } = useTextExtraction();
 
-  const { documents, isLoading: isLoadingDocuments } = useProcessedDocumentsFetch();
-  const { isCheckingConnection, isProxyAvailable } = useProxyConnectionStatus();
+  const { data: documents, isLoading: isLoadingDocuments } = useProcessedDocumentsFetch();
+  const { connectionStatus, checkConnection } = useProxyConnectionStatus();
+  
+  // Derived state based on connection status
+  const isCheckingConnection = connectionStatus === "checking";
+  const isProxyAvailable = connectionStatus === "connected";
 
   // Effects to handle document selection
   const [selectedDocument, setSelectedDocument] = useState<ProcessedDocument | null>(null);
@@ -59,7 +63,7 @@ export function DocumentExtraction() {
           <DocumentSelector
             documents={documents || []}
             selectedDocumentId={selectedDocumentId}
-            onDocumentSelect={handleDocumentSelection}
+            setSelectedDocumentId={handleDocumentSelection}
             onExtractClick={handleExtract}
             isLoading={isLoadingDocuments}
             isExtracting={isExtracting}
@@ -89,21 +93,22 @@ export function DocumentExtraction() {
 
       {/* Progress, Text Display and Error sections */}
       {isExtracting && (
-        <ExtractionProgress progress={extractionProgress} />
+        <ExtractionProgress 
+          isExtracting={isExtracting} 
+          extractionProgress={extractionProgress} 
+        />
       )}
 
       {error && (
         <ExtractionError 
           error={error} 
           onRetry={retryExtraction}
-          documentTitle={selectedDocument?.title || "document"}
         />
       )}
 
       {extractedText && !error && (
         <ExtractedTextDisplay 
-          text={extractedText} 
-          documentTitle={selectedDocument?.title || "Unknown Document"}
+          extractedText={extractedText} 
         />
       )}
     </div>

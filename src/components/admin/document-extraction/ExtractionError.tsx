@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 interface ExtractionErrorProps {
   error: string | null;
   onRetry?: () => void;
+  documentTitle?: string;
 }
 
-export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry }) => {
+export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry, documentTitle }) => {
   if (!error) return null;
 
   // Categorize the error to provide better guidance
@@ -26,6 +27,10 @@ export const ExtractionError: React.FC<ExtractionErrorProps> = ({ error, onRetry
       <AlertTitle>Extraction Error</AlertTitle>
       <AlertDescription className="space-y-3">
         <p>{error}</p>
+        
+        {documentTitle && (
+          <p className="font-medium">Document: {documentTitle}</p>
+        )}
         
         {isNetworkError && (
           <div className="mt-2 p-3 bg-red-50 rounded-md">

@@ -40,18 +40,22 @@ export async function getDocumentBinaryStats() {
       throw countError;
     }
     
-    // Get total size of all document binaries
+    // Get total size by summing the file_size column
     const { data: sizeData, error: sizeError } = await supabase
-      .rpc('get_document_binaries_total_size');
+      .from('document_binaries')
+      .select('file_size');
     
-    // This RPC function doesn't exist yet, so handle as if it returned null
-    // In a real implementation, you would create this database function
-    const totalSize = sizeData || 0;
+    if (sizeError) {
+      throw sizeError;
+    }
+    
+    // Calculate total size by summing the file_size values
+    const totalSize = sizeData ? sizeData.reduce((sum, item) => sum + Number(item.file_size), 0) : 0;
     
     return {
       totalCount: totalCount || 0,
       totalSize: totalSize,
-      averageSize: totalCount && totalSize ? totalSize / totalCount : 0
+      averageSize: totalCount && totalSize ? Number(totalSize) / Number(totalCount) : 0
     };
   } catch (error) {
     console.error("Error fetching document binary stats:", error);
