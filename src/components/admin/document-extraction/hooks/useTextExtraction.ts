@@ -26,24 +26,25 @@ export const useTextExtraction = () => {
     setExtractionProgress(10);
     
     try {
-      // Set a longer timeout for the function call
-      const { data, error } = await supabase.functions.invoke("pdf-proxy", {
+      console.log("Calling pdf-proxy Edge Function with URL:", url);
+      
+      // Important: We're using the edge function directly with supabase.functions.invoke
+      const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
         body: { 
           url,
           title,
           // Add additional context that might help with debugging
           requestedAt: new Date().toISOString()
         },
-        headers: { 'Cache-Control': 'no-cache' }, // Avoid caching issues
+        // Important: Set responseType to arrayBuffer to handle binary data
+        // This properly handles binary response from the Edge Function
+        responseType: "arrayBuffer"
       });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(`Proxy service error: ${error.message}`);
-      }
-      
-      if (data?.error) {
-        throw new Error(`${data.error}`);
+      // Explicit error checking for Edge Function call
+      if (functionError) {
+        console.error("Edge function error:", functionError);
+        throw new Error(`Proxy service error: ${functionError.message || "Unknown error"}`);
       }
       
       if (!data) {
@@ -54,7 +55,21 @@ export const useTextExtraction = () => {
       return data;
     } catch (proxyError) {
       console.error("Proxy fetch failed:", proxyError);
-      throw new Error(`Failed to fetch document through proxy: ${proxyError.message}`);
+      
+      // More specific error messages
+      let errorMessage = "Failed to fetch document through proxy";
+      if (proxyError instanceof Error) {
+        errorMessage = proxyError.message;
+        
+        // Enhance known error types
+        if (errorMessage.includes("Failed to fetch")) {
+          errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
+        } else if (errorMessage.includes("timeout") || errorMessage.includes("timed out")) {
+          errorMessage = "The request timed out. The document may be too large or the server is not responding.";
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
   };
 
