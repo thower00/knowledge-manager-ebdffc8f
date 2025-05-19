@@ -2,41 +2,55 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { cors } from "../_shared/cors.ts";
 
-// Helper function to handle connection test requests
+// Constants
+const FETCH_TIMEOUT = 45000; // 45 second timeout
+
+/**
+ * Response header constants
+ */
+const HEADERS = {
+  JSON: {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-cache",
+  },
+  BINARY: {
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "max-age=3600",
+  }
+};
+
+/**
+ * Handle connection test requests
+ */
 function handleConnectionTest() {
   console.log("Connection test received and successful");
   return new Response(
     JSON.stringify({ status: "ok", message: "Proxy service is reachable" }),
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "no-cache",
-      },
-    }
+    { status: 200, headers: HEADERS.JSON }
   );
 }
 
-// Helper function to handle input validation
+/**
+ * Validate input parameters
+ * @param url URL to validate
+ * @returns Response object if validation fails, null otherwise
+ */
 function validateInput(url: string) {
   if (!url) {
     return new Response(
       JSON.stringify({ error: "URL parameter is required" }),
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-          "Cache-Control": "no-cache",
-        },
-      }
+      { status: 400, headers: HEADERS.JSON }
     );
   }
   return null;
 }
 
-// Helper function to convert Google Drive URLs to direct download URLs
+/**
+ * Convert Google Drive URLs to direct download URLs
+ * @param url Original URL
+ * @returns Direct download URL if applicable, otherwise original URL
+ */
 function getDirectDownloadUrl(url: string): string {
   let fileId = null;
   
@@ -65,29 +79,31 @@ function getDirectDownloadUrl(url: string): string {
   return url; // Return original URL if no conversion needed
 }
 
-// Helper function to generate error response
+/**
+ * Create a standardized error response
+ * @param message Error message
+ * @param status HTTP status code
+ * @returns Response object
+ */
 function createErrorResponse(message: string, status: number = 400) {
   return new Response(
     JSON.stringify({ error: message }),
-    {
-      status,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "no-cache",
-      },
-    }
+    { status, headers: HEADERS.JSON }
   );
 }
 
-// Helper function to handle document fetch
+/**
+ * Fetch document from URL with timeout
+ * @param url URL to fetch document from
+ * @returns Response object from fetch
+ */
 async function fetchDocument(url: string) {
   const directUrl = getDirectDownloadUrl(url);
   console.log("Attempting to fetch document from:", directUrl);
   
   // Set a reasonable timeout for the fetch operation
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
   
   try {
     // Fetch the document with timeout
@@ -138,7 +154,12 @@ async function fetchDocument(url: string) {
   }
 }
 
-// Helper function to validate content type and check for HTML error pages
+/**
+ * Validate response content to check for HTML error pages
+ * @param fileData ArrayBuffer containing the file data
+ * @param contentType Content-Type header from response
+ * @returns Object with validation result and error response if needed
+ */
 function validateResponseContent(fileData: ArrayBuffer, contentType: string | null) {
   if (contentType?.includes('text/html') || contentType?.includes('text/plain')) {
     // Convert first part of the response to text to check if it's an error message
@@ -157,14 +178,7 @@ function validateResponseContent(fileData: ArrayBuffer, contentType: string | nu
             error: "The server returned an HTML error page instead of the requested document",
             preview: textPreview.substring(0, 200)
           }),
-          {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
-              "Cache-Control": "no-cache",
-            },
-          }
+          { status: 400, headers: HEADERS.JSON }
         )
       };
     }
@@ -173,7 +187,11 @@ function validateResponseContent(fileData: ArrayBuffer, contentType: string | nu
   return { isValid: true };
 }
 
-// Helper function to process PDF requests
+/**
+ * Process PDF request and return the file
+ * @param requestData Request data containing URL and title
+ * @returns Response object with PDF data or error
+ */
 async function processPdfRequest(requestData: any) {
   const { url, title } = requestData;
   
@@ -208,8 +226,7 @@ async function processPdfRequest(requestData: any) {
     return new Response(fileData, {
       headers: {
         "Content-Type": contentType || "application/octet-stream",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "max-age=3600",
+        ...HEADERS.BINARY,
       },
     });
   } catch (error) {
@@ -217,7 +234,37 @@ async function processPdfRequest(requestData: any) {
   }
 }
 
-// Main request handler
+/**
+ * Handle request errors with specific error messages
+ * @param error Error object
+ * @returns Response object with error details
+ */
+function handleRequestError(error: Error) {
+  console.error(`PDF proxy error: ${error.message}`);
+  
+  // Provide a more helpful error message based on the error
+  let errorMessage = error.message;
+  let statusCode = 500;
+  
+  if (error.message.includes('timed out') || error.message.includes('timeout')) {
+    errorMessage = 'Request timed out. The document may be too large or the server is not responding.';
+  } else if (error.message.includes('NetworkError') || error.message.includes('network')) {
+    errorMessage = 'Network error: Unable to connect to the document server. Please check that the URL is accessible.';
+    statusCode = 503;
+  } else if (error.message.includes('CORS') || error.message.includes('cross-origin')) {
+    errorMessage = 'CORS error: The document server has blocked access through this proxy due to cross-origin restrictions.';
+    statusCode = 403;
+  } else if (error.message.includes('requires authentication') || error.message.includes('login')) {
+    errorMessage = 'This document requires authentication. The proxy cannot access protected documents.';
+    statusCode = 401;
+  }
+  
+  return createErrorResponse(errorMessage, statusCode);
+}
+
+/**
+ * Main request handler
+ */
 serve(async (req) => {
   // Handle OPTIONS requests for CORS
   if (req.method === 'OPTIONS') {
@@ -236,25 +283,6 @@ serve(async (req) => {
     return await processPdfRequest(requestData);
     
   } catch (error) {
-    console.error(`PDF proxy error: ${error.message}`);
-    
-    // Provide a more helpful error message based on the error
-    let errorMessage = error.message;
-    let statusCode = 500;
-    
-    if (error.message.includes('timed out') || error.message.includes('timeout')) {
-      errorMessage = 'Request timed out. The document may be too large or the server is not responding.';
-    } else if (error.message.includes('NetworkError') || error.message.includes('network')) {
-      errorMessage = 'Network error: Unable to connect to the document server. Please check that the URL is accessible.';
-      statusCode = 503;
-    } else if (error.message.includes('CORS') || error.message.includes('cross-origin')) {
-      errorMessage = 'CORS error: The document server has blocked access through this proxy due to cross-origin restrictions.';
-      statusCode = 403;
-    } else if (error.message.includes('requires authentication') || error.message.includes('login')) {
-      errorMessage = 'This document requires authentication. The proxy cannot access protected documents.';
-      statusCode = 401;
-    }
-    
-    return createErrorResponse(errorMessage, statusCode);
+    return handleRequestError(error);
   }
 });
