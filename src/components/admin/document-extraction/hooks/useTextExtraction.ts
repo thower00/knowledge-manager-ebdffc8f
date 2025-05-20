@@ -48,66 +48,52 @@ export const useTextExtraction = () => {
       // Fetch document via proxy
       console.log("Fetching document via proxy:", selectedDocument.url);
       setExtractionProgress(10);
-      const documentData = await fetchDocumentViaProxy(
-        selectedDocument.url, 
-        selectedDocument.title
-      );
-      setExtractionProgress(30);
       
       try {
-        // Extract text from the PDF data
-        const extractedContent = await extractPdfText(documentData, setExtractionProgress);
+        const documentData = await fetchDocumentViaProxy(
+          selectedDocument.url, 
+          selectedDocument.title
+        );
+        setExtractionProgress(30);
         
-        setTimeout(() => {
-          setExtractedText(extractedContent);
-          setExtractionProgress(100);
-          toast({
-            title: "Text extraction completed",
-            description: `Successfully extracted text from "${selectedDocument.title}"`,
-          });
-        }, 500);
-      } catch (pdfError) {
-        console.error("Error extracting text from PDF:", pdfError);
-        let errorMessage = "Error processing PDF document";
-        
-        // Check for common PDF.js worker errors
-        if (pdfError instanceof Error) {
-          const errorMsg = pdfError.message;
+        try {
+          // Extract text from the PDF data
+          const extractedContent = await extractPdfText(documentData, setExtractionProgress);
           
-          if (errorMsg.includes("Failed to fetch") && errorMsg.includes("pdf.worker")) {
-            errorMessage = "Failed to load PDF processing worker. This may be due to network issues or content filtering. Try again later or on a different network.";
-          } else if (errorMsg.includes("Setting up fake worker")) {
-            errorMessage = "Failed to initialize PDF processing components. This is likely due to network restrictions or content filtering.";
-          } else if (errorMsg.includes("worker") || errorMsg.includes("Worker")) {
-            errorMessage = "PDF worker error: " + errorMsg;
+          setTimeout(() => {
+            setExtractedText(extractedContent);
+            setExtractionProgress(100);
+            toast({
+              title: "Text extraction completed",
+              description: `Successfully extracted text from "${selectedDocument.title}"`,
+            });
+          }, 500);
+        } catch (pdfError) {
+          console.error("Error extracting text from PDF:", pdfError);
+          throw pdfError; // Propagate PDF-specific errors to the outer catch
+        }
+      } catch (fetchError) {
+        console.error("Error fetching document:", fetchError);
+        
+        // Specific error handling for fetch errors
+        let errorMessage = "Failed to fetch the document";
+        if (fetchError instanceof Error) {
+          if (fetchError.message.includes("NetworkError") || 
+              fetchError.message.includes("Failed to fetch")) {
+            errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
           } else {
-            errorMessage = errorMsg;
+            errorMessage = fetchError.message;
           }
         }
         
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error("Error extracting text:", error);
+      console.error("Error in extraction process:", error);
       
       let errorMessage = "Failed to extract text from the document";
       if (error instanceof Error) {
-        // Special handling for common PDF.js errors
-        const errorMsg = error.message;
-        
-        if (errorMsg.includes("Invalid PDF structure")) {
-          errorMessage = "The file is not a valid PDF document.";
-        } else if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
-          errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
-        } else if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
-          errorMessage = "The request timed out. The document may be too large or the server is not responding.";
-        } else if (errorMsg.includes("Failed to decode")) {
-          errorMessage = "Failed to decode the document data. The file might be corrupted or in an unsupported format.";
-        } else if (errorMsg.includes("pdf.worker") || errorMsg.includes("fake worker")) {
-          errorMessage = "Failed to load PDF processing components. This may be due to network restrictions or content filtering.";
-        } else {
-          errorMessage = errorMsg;
-        }
+        errorMessage = error.message;
       }
       
       setError(errorMessage);

@@ -1,27 +1,45 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure the worker source - using a local fallback if CDN fails
-const PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.133/pdf.worker.min.js';
+// Configure the worker sources - using multiple fallback options
+// The correct version for PDF.js 5.2.133 should be 5.2.131
+const CDN_WORKER_SOURCES = [
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.131/pdf.worker.min.js',
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.131/build/pdf.worker.min.js',
+  'https://unpkg.com/pdfjs-dist@5.2.131/build/pdf.worker.min.js'
+];
 const LOCAL_WORKER_SRC = '/pdf.worker.min.js'; // Local fallback path
 
-// Initialize the worker with fallback mechanism
+// Initialize the worker with multiple fallback mechanisms
 async function initPdfWorker() {
+  // Try each CDN source in order
+  for (const workerSrc of CDN_WORKER_SOURCES) {
+    try {
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+      console.log(`Attempting to load PDF worker from: ${workerSrc}`);
+      
+      // Test if the worker can be loaded - if not, will throw an error
+      const response = await fetch(workerSrc, { method: 'HEAD', cache: 'no-cache' });
+      if (response.ok) {
+        console.log(`PDF worker loaded successfully from: ${workerSrc}`);
+        return true; // Worker loaded successfully
+      }
+    } catch (error) {
+      console.warn(`Failed to load PDF worker from: ${workerSrc}`, error);
+      // Continue to next source
+    }
+  }
+  
+  // All CDN sources failed, use local worker
   try {
-    // First attempt: try setting to CDN worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
-    
-    // Test if the worker can be loaded - if not, will throw an error
-    await fetch(PDF_WORKER_SRC, { method: 'HEAD' });
-    console.log("PDF worker loaded from CDN successfully");
-  } catch (error) {
-    console.warn("Failed to load PDF worker from CDN, falling back to local worker");
-    
-    // Fallback: use local worker
+    console.warn("All CDN worker sources failed, falling back to local worker");
     pdfjsLib.GlobalWorkerOptions.workerSrc = LOCAL_WORKER_SRC;
-    
-    // Optional: notify that we're using the local worker
     console.log("Using local PDF worker");
+    return true;
+  } catch (error) {
+    console.error("Failed to initialize PDF worker from any source", error);
+    throw new Error("Could not initialize PDF worker from any source");
   }
 }
 
@@ -35,16 +53,27 @@ export const extractPdfText = async (
   pdfData: ArrayBuffer,
   progressCallback?: (progress: number) => void
 ): Promise<string> => {
+  // Initialize progress reporting
+  if (progressCallback) progressCallback(5);
+  
   // Initialize the worker before processing
-  await initPdfWorker();
+  try {
+    await initPdfWorker();
+    if (progressCallback) progressCallback(20);
+  } catch (error) {
+    console.error("Failed to initialize PDF worker:", error);
+    throw new Error("Failed to load PDF processing worker. This may be due to network issues or content filtering. Try again later or on a different network.");
+  }
   
   try {
     // Load the PDF document
+    if (progressCallback) progressCallback(30);
+    
     const loadingTask = pdfjsLib.getDocument({ data: pdfData });
     const pdf = await loadingTask.promise;
     console.log("PDF document loaded with", pdf.numPages, "pages");
     
-    // Set initial progress
+    // Set progress after loading document
     if (progressCallback) progressCallback(40);
     
     // Extract text from each page
@@ -83,6 +112,19 @@ export const extractPdfText = async (
     return fullText.trim();
   } catch (error) {
     console.error("Error extracting text from PDF:", error);
-    throw error;
+    
+    // More specific error handling
+    let errorMessage = "Error processing PDF document";
+    if (error instanceof Error) {
+      if (error.message.includes("worker")) {
+        errorMessage = "PDF worker error: " + error.message;
+      } else if (error.message.includes("Invalid PDF")) {
+        errorMessage = "The file is not a valid PDF document.";
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    throw new Error(errorMessage);
   }
 };

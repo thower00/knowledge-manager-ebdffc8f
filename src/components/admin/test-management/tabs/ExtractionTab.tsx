@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, Info, CheckCircle } from "lucide-react";
+import { AlertTriangle, Info, CheckCircle, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { validatePdfUrl, convertGoogleDriveUrl } from "@/components/admin/document-extraction/utils/urlUtils";
 
@@ -72,6 +72,12 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       if (!validateUrl(testUrl)) {
         return;
       }
+      
+      // If using test URL, show a guide to check PDF worker loading
+      toast({
+        title: "Testing with URL",
+        description: "Check the browser console for PDF worker loading messages",
+      });
     }
     
     onRunTest({ extractionText });
@@ -133,6 +139,29 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               <li>For Google Drive PDFs, use URL format: <code className="px-1 bg-blue-100">https://drive.google.com/uc?export=download&id=YOUR_FILE_ID&alt=media</code></li>
               <li>Change <code className="px-1 bg-blue-100">.../file/d/FILE_ID/view</code> to <code className="px-1 bg-blue-100">.../file/d/FILE_ID/view?alt=media</code></li>
               <li>File must be shared with "Anyone with the link"</li>
+            </ul>
+          </div>
+          
+          <div className="mt-2 p-3 border border-amber-300 bg-amber-50 text-amber-800 rounded-md">
+            <p className="font-medium flex items-center">
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              PDF Worker Troubleshooting:
+            </p>
+            <ul className="list-disc ml-5 mt-1 text-sm">
+              <li>If extraction fails with worker errors, try using a different browser or network</li>
+              <li>Some corporate networks block worker script downloads from CDNs</li>
+              <li>The system will attempt multiple CDN sources and a local fallback</li>
+              <li>
+                <a 
+                  href="https://mozilla.github.io/pdf.js/getting_started/" 
+                  className="text-amber-600 hover:text-amber-800 flex items-center" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Learn more about PDF.js workers
+                </a>
+              </li>
             </ul>
           </div>
         </div>
