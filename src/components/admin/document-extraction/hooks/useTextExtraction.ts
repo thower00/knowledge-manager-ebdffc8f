@@ -49,45 +49,27 @@ export const useTextExtraction = () => {
       console.log("Fetching document via proxy:", selectedDocument.url);
       setExtractionProgress(10);
       
-      try {
-        const documentData = await fetchDocumentViaProxy(
-          selectedDocument.url, 
-          selectedDocument.title
-        );
-        setExtractionProgress(30);
-        
-        try {
-          // Extract text from the PDF data
-          const extractedContent = await extractPdfText(documentData, setExtractionProgress);
-          
-          setTimeout(() => {
-            setExtractedText(extractedContent);
-            setExtractionProgress(100);
-            toast({
-              title: "Text extraction completed",
-              description: `Successfully extracted text from "${selectedDocument.title}"`,
-            });
-          }, 500);
-        } catch (pdfError) {
-          console.error("Error extracting text from PDF:", pdfError);
-          throw pdfError; // Propagate PDF-specific errors to the outer catch
-        }
-      } catch (fetchError) {
-        console.error("Error fetching document:", fetchError);
-        
-        // Specific error handling for fetch errors
-        let errorMessage = "Failed to fetch the document";
-        if (fetchError instanceof Error) {
-          if (fetchError.message.includes("NetworkError") || 
-              fetchError.message.includes("Failed to fetch")) {
-            errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
-          } else {
-            errorMessage = fetchError.message;
-          }
-        }
-        
-        throw new Error(errorMessage);
-      }
+      const documentData = await fetchDocumentViaProxy(
+        selectedDocument.url, 
+        selectedDocument.title
+      );
+      setExtractionProgress(30);
+      
+      // Extract text from the PDF data
+      const extractedContent = await extractPdfText(documentData, progress => {
+        // Map progress to our 30-95% range
+        const mappedProgress = 30 + Math.floor((progress / 100) * 65);
+        setExtractionProgress(mappedProgress);
+      });
+      
+      // Successful extraction
+      setExtractedText(extractedContent);
+      setExtractionProgress(100);
+      toast({
+        title: "Text extraction completed",
+        description: `Successfully extracted text from "${selectedDocument.title}"`,
+      });
+      
     } catch (error) {
       console.error("Error in extraction process:", error);
       
