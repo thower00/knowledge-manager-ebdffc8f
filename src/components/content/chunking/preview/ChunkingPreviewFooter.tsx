@@ -8,11 +8,10 @@ interface ChunkingPreviewFooterProps {
 
 export function ChunkingPreviewFooter({ onClose }: ChunkingPreviewFooterProps) {
   return (
-    <CardFooter className="flex justify-between">
-      <div className="text-sm text-muted-foreground">
-        Click on a chunk to view its metadata
-      </div>
-      <Button variant="outline" onClick={onClose}>Close Preview</Button>
+    <CardFooter className="flex justify-end">
+      <Button variant="outline" onClick={onClose}>
+        Close Preview
+      </Button>
     </CardFooter>
   );
 }

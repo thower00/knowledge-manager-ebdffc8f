@@ -73,8 +73,6 @@ export function useConfigLoader(activeTab: string) {
 
   // Load existing configuration when component mounts or activeTab changes to document-processing
   useEffect(() => {
-    let mounted = true; // Track mounted state locally
-    
     // Only fetch config for the document-processing tab and when not already fetched
     if (activeTab === "document-processing" && !configFetched) {
       fetchConfig();
@@ -82,17 +80,10 @@ export function useConfigLoader(activeTab: string) {
     
     // Cleanup function to prevent memory leaks
     return () => {
-      mounted = false;
-    };
-  }, [activeTab, fetchConfig, configFetched]);
-
-  // Reset fetch flag when component unmounts or tab changes away from document-processing
-  useEffect(() => {
-    return () => {
       // This will ensure we reset our fetch status when the tab changes away from document-processing
       if (activeTab !== "document-processing") {
         setConfigFetched(false);
       }
     };
-  }, [activeTab]);
+  }, [activeTab, fetchConfig, configFetched]);
 }

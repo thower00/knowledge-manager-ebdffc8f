@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { OpenAIKeyField } from "./OpenAIKeyField";
 import { CohereKeyField } from "./CohereKeyField";
 import { ModelSelector } from "./ModelSelector";
@@ -8,6 +8,7 @@ import { ChunkStrategyField } from "./ChunkStrategyField";
 import { StoragePathField } from "./StoragePathField";
 import { CustomConfigField } from "./CustomConfigField";
 import { useConfig } from "./ConfigContext";
+import { getModelDefaults } from "./utils/modelProviders";
 
 export function ConfigForm() {
   const { config, isLoading, setConfig } = useConfig();
@@ -22,8 +23,51 @@ export function ConfigForm() {
 
   const handleSelectChange = (name: string, value: string) => {
     console.log(`Setting ${name} to ${value}`);
-    setConfig(prev => ({ ...prev, [name]: value }));
+    
+    if (name === "provider") {
+      // When changing provider, reset model and apply defaults
+      const firstModelId = getModelDefaults(value, "").specificModelId;
+      const defaults = getModelDefaults(value, firstModelId);
+      
+      setConfig(prev => ({
+        ...prev,
+        provider: value,
+        specificModelId: firstModelId,
+        chunkSize: defaults.chunkSize,
+        chunkOverlap: defaults.chunkOverlap,
+        chunkStrategy: defaults.chunkStrategy,
+        // If we have a saved API key for this provider, use it
+        apiKey: prev.providerApiKeys[value] || ""
+      }));
+    } else if (name === "specificModelId") {
+      // When changing model, apply its default settings
+      const defaults = getModelDefaults(config.provider, value);
+      
+      setConfig(prev => ({
+        ...prev,
+        specificModelId: value,
+        chunkSize: defaults.chunkSize,
+        chunkOverlap: defaults.chunkOverlap,
+        chunkStrategy: defaults.chunkStrategy
+      }));
+    } else {
+      // For other selections
+      setConfig(prev => ({ ...prev, [name]: value }));
+    }
   };
+  
+  // Save API key to provider-specific storage when it changes
+  useEffect(() => {
+    if (config.provider && config.apiKey) {
+      setConfig(prev => ({
+        ...prev,
+        providerApiKeys: {
+          ...prev.providerApiKeys,
+          [config.provider]: config.apiKey
+        }
+      }));
+    }
+  }, [config.provider, config.apiKey, setConfig]);
 
   const renderApiKeyField = () => {
     switch(config.provider) {
@@ -64,13 +108,15 @@ export function ConfigForm() {
             chunkSize={config.chunkSize} 
             chunkOverlap={config.chunkOverlap} 
             onChange={handleChange} 
-            isLoading={isLoading} 
+            isLoading={isLoading}
+            modelDefaults={getModelDefaults(config.provider, config.specificModelId)}
           />
 
           <ChunkStrategyField
             chunkStrategy={config.chunkStrategy}
             onChange={handleSelectChange}
             isLoading={isLoading}
+            defaultStrategy={getModelDefaults(config.provider, config.specificModelId).chunkStrategy}
           />
         </div>
       </div>

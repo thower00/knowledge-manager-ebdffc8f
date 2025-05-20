@@ -3,6 +3,7 @@ export interface ModelOption {
   id: string;
   name: string;
   description?: string;
+  dimensions?: string;
   defaultChunkSize: string;
   defaultChunkOverlap: string;
   defaultChunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph" | "sentence";
@@ -26,7 +27,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "text-embedding-ada-002",
         name: "Ada (v2)",
-        description: "Good balance of quality and speed, 1536 dimensions",
+        description: "Good balance of quality and speed",
+        dimensions: "1536",
         defaultChunkSize: "1000",
         defaultChunkOverlap: "200",
         defaultChunkStrategy: "fixed_size"
@@ -34,7 +36,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "text-embedding-3-small",
         name: "Small (v3)",
-        description: "Efficient and cost-effective, 1536 dimensions",
+        description: "Efficient and cost-effective",
+        dimensions: "1536",
         defaultChunkSize: "800",
         defaultChunkOverlap: "150",
         defaultChunkStrategy: "semantic"
@@ -42,7 +45,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "text-embedding-3-large",
         name: "Large (v3)",
-        description: "Highest quality, 3072 dimensions",
+        description: "Highest quality embeddings",
+        dimensions: "3072",
         defaultChunkSize: "1500",
         defaultChunkOverlap: "300",
         defaultChunkStrategy: "semantic"
@@ -58,7 +62,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "embed-english-v2.0",
         name: "English (v2.0)",
-        description: "Optimized for English text, 4096 dimensions",
+        description: "Optimized for English text",
+        dimensions: "4096",
         defaultChunkSize: "1200",
         defaultChunkOverlap: "250",
         defaultChunkStrategy: "semantic"
@@ -66,7 +71,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "embed-multilingual-v2.0",
         name: "Multilingual (v2.0)",
-        description: "Supports 100+ languages, 768 dimensions",
+        description: "Supports 100+ languages",
+        dimensions: "768",
         defaultChunkSize: "1000",
         defaultChunkOverlap: "150",
         defaultChunkStrategy: "fixed_size"
@@ -74,7 +80,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "embed-english-light-v2.0",
         name: "English Light (v2.0)",
-        description: "Faster and cheaper, 1024 dimensions",
+        description: "Faster and cheaper",
+        dimensions: "1024",
         defaultChunkSize: "800",
         defaultChunkOverlap: "100",
         defaultChunkStrategy: "fixed_size"
@@ -90,7 +97,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "sentence-transformers/all-mpnet-base-v2",
         name: "MPNet",
-        description: "High quality, 768 dimensions",
+        description: "High quality embeddings",
+        dimensions: "768",
         defaultChunkSize: "1000",
         defaultChunkOverlap: "200",
         defaultChunkStrategy: "fixed_size"
@@ -98,7 +106,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "sentence-transformers/all-MiniLM-L6-v2",
         name: "MiniLM",
-        description: "Fast and lightweight, 384 dimensions",
+        description: "Fast and lightweight",
+        dimensions: "384",
         defaultChunkSize: "800",
         defaultChunkOverlap: "150",
         defaultChunkStrategy: "fixed_size"
@@ -106,7 +115,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
       {
         id: "sentence-transformers/multi-qa-mpnet-base-dot-v1",
         name: "Multi-QA MPNet",
-        description: "Optimized for Q&A matching, 768 dimensions",
+        description: "Optimized for Q&A matching",
+        dimensions: "768",
         defaultChunkSize: "1500",
         defaultChunkOverlap: "300",
         defaultChunkStrategy: "paragraph"
@@ -123,6 +133,7 @@ export const MODEL_PROVIDERS: Record<string, ProviderConfig> = {
         id: "local-model",
         name: "Default Local Model",
         description: "Uses locally deployed embedding model",
+        dimensions: "Varies",
         defaultChunkSize: "500",
         defaultChunkOverlap: "100",
         defaultChunkStrategy: "fixed_size"
@@ -141,25 +152,46 @@ export function getProviderFromModel(modelId: string): string {
 }
 
 export function getModelDefaults(providerId: string, modelId: string): {
+  specificModelId: string;
   chunkSize: string;
   chunkOverlap: string;
   chunkStrategy: "fixed_size" | "semantic" | "recursive" | "paragraph" | "sentence";
 } {
   const provider = MODEL_PROVIDERS[providerId];
-  if (!provider) return {
-    chunkSize: "1000",
-    chunkOverlap: "200",
-    chunkStrategy: "fixed_size"
-  };
+  if (!provider) {
+    return {
+      specificModelId: "text-embedding-ada-002",
+      chunkSize: "1000",
+      chunkOverlap: "200",
+      chunkStrategy: "fixed_size"
+    };
+  }
+  
+  // If no modelId is specified, use the first model from the provider
+  if (!modelId && provider.models.length > 0) {
+    const defaultModel = provider.models[0];
+    return {
+      specificModelId: defaultModel.id,
+      chunkSize: defaultModel.defaultChunkSize,
+      chunkOverlap: defaultModel.defaultChunkOverlap,
+      chunkStrategy: defaultModel.defaultChunkStrategy
+    };
+  }
   
   const model = provider.models.find(m => m.id === modelId);
-  if (!model) return {
-    chunkSize: "1000",
-    chunkOverlap: "200",
-    chunkStrategy: "fixed_size"
-  };
+  if (!model) {
+    // If model not found, use the first one
+    const firstModel = provider.models[0];
+    return {
+      specificModelId: firstModel ? firstModel.id : "text-embedding-ada-002",
+      chunkSize: firstModel ? firstModel.defaultChunkSize : "1000",
+      chunkOverlap: firstModel ? firstModel.defaultChunkOverlap : "200",
+      chunkStrategy: firstModel ? firstModel.defaultChunkStrategy : "fixed_size"
+    };
+  }
   
   return {
+    specificModelId: model.id,
     chunkSize: model.defaultChunkSize,
     chunkOverlap: model.defaultChunkOverlap,
     chunkStrategy: model.defaultChunkStrategy

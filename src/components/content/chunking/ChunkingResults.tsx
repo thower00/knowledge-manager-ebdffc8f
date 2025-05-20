@@ -1,66 +1,66 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle } from "lucide-react";
+import { Check } from "lucide-react";
+
+interface ChunkingResult {
+  documentId: string;
+  documentTitle: string;
+  chunkCount: number;
+  success: boolean;
+  error?: string;
+}
 
 interface ChunkingResultsProps {
-  results: {
-    documentId: string;
-    documentTitle: string;
-    chunkCount: number;
-    success: boolean;
-    error?: string;
-  }[];
+  results: ChunkingResult[];
 }
 
 export function ChunkingResults({ results }: ChunkingResultsProps) {
-  const successCount = results.filter(r => r.success).length;
+  const successful = results.filter(result => result.success).length;
+  const failed = results.length - successful;
   
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Chunking Results</span>
-          <Badge variant={successCount === results.length ? "default" : "destructive"}>
-            {successCount}/{results.length} Successful
-          </Badge>
+        <CardTitle className="flex items-center">
+          <Check className="mr-2 h-5 w-5 text-green-500" />
+          Chunking Results
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">Status</TableHead>
-              <TableHead>Document</TableHead>
-              <TableHead className="text-right">Chunks Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between bg-muted/30 p-4 rounded-md">
+            <div>
+              <p className="font-medium">{successful} document(s) successfully chunked</p>
+              {failed > 0 && (
+                <p className="text-sm text-destructive">{failed} document(s) failed</p>
+              )}
+            </div>
+            <div className="text-sm font-mono">
+              {results.reduce((acc, result) => acc + (result.success ? result.chunkCount : 0), 0)} total chunks generated
+            </div>
+          </div>
+          
+          <div className="space-y-2">
             {results.map((result) => (
-              <TableRow key={result.documentId}>
-                <TableCell>
+              <div 
+                key={result.documentId}
+                className={`p-3 rounded-md border ${result.success ? 'border-green-200 bg-green-50' : 'border-destructive/30 bg-destructive/10'}`}
+              >
+                <div className="flex justify-between">
+                  <p className="font-medium">{result.documentTitle}</p>
                   {result.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <span className="text-sm text-green-600">{result.chunkCount} chunks</span>
                   ) : (
-                    <XCircle className="h-5 w-5 text-destructive" />
+                    <span className="text-sm text-destructive">Failed</span>
                   )}
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{result.documentTitle}</div>
-                    {!result.success && result.error && (
-                      <div className="text-sm text-destructive">{result.error}</div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {result.success ? result.chunkCount : "—"}
-                </TableCell>
-              </TableRow>
+                </div>
+                {!result.success && result.error && (
+                  <p className="text-sm text-destructive mt-1">{result.error}</p>
+                )}
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

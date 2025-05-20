@@ -1,30 +1,25 @@
 
 import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface ErrorStateProps {
-  message?: string;
+  message: string;
   description?: string;
   onRetry?: () => void;
 }
 
-export function ErrorState({ 
-  message = "Error Loading Document", 
-  description = "Could not load document chunks for preview.",
-  onRetry
-}: ErrorStateProps) {
+export function ErrorState({ message, description, onRetry }: ErrorStateProps) {
   return (
-    <div className="h-60 flex items-center justify-center">
-      <div className="text-center">
-        <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-3" />
-        <p className="text-destructive font-medium mb-2">{message}</p>
-        <p className="text-muted-foreground mb-4 max-w-md">{description}</p>
-        {onRetry && (
-          <Button variant="outline" size="sm" onClick={onRetry} className="min-w-[100px]">
-            Try Again
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+      <h3 className="text-lg font-semibold mb-2">{message}</h3>
+      {description && <p className="text-muted-foreground mb-4">{description}</p>}
+      {onRetry && (
+        <Button variant="outline" onClick={onRetry}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MODEL_PROVIDERS, getModelDefaults } from "./utils/modelProviders";
@@ -31,18 +31,6 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
     }
   }, []);
   
-  const applyModelDefaults = (providerId: string, modelId: string) => {
-    const defaults = getModelDefaults(providerId, modelId);
-    console.log(`Applying defaults for ${providerId}/${modelId}:`, defaults);
-    
-    setConfig(prev => ({
-      ...prev,
-      chunkSize: defaults.chunkSize,
-      chunkOverlap: defaults.chunkOverlap,
-      chunkStrategy: defaults.chunkStrategy,
-    }));
-  };
-  
   const handleProviderChange = (newProvider: string) => {
     console.log(`Changing provider to: ${newProvider}`);
     // Get the first model from the selected provider
@@ -51,33 +39,38 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
     // If the provider has a saved API key, load it
     const savedApiKey = config.providerApiKeys[newProvider] || "";
     
+    // Get model defaults
+    const defaults = getModelDefaults(newProvider, firstModel);
+    
     setConfig(prev => ({
       ...prev,
       provider: newProvider,
       specificModelId: firstModel,
       apiKey: savedApiKey,
+      // Apply model defaults
+      chunkSize: defaults.chunkSize,
+      chunkOverlap: defaults.chunkOverlap,
+      chunkStrategy: defaults.chunkStrategy
     }));
-    
-    // Apply the default settings for the selected model
-    applyModelDefaults(newProvider, firstModel);
   };
   
   const handleModelChange = (modelId: string) => {
     console.log(`Changing model to: ${modelId}`);
+    
+    // Apply the default settings for the selected model
+    const defaults = getModelDefaults(provider, modelId);
+    
     setConfig(prev => ({
       ...prev,
       specificModelId: modelId,
+      chunkSize: defaults.chunkSize,
+      chunkOverlap: defaults.chunkOverlap,
+      chunkStrategy: defaults.chunkStrategy
     }));
-    
-    // Apply the default settings for the selected model
-    applyModelDefaults(provider, modelId);
   };
   
   // Find the currently selected model
   const selectedModel = MODEL_PROVIDERS[provider]?.models.find(m => m.id === specificModelId);
-  
-  console.log("Rendering ModelSelector with provider:", provider, "and model:", specificModelId);
-  console.log("Available models for provider:", MODEL_PROVIDERS[provider]?.models);
   
   return (
     <div className="space-y-6">
@@ -103,7 +96,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
       </div>
       
       <div className="grid gap-2">
-        <Label htmlFor="specificModelId">Specific Model</Label>
+        <Label htmlFor="specificModelId">Embedding Model</Label>
         <Select
           value={specificModelId || (MODEL_PROVIDERS[provider]?.models[0]?.id || "")}
           onValueChange={handleModelChange}
@@ -130,13 +123,10 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
         {selectedModel && (
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge variant="outline">
-              Chunk size: {selectedModel.defaultChunkSize}
+              Dimensions: {selectedModel.dimensions || "Unknown"}
             </Badge>
             <Badge variant="outline">
-              Overlap: {selectedModel.defaultChunkOverlap}
-            </Badge>
-            <Badge variant="outline">
-              Strategy: {selectedModel.defaultChunkStrategy}
+              Recommended chunk size: {selectedModel.defaultChunkSize}
             </Badge>
           </div>
         )}

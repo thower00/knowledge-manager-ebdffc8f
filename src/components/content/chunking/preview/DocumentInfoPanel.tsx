@@ -1,32 +1,54 @@
 
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { FileText, Eye } from "lucide-react";
+
+interface ProcessedDocument {
+  id: string;
+  title: string;
+  content?: string;
+  status: string;
+  mime_type: string;
+  created_at: string;
+  processed_at: string | null;
+}
 
 interface DocumentInfoPanelProps {
-  document: {
-    title: string;
-    content?: string;
-  } | null;
+  document: ProcessedDocument;
   chunksCount: number;
   onViewFullDocument: () => void;
 }
 
-export function DocumentInfoPanel({ document, chunksCount, onViewFullDocument }: DocumentInfoPanelProps) {
-  // Calculate content length for display
-  const contentLength = document?.content?.length || 0;
-  
+export function DocumentInfoPanel({ 
+  document, 
+  chunksCount, 
+  onViewFullDocument 
+}: DocumentInfoPanelProps) {
   return (
-    <div className="p-4 border rounded-md bg-muted/30">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-medium">{document?.title || 'Document Preview'}</h3>
-        <Button variant="outline" size="sm" onClick={onViewFullDocument}>
-          <Eye className="h-4 w-4 mr-2" />
-          View Full Document
-        </Button>
-      </div>
-      <div className="flex flex-col space-y-1">
-        <p className="text-sm text-muted-foreground">Generated {chunksCount} chunks</p>
-        <p className="text-sm text-muted-foreground">Document length: {contentLength} characters</p>
+    <div className="bg-muted/40 p-4 rounded-md">
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <h3 className="text-lg font-medium flex items-center">
+            <FileText className="mr-2 h-5 w-5 text-primary" />
+            {document.title}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {document.mime_type} • {document.content?.length.toLocaleString() || 0} characters
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Document will be divided into <span className="font-semibold">{chunksCount}</span> chunks
+          </p>
+        </div>
+        <div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center" 
+            onClick={onViewFullDocument}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            View Full Document
+          </Button>
+        </div>
       </div>
     </div>
   );
