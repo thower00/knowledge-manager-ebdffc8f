@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [extractAllDocuments, setExtractAllDocuments] = useState(false);
   const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
+  
+  // Define documentsToProcess - this fixes the error
+  const documentsToProcess = extractAllDocuments 
+    ? dbDocuments 
+    : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
 
   // Fetch documents from the database
   const fetchDocuments = async () => {
@@ -220,10 +226,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       return;
     }
     
-    const documentsToProcess = extractAllDocuments 
-      ? dbDocuments 
-      : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-    
+    // Use the defined documentsToProcess variable here
     if (documentsToProcess.length === 0) {
       toast({
         title: "No Documents",
