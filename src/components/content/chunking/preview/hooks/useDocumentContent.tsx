@@ -53,10 +53,12 @@ export function useDocumentContent(documentId: string) {
           throw new Error(`Error fetching document binary: ${binaryError.message}`);
         }
         
-        // Create the document object
+        // Create the document object - Fix the decoding approach
         const processedDoc: ProcessedDocument = {
           ...docData,
-          content: binaryData?.binary_data ? new TextDecoder().decode(binaryData.binary_data) : undefined
+          content: binaryData?.binary_data 
+            ? new TextDecoder().decode(new Uint8Array(binaryData.binary_data))
+            : undefined
         };
         
         setDocument(processedDoc);
