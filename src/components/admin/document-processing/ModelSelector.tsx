@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MODEL_PROVIDERS, getModelDefaults } from "./utils/modelProviders";
@@ -15,15 +15,43 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   const { provider, specificModelId } = config;
   
   // Track if component is mounted to prevent state updates after unmounting
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useRef(true);
   
   useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
+    console.log("ModelSelector mounted with provider:", provider, "model:", specificModelId);
+    
+    // Set isMounted ref to true on mount
+    isMounted.current = true;
+    
+    // Check if we have valid provider and model
+    if (!provider || !MODEL_PROVIDERS[provider]) {
+      console.log("Invalid provider, resetting to default");
+      handleProviderChange("openai");
+    } else if (!specificModelId) {
+      console.log("No model selected, selecting default");
+      const firstModel = MODEL_PROVIDERS[provider]?.models[0]?.id;
+      if (firstModel) {
+        handleModelChange(firstModel);
+      }
+    }
+    
+    // Force a refresh after a short delay to ensure UI renders correctly
+    const timer = setTimeout(() => {
+      if (isMounted.current) {
+        console.log("Forcing ModelSelector refresh");
+        setConfig(prev => ({ ...prev })); // Force a state update
+      }
+    }, 200);
+    
+    // Cleanup function to prevent state updates after unmounting
+    return () => {
+      clearTimeout(timer);
+      isMounted.current = false;
+    };
   }, []);
   
   const applyModelDefaults = (providerId: string, modelId: string) => {
-    if (!isMounted) return;
+    if (!isMounted.current) return;
     
     const defaults = getModelDefaults(providerId, modelId);
     console.log(`Applying defaults for ${providerId}/${modelId}:`, defaults);
@@ -37,7 +65,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleProviderChange = (newProvider: string) => {
-    if (!isMounted) return;
+    if (!isMounted.current) return;
     
     console.log(`Changing provider to: ${newProvider}`);
     // Get the first model from the selected provider
@@ -58,7 +86,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleModelChange = (modelId: string) => {
-    if (!isMounted) return;
+    if (!isMounted.current) return;
     
     console.log(`Changing model to: ${modelId}`);
     setConfig(prev => ({
@@ -70,25 +98,11 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
     applyModelDefaults(provider, modelId);
   };
   
-  // Ensure we have a valid provider and model selected
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    if (!provider || !MODEL_PROVIDERS[provider]) {
-      // Use a default provider if current is invalid
-      const defaultProvider = "openai";
-      handleProviderChange(defaultProvider);
-    } else if (!specificModelId) {
-      // If provider is valid but no model selected, select the first model
-      const firstModel = MODEL_PROVIDERS[provider]?.models[0]?.id;
-      if (firstModel) {
-        handleModelChange(firstModel);
-      }
-    }
-  }, [provider, specificModelId, isMounted]);
-  
   // Find the currently selected model
   const selectedModel = MODEL_PROVIDERS[provider]?.models.find(m => m.id === specificModelId);
+  
+  // Generate a key for the selection content to force re-render when provider changes
+  const selectContentKey = `model-select-${provider}-${Date.now()}`;
   
   return (
     <div className="space-y-6">
@@ -116,6 +130,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
       <div className="grid gap-2">
         <Label htmlFor="specificModelId">Specific Model</Label>
         <Select
+          key={selectContentKey}
           value={specificModelId}
           onValueChange={handleModelChange}
           disabled={isLoading}

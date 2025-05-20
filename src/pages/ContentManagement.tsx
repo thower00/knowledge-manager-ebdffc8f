@@ -8,21 +8,27 @@ import { ChunkingTab } from "@/components/content/chunking/ChunkingTab";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function ContentManagement() {
-  const [activeTab, setActiveTab] = useState("documents");
+  // Use localStorage to persist the active tab between renders
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem("contentActiveTab");
+    return savedTab || "documents";
+  });
   const { toast } = useToast();
 
   // Effect to ensure components are loaded
   useEffect(() => {
     console.log("ContentManagement component mounted");
     
+    // Save active tab to localStorage whenever it changes
+    localStorage.setItem("contentActiveTab", activeTab);
+    
     // Force a refresh of the component state
     const timer = setTimeout(() => {
       console.log("Ensuring components are properly rendered");
-      setActiveTab(prev => prev);
     }, 500);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [activeTab]);
 
   const handleTabChange = (value: string) => {
     console.log(`Tab changed to: ${value}`);
@@ -48,13 +54,17 @@ export default function ContentManagement() {
           </p>
         </div>
         
-        <Tabs defaultValue="documents" value={activeTab} onValueChange={handleTabChange}>
+        <Tabs 
+          value={activeTab} 
+          onValueChange={handleTabChange}
+          className="w-full"
+        >
           <TabsList className="mb-4">
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="chunking">Chunking</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="documents" className="space-y-4">
+          <TabsContent value="documents" className="space-y-4" forceMount hidden={activeTab !== "documents"}>
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle>Document Management</CardTitle>
@@ -77,7 +87,7 @@ export default function ContentManagement() {
             <DocumentsTab />
           </TabsContent>
           
-          <TabsContent value="chunking" className="space-y-4" forceMount>
+          <TabsContent value="chunking" className="space-y-4" forceMount hidden={activeTab !== "chunking"}>
             <ChunkingTab />
           </TabsContent>
         </Tabs>
