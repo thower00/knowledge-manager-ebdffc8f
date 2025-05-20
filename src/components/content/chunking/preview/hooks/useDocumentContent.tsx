@@ -61,8 +61,7 @@ export function useDocumentContent(documentId: string) {
           if (typeof binaryData.binary_data === 'string') {
             // If it's already a string, use directly
             contentText = binaryData.binary_data;
-          } else if (ArrayBuffer.isView(binaryData.binary_data) || 
-                    binaryData.binary_data.constructor?.name === 'Uint8Array') {
+          } else if (ArrayBuffer.isView(binaryData.binary_data)) {
             // If it's an ArrayBuffer view (like Uint8Array), decode it
             try {
               contentText = new TextDecoder().decode(binaryData.binary_data as ArrayBufferLike);
@@ -70,7 +69,7 @@ export function useDocumentContent(documentId: string) {
               console.error("Error decoding binary data:", err);
               contentText = JSON.stringify(binaryData.binary_data);
             }
-          } else if (typeof binaryData.binary_data === 'object') {
+          } else if (typeof binaryData.binary_data === 'object' && binaryData.binary_data !== null) {
             // If it's another array-like object, try to convert to Uint8Array first
             try {
               // Handle potential array-like objects
