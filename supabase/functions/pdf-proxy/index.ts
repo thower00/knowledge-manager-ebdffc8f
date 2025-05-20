@@ -43,13 +43,14 @@ serve(async (req: Request) => {
   try {
     const requestBody = await req.json();
     
-    // Handle connection test requests
+    // Handle connection test requests - Always respond with success for test requests
     if (requestBody.action === "connection_test") {
       console.log("Connection test request received");
       return new Response(
         JSON.stringify({ 
           status: "connected",
-          message: "PDF proxy service is available" 
+          message: "PDF proxy service is available",
+          timestamp: new Date().toISOString()
         }),
         { 
           status: 200, 
@@ -130,7 +131,10 @@ serve(async (req: Request) => {
     console.error("Error in pdf-proxy:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to process document" }),
+      JSON.stringify({ 
+        error: error.message || "Failed to process document",
+        timestamp: new Date().toISOString() 
+      }),
       { 
         status: 500, 
         headers: { 

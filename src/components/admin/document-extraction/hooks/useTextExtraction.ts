@@ -54,17 +54,33 @@ export const useTextExtraction = () => {
       );
       setExtractionProgress(30);
       
-      // Extract text from the PDF data
-      const extractedContent = await extractPdfText(documentData, setExtractionProgress);
-      
-      setTimeout(() => {
-        setExtractedText(extractedContent);
-        setExtractionProgress(100);
-        toast({
-          title: "Text extraction completed",
-          description: `Successfully extracted text from "${selectedDocument.title}"`,
-        });
-      }, 500);
+      try {
+        // Extract text from the PDF data
+        const extractedContent = await extractPdfText(documentData, setExtractionProgress);
+        
+        setTimeout(() => {
+          setExtractedText(extractedContent);
+          setExtractionProgress(100);
+          toast({
+            title: "Text extraction completed",
+            description: `Successfully extracted text from "${selectedDocument.title}"`,
+          });
+        }, 500);
+      } catch (pdfError) {
+        console.error("Error extracting text from PDF:", pdfError);
+        let errorMessage = "Error processing PDF document";
+        
+        // Check for common PDF.js worker errors
+        if (pdfError instanceof Error) {
+          if (pdfError.message.includes("Failed to fetch") && pdfError.message.includes("pdf.worker")) {
+            errorMessage = "Failed to load PDF processing worker. This may be due to network issues or content filtering. Try again later or on a different network.";
+          } else {
+            errorMessage = pdfError.message;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
     } catch (error) {
       console.error("Error extracting text:", error);
       
@@ -79,6 +95,8 @@ export const useTextExtraction = () => {
           errorMessage = "The request timed out. The document may be too large or the server is not responding.";
         } else if (error.message.includes("Failed to decode")) {
           errorMessage = "Failed to decode the document data. The file might be corrupted or in an unsupported format.";
+        } else if (error.message.includes("pdf.worker")) {
+          errorMessage = "Failed to load PDF processing components. This may be due to network restrictions or content filtering.";
         } else {
           errorMessage = error.message;
         }

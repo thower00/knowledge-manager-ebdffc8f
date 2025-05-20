@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 /**
  * Hook to check and monitor the proxy connection status
@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 export const useProxyConnectionStatus = () => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [lastCheckedAt, setLastCheckedAt] = useState<number>(0);
   const { toast } = useToast();
 
   /**
@@ -17,9 +18,11 @@ export const useProxyConnectionStatus = () => {
    * @returns Connection status after checking
    */
   const checkConnection = useCallback(async (forceCheck = false): Promise<'connected' | 'error'> => {
-    // Don't check if already connected unless forced
-    if (connectionStatus === 'connected' && !forceCheck) {
-      return 'connected';
+    // Don't check if already checked in the last 30 seconds unless forced
+    const now = Date.now();
+    if (!forceCheck && (now - lastCheckedAt < 30000) && connectionStatus !== 'idle') {
+      console.log("Skipping check, last check was less than 30 seconds ago");
+      return connectionStatus === 'connected' ? 'connected' : 'error';
     }
 
     setConnectionStatus('checking');
@@ -33,11 +36,12 @@ export const useProxyConnectionStatus = () => {
         const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
           body: { 
             action: "connection_test",
-            timestamp: new Date().toISOString() // Add timestamp to prevent caching
+            timestamp: Date.now() // Add timestamp to prevent caching
           }
         });
 
         if (functionError) {
+          console.error("Function error during connection check:", functionError);
           throw functionError;
         }
 
@@ -45,8 +49,10 @@ export const useProxyConnectionStatus = () => {
           console.log("Proxy service connection successful:", data.message || "Connected");
           setConnectionStatus('connected');
           setConnectionError(null);
+          setLastCheckedAt(now);
           return 'connected';
         } else {
+          console.error("Invalid response from proxy service:", data);
           throw new Error("Invalid response from proxy service");
         }
       } catch (error) {
@@ -65,6 +71,7 @@ export const useProxyConnectionStatus = () => {
           
           setConnectionStatus('error');
           setConnectionError(errorMessage);
+          setLastCheckedAt(now);
           
           if (forceCheck) {
             toast({
@@ -81,7 +88,7 @@ export const useProxyConnectionStatus = () => {
     
     // This should never be reached due to the returns above, but TypeScript requires it
     return 'error';
-  }, [connectionStatus, toast]);
+  }, [connectionStatus, lastCheckedAt, toast]);
 
   // Initial connection check on mount
   useEffect(() => {

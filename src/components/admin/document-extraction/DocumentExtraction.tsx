@@ -70,7 +70,7 @@ export function DocumentExtraction() {
             isCheckingConnection={isCheckingConnection}
           />
           
-          {/* Connection status indicator */}
+          {/* Connection status indicator - Always visible */}
           <div className="mt-4 flex items-center space-x-2">
             <span className={`h-2 w-2 rounded-full ${
               connectionStatus === 'connected' ? 'bg-green-500' : 
@@ -98,6 +98,7 @@ export function DocumentExtraction() {
                 </Tooltip>
               </TooltipProvider>
             )}
+            {/* Always show the check connection button */}
             <Button 
               variant="outline" 
               size="sm" 

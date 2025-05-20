@@ -14,11 +14,13 @@ export const fetchDocumentViaProxy = async (
   try {
     console.log("Calling pdf-proxy Edge Function with URL:", url);
     
+    // Add a timestamp to prevent caching issues
     const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
       body: { 
         url,
         title,
-        requestedAt: new Date().toISOString()
+        requestedAt: new Date().toISOString(),
+        timestamp: Date.now() // Add timestamp to bust cache
       }
     });
 
