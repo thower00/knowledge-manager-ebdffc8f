@@ -1,0 +1,74 @@
+
+import { useState } from "react";
+import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
+import { ProcessedDocument } from "@/types/document";
+import { useToast } from "@/hooks/use-toast";
+
+export const useDocumentSelection = () => {
+  const [dbDocuments, setDbDocuments] = useState<ProcessedDocument[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [extractAllDocuments, setExtractAllDocuments] = useState(false);
+  const { toast } = useToast();
+
+  // Define documentsToProcess - documents that will be processed based on selection
+  const documentsToProcess = extractAllDocuments 
+    ? dbDocuments 
+    : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+
+  // Fetch documents from the database
+  const fetchDocuments = async () => {
+    setIsLoadingDocuments(true);
+    try {
+      const documents = await fetchProcessedDocuments();
+      setDbDocuments(documents.filter(doc => doc.status === 'completed'));
+      setIsLoadingDocuments(false);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch documents from the database",
+        variant: "destructive"
+      });
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  const toggleDocumentSelection = (documentId: string) => {
+    setSelectedDocumentIds(prev => {
+      if (prev.includes(documentId)) {
+        return prev.filter(id => id !== documentId);
+      } else {
+        return [...prev, documentId];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocumentIds.length === dbDocuments.length) {
+      // Deselect all
+      setSelectedDocumentIds([]);
+    } else {
+      // Select all
+      setSelectedDocumentIds(dbDocuments.map(doc => doc.id));
+    }
+  };
+
+  const refreshDocuments = () => {
+    fetchDocuments();
+    setSelectedDocumentIds([]);
+  };
+
+  return {
+    dbDocuments,
+    selectedDocumentIds,
+    isLoadingDocuments,
+    extractAllDocuments,
+    setExtractAllDocuments,
+    toggleDocumentSelection,
+    toggleSelectAll,
+    refreshDocuments,
+    fetchDocuments,
+    documentsToProcess
+  };
+};

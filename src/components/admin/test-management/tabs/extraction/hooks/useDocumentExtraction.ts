@@ -1,150 +1,62 @@
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ProcessedDocument } from "@/types/document";
-import { validatePdfUrl, convertGoogleDriveUrl } from "@/components/admin/document-extraction/utils/urlUtils";
-import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
-import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
-import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
+import { useDocumentSelection } from "./useDocumentSelection";
+import { useUrlValidation } from "./useUrlValidation";
+import { useExtractionProcess } from "./useExtractionProcess";
 
 interface UseDocumentExtractionProps {
   onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
 }
 
 export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps) => {
-  const [extractionText, setExtractionText] = useState("");
-  const [testUrl, setTestUrl] = useState("");
-  const [testUrlError, setTestUrlError] = useState<string | null>(null);
-  const [testUrlValid, setTestUrlValid] = useState<boolean>(false);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [extractionProgress, setExtractionProgress] = useState(0);
-  const [proxyConnected, setProxyConnected] = useState<boolean | null>(null);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
-  
-  // Database document selection
-  const [dbDocuments, setDbDocuments] = useState<ProcessedDocument[]>([]);
-  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [extractAllDocuments, setExtractAllDocuments] = useState(false);
-  const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
-  
-  // Define documentsToProcess
-  const documentsToProcess = extractAllDocuments 
-    ? dbDocuments 
-    : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-    
-  const { toast } = useToast();
+  const { 
+    dbDocuments, 
+    selectedDocumentIds, 
+    isLoadingDocuments, 
+    extractAllDocuments, 
+    setExtractAllDocuments,
+    toggleDocumentSelection, 
+    toggleSelectAll, 
+    refreshDocuments, 
+    fetchDocuments,
+    documentsToProcess
+  } = useDocumentSelection();
 
-  // Fetch documents from the database
-  const fetchDocuments = async () => {
-    setIsLoadingDocuments(true);
-    try {
-      const documents = await fetchProcessedDocuments();
-      setDbDocuments(documents.filter(doc => doc.status === 'completed'));
-      setIsLoadingDocuments(false);
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch documents from the database",
-        variant: "destructive"
-      });
-      setIsLoadingDocuments(false);
-    }
-  };
+  const {
+    testUrl,
+    setTestUrl,
+    testUrlError,
+    testUrlValid,
+    validateUrl
+  } = useUrlValidation();
+
+  const {
+    isExtracting,
+    setIsExtracting,
+    extractionText,
+    setExtractionText,
+    extractionProgress,
+    setExtractionProgress,
+    extractionError,
+    setExtractionError,
+    proxyConnected,
+    setProxyConnected,
+    currentDocumentIndex,
+    setCurrentDocumentIndex,
+    checkProxyConnection,
+    extractFromDocument
+  } = useExtractionProcess();
+
+  const { toast } = useToast();
 
   // Check proxy connection on mount
   useEffect(() => {
-    const checkProxyConnection = async () => {
-      try {
-        await fetchDocumentViaProxy("", "connection_test", 0);
-        setProxyConnected(true);
-      } catch (error) {
-        console.error("Proxy connection failed:", error);
-        setProxyConnected(false);
-      }
-    };
-    
     checkProxyConnection();
     fetchDocuments();
   }, []);
 
-  // Validate URL when it changes
-  useEffect(() => {
-    if (testUrl) {
-      validateUrl(testUrl);
-    }
-  }, [testUrl]);
-
-  const validateUrl = (url: string) => {
-    // Reset error and valid states first
-    setTestUrlError(null);
-    setTestUrlValid(false);
-    
-    if (!url) return true;
-    
-    // Use our validation utility
-    const { isValid, message } = validatePdfUrl(url);
-    
-    if (!isValid && message) {
-      setTestUrlError(message);
-      return false;
-    }
-    
-    // URL is valid
-    setTestUrlValid(true);
-    
-    // Check if we can convert Google Drive URL to a better format
-    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
-    if (wasConverted) {
-      setTestUrl(convertedUrl);
-      toast({
-        title: "URL Improved",
-        description: "The Google Drive URL has been converted to direct download format.",
-        variant: "default"
-      });
-    }
-    
-    return true;
-  };
-
-  const extractFromDocument = async (document: ProcessedDocument) => {
-    if (!document || !document.url) {
-      toast({
-        title: "Error",
-        description: "Selected document has no URL",
-        variant: "destructive"
-      });
-      return "";
-    }
-
-    try {
-      // Set initial progress
-      setExtractionProgress(10);
-      
-      // Fetch the document via proxy
-      console.log(`Starting extraction for document: ${document.title} (${document.url})`);
-      const documentData = await fetchDocumentViaProxy(document.url, document.title);
-      
-      // Update progress after fetch completes
-      setExtractionProgress(40);
-      
-      // Extract text from the document
-      const text = await extractPdfText(documentData, (progress) => {
-        // Map the progress to our overall progress (40-95)
-        const overallProgress = 40 + Math.floor((progress / 100) * 55);
-        setExtractionProgress(overallProgress);
-      });
-      
-      // Complete the extraction
-      setExtractionProgress(100);
-      return text;
-    } catch (error) {
-      console.error(`Error extracting from document ${document.title}:`, error);
-      throw error;
-    }
-  };
-
+  // Extract text from a URL
   const handleExtractFromUrl = async () => {
     if (!testUrl || !validateUrl(testUrl)) {
       return;
@@ -197,6 +109,7 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     }
   };
 
+  // Extract text from selected database documents
   const handleExtractFromDatabase = async () => {
     // If no documents selected or extract all not checked
     if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
@@ -280,31 +193,6 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     } finally {
       setIsExtracting(false);
     }
-  };
-
-  const toggleDocumentSelection = (documentId: string) => {
-    setSelectedDocumentIds(prev => {
-      if (prev.includes(documentId)) {
-        return prev.filter(id => id !== documentId);
-      } else {
-        return [...prev, documentId];
-      }
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedDocumentIds.length === dbDocuments.length) {
-      // Deselect all
-      setSelectedDocumentIds([]);
-    } else {
-      // Select all
-      setSelectedDocumentIds(dbDocuments.map(doc => doc.id));
-    }
-  };
-
-  const refreshDocuments = () => {
-    fetchDocuments();
-    setSelectedDocumentIds([]);
   };
 
   return {
