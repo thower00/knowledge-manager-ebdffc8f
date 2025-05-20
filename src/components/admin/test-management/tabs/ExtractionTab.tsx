@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,21 +11,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, Info, CheckCircle, ExternalLink, Loader2, FileText } from "lucide-react";
+import { AlertTriangle, Info, CheckCircle, ExternalLink, Loader2, FileText, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { validatePdfUrl, convertGoogleDriveUrl } from "@/components/admin/document-extraction/utils/urlUtils";
 import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ExtractionTabProps {
   isLoading: boolean;
@@ -42,12 +36,12 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [proxyConnected, setProxyConnected] = useState<boolean | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [showExtractedText, setShowExtractedText] = useState(true);
   const { toast } = useToast();
   
   // Database document selection
   const [dbDocuments, setDbDocuments] = useState<ProcessedDocument[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
-  const [selectedDocument, setSelectedDocument] = useState<ProcessedDocument | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [extractAllDocuments, setExtractAllDocuments] = useState(false);
   const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
@@ -85,16 +79,6 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     checkProxyConnection();
     fetchDocuments();
   }, []);
-
-  // Update selected document when ID changes
-  useEffect(() => {
-    if (selectedDocumentId && dbDocuments.length > 0) {
-      const doc = dbDocuments.find(d => d.id === selectedDocumentId);
-      setSelectedDocument(doc || null);
-    } else {
-      setSelectedDocument(null);
-    }
-  }, [selectedDocumentId, dbDocuments]);
 
   // Validate URL when it changes
   useEffect(() => {
@@ -135,7 +119,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     return true;
   };
 
-  const extractFromSelectedDocument = async (document: ProcessedDocument) => {
+  const extractFromDocument = async (document: ProcessedDocument) => {
     if (!document || !document.url) {
       toast({
         title: "Error",
@@ -145,21 +129,26 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       return "";
     }
 
-    setExtractionProgress(10);
-    
     try {
+      // Set initial progress
+      setExtractionProgress(10);
+      
       // Fetch the document via proxy
+      console.log(`Starting extraction for document: ${document.title} (${document.url})`);
       const documentData = await fetchDocumentViaProxy(document.url, document.title);
-      setExtractionProgress(30);
+      
+      // Update progress after fetch completes
+      setExtractionProgress(40);
       
       // Extract text from the document
       const text = await extractPdfText(documentData, (progress) => {
-        // Map the progress to our overall progress (40-90)
-        const overallProgress = 30 + Math.floor((progress / 100) * 65);
+        // Map the progress to our overall progress (40-95)
+        const overallProgress = 40 + Math.floor((progress / 100) * 55);
         setExtractionProgress(overallProgress);
       });
       
-      setExtractionProgress(95);
+      // Complete the extraction
+      setExtractionProgress(100);
       return text;
     } catch (error) {
       console.error(`Error extracting from document ${document.title}:`, error);
@@ -189,13 +178,10 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       
       // Extract text from the document
       const text = await extractPdfText(documentData, (progress) => {
-        // Map the progress from the PDF extraction (which goes from 5-95)
-        // to our overall progress (40-90)
-        const overallProgress = 40 + Math.floor((progress - 5) * 0.5);
+        // Map the progress from the PDF extraction
+        const overallProgress = 40 + Math.floor((progress / 100) * 55);
         setExtractionProgress(overallProgress);
       });
-      
-      setExtractionProgress(95);
       
       // Update the extraction text
       setExtractionText(text);
@@ -209,6 +195,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       
       // Call the onRunTest callback with the extracted text
       onRunTest({ extractionText: text, testUrl });
+      setShowExtractedText(true);
     } catch (error) {
       console.error("Extraction error:", error);
       setExtractionError(error instanceof Error ? error.message : String(error));
@@ -223,118 +210,119 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   };
 
   const handleExtractFromDatabase = async () => {
-    if (extractAllDocuments) {
-      if (dbDocuments.length === 0) {
-        toast({
-          title: "No Documents",
-          description: "There are no documents to extract from",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setIsExtracting(true);
-      setExtractionProgress(0);
-      setExtractionError(null);
-      setCurrentDocumentIndex(0);
-      
-      // Extract from all documents one by one
-      let allText = "";
-      let successCount = 0;
-      let failureCount = 0;
-      
-      for (let i = 0; i < dbDocuments.length; i++) {
-        const doc = dbDocuments[i];
-        setCurrentDocumentIndex(i);
-        
-        try {
-          const text = await extractFromSelectedDocument(doc);
-          allText += `\n\n--- Document: ${doc.title} ---\n\n${text}`;
-          successCount++;
-        } catch (error) {
-          failureCount++;
-          allText += `\n\n--- Document: ${doc.title} (FAILED) ---\n\nFailed to extract: ${error instanceof Error ? error.message : String(error)}`;
-        }
-        
-        // Update overall progress
-        setExtractionProgress(Math.floor(((i + 1) / dbDocuments.length) * 100));
-      }
-      
-      setExtractionText(allText);
-      
+    // If no documents selected or extract all not checked
+    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
       toast({
-        title: "Batch Extraction Completed",
-        description: `Successfully extracted ${successCount} documents, failed ${failureCount}`,
-        variant: successCount > 0 ? "default" : "destructive"
+        title: "No Selection",
+        description: "Please select a document or check 'Extract from all documents'",
+        variant: "destructive"
       });
-      
-      onRunTest({ extractionText: allText });
-      setIsExtracting(false);
-      
-    } else {
-      // Extract from single selected document
-      if (!selectedDocument) {
-        toast({
-          title: "No Document Selected",
-          description: "Please select a document to extract from",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setIsExtracting(true);
-      setExtractionProgress(0);
-      setExtractionError(null);
-      
-      try {
-        const text = await extractFromSelectedDocument(selectedDocument);
-        
+      return;
+    }
+    
+    const documentsToProcess = extractAllDocuments 
+      ? dbDocuments 
+      : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    
+    if (documentsToProcess.length === 0) {
+      toast({
+        title: "No Documents",
+        description: "There are no documents to extract from",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsExtracting(true);
+    setExtractionProgress(0);
+    setExtractionError(null);
+    setCurrentDocumentIndex(0);
+    
+    try {
+      if (documentsToProcess.length === 1) {
+        // Single document extraction
+        const document = documentsToProcess[0];
+        const text = await extractFromDocument(document);
         setExtractionText(text);
-        setExtractionProgress(100);
         
         toast({
           title: "Extraction Completed",
-          description: `Successfully extracted text from ${selectedDocument.title}`,
+          description: `Successfully extracted text from ${document.title}`,
         });
         
         onRunTest({ extractionText: text });
-      } catch (error) {
-        console.error("Extraction error:", error);
-        setExtractionError(error instanceof Error ? error.message : String(error));
+        setShowExtractedText(true);
+      } else {
+        // Multiple documents extraction
+        let allText = "";
+        let successCount = 0;
+        let failureCount = 0;
+        
+        for (let i = 0; i < documentsToProcess.length; i++) {
+          const doc = documentsToProcess[i];
+          setCurrentDocumentIndex(i);
+          
+          try {
+            const text = await extractFromDocument(doc);
+            allText += `\n\n--- Document: ${doc.title} ---\n\n${text}`;
+            successCount++;
+          } catch (error) {
+            failureCount++;
+            allText += `\n\n--- Document: ${doc.title} (FAILED) ---\n\nFailed to extract: ${error instanceof Error ? error.message : String(error)}`;
+          }
+          
+          // Update overall progress
+          setExtractionProgress(Math.floor(((i + 1) / documentsToProcess.length) * 100));
+        }
+        
+        setExtractionText(allText);
         
         toast({
-          title: "Extraction Failed",
-          description: error instanceof Error ? error.message : "Failed to extract text from document",
-          variant: "destructive"
+          title: "Batch Extraction Completed",
+          description: `Successfully extracted ${successCount} documents, failed ${failureCount}`,
+          variant: successCount > 0 ? "default" : "destructive"
         });
-      } finally {
-        setIsExtracting(false);
+        
+        onRunTest({ extractionText: allText });
+        setShowExtractedText(true);
       }
+    } catch (error) {
+      console.error("Extraction error:", error);
+      setExtractionError(error instanceof Error ? error.message : String(error));
+      
+      toast({
+        title: "Extraction Failed",
+        description: error instanceof Error ? error.message : "Failed to extract text from document",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExtracting(false);
     }
   };
 
-  const handleTest = () => {
-    if (testUrl) {
-      handleExtractFromUrl();
-    } else if (selectedDocumentId || extractAllDocuments) {
-      handleExtractFromDatabase();
-    } else if (extractionText) {
-      onRunTest({ extractionText });
-      toast({
-        title: "Test completed",
-        description: "Extraction test completed with provided text",
-      });
+  const toggleDocumentSelection = (documentId: string) => {
+    setSelectedDocumentIds(prev => {
+      if (prev.includes(documentId)) {
+        return prev.filter(id => id !== documentId);
+      } else {
+        return [...prev, documentId];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocumentIds.length === dbDocuments.length) {
+      // Deselect all
+      setSelectedDocumentIds([]);
     } else {
-      toast({
-        title: "No input",
-        description: "Please provide either a URL, select a document, or enter text to extract",
-        variant: "destructive"
-      });
+      // Select all
+      setSelectedDocumentIds(dbDocuments.map(doc => doc.id));
     }
   };
 
   const refreshDocuments = () => {
     fetchDocuments();
+    setSelectedDocumentIds([]);
   };
 
   return (
@@ -346,10 +334,10 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Database Document Selection */}
+        {/* Database Document List */}
         <div className="space-y-2 p-4 border rounded-md bg-gray-50">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-md font-medium">Extract from Database Document</h3>
+            <h3 className="text-md font-medium">Extract from Database Documents</h3>
             <Button 
               variant="outline" 
               size="sm" 
@@ -364,61 +352,93 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             </Button>
           </div>
           
+          {/* Document List with checkboxes */}
           <div className="space-y-2">
-            <div className="flex items-center space-x-2 mb-2">
+            {isLoadingDocuments ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : dbDocuments.length > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="select-all" 
+                      checked={selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                    <Label htmlFor="select-all" className="cursor-pointer">Select All Documents</Label>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedDocumentIds.length} of {dbDocuments.length} selected
+                  </span>
+                </div>
+                
+                <div className="max-h-60 overflow-auto border rounded-md">
+                  <ScrollArea className="h-full">
+                    <div className="p-2 space-y-1">
+                      {dbDocuments.map((doc) => (
+                        <div 
+                          key={doc.id} 
+                          className={`flex items-center space-x-2 p-2 rounded-md ${
+                            selectedDocumentIds.includes(doc.id) ? 'bg-blue-50' : 'hover:bg-gray-100'
+                          }`}
+                        >
+                          <Checkbox 
+                            id={`doc-${doc.id}`} 
+                            checked={selectedDocumentIds.includes(doc.id)}
+                            onCheckedChange={() => toggleDocumentSelection(doc.id)}
+                          />
+                          <div className="flex-grow">
+                            <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">{doc.title}</Label>
+                            <div className="flex gap-2 items-center mt-1">
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {doc.mime_type}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 text-center border rounded-md bg-gray-100">
+                <p className="text-muted-foreground">No documents available in the database</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload documents in the Documents tab first
+                </p>
+              </div>
+            )}
+            
+            <div className="flex items-center space-x-2 mt-4">
               <Checkbox 
                 id="extract-all" 
                 checked={extractAllDocuments}
                 onCheckedChange={(checked) => {
                   setExtractAllDocuments(checked === true);
                   if (checked) {
-                    setSelectedDocumentId("");
-                    setSelectedDocument(null);
+                    setSelectedDocumentIds([]);
                   }
                 }}
               />
-              <Label htmlFor="extract-all">Extract from all documents</Label>
+              <Label htmlFor="extract-all">Extract from all documents (ignores selection)</Label>
             </div>
-            
-            {!extractAllDocuments && (
-              <Select 
-                value={selectedDocumentId} 
-                onValueChange={setSelectedDocumentId}
-                disabled={isLoadingDocuments || extractAllDocuments}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a document" />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingDocuments ? (
-                    <SelectItem value="loading" disabled>
-                      Loading documents...
-                    </SelectItem>
-                  ) : dbDocuments.length > 0 ? (
-                    dbDocuments.map(doc => (
-                      <SelectItem key={doc.id} value={doc.id}>
-                        {doc.title}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-docs" disabled>
-                      No documents available
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            )}
             
             <Button 
               className="w-full" 
-              onClick={() => handleExtractFromDatabase()} 
-              disabled={(!selectedDocumentId && !extractAllDocuments) || isExtracting}
+              onClick={handleExtractFromDatabase} 
+              disabled={(selectedDocumentIds.length === 0 && !extractAllDocuments) || isExtracting || dbDocuments.length === 0}
             >
               {isExtracting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {extractAllDocuments 
-                    ? `Extracting Document ${currentDocumentIndex + 1}/${dbDocuments.length}...` 
+                  {documentsToProcess?.length > 1 
+                    ? `Extracting Document ${currentDocumentIndex + 1}/${documentsToProcess.length}...` 
                     : "Extracting..."}
                 </>
               ) : (
@@ -426,7 +446,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                   <FileText className="h-4 w-4 mr-2" />
                   {extractAllDocuments 
                     ? `Extract from All Documents (${dbDocuments.length})` 
-                    : "Extract from Selected Document"}
+                    : `Extract from Selected Documents (${selectedDocumentIds.length})`}
                 </>
               )}
             </Button>
@@ -449,6 +469,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </div>
         </div>
 
+        {/* URL Input (keeping this as an alternative option) */}
         <div className="grid gap-2">
           <Label>Or enter PDF URL for extraction test</Label>
           <Input
@@ -456,7 +477,6 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             value={testUrl}
             onChange={(e) => {
               setTestUrl(e.target.value);
-              // Don't immediately validate on every keystroke
               if (e.target.value.length > 5) {
                 validateUrl(e.target.value);
               } else {
@@ -467,13 +487,6 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             placeholder="https://example.com/sample.pdf"
             className={testUrlValid ? "border-green-400 focus-visible:ring-green-400" : ""}
           />
-          
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground flex items-center">
-              <Info className="h-4 w-4 mr-1 inline" />
-              Enter direct URL to a PDF document
-            </p>
-          </div>
           
           {testUrlValid && (
             <Alert variant="default" className="bg-green-50 border-green-300 text-green-800 mt-2">
@@ -488,8 +501,24 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               <AlertDescription className="ml-2">{testUrlError}</AlertDescription>
             </Alert>
           )}
+          
+          <Button 
+            onClick={handleExtractFromUrl} 
+            disabled={!testUrlValid || isExtracting}
+            variant="outline"
+          >
+            {isExtracting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Extracting from URL...
+              </>
+            ) : (
+              "Extract from URL"
+            )}
+          </Button>
         </div>
 
+        {/* Manual Text Input Option */}
         <div className="space-y-4">
           <div className="grid gap-2">
             <Label>Or paste document text for extraction test</Label>
@@ -502,6 +531,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </div>
         </div>
 
+        {/* Extraction Progress Bar */}
         {isExtracting && (
           <div className="mt-2 space-y-2">
             <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -516,6 +546,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </div>
         )}
         
+        {/* Error Display */}
         {extractionError && (
           <Alert variant="destructive" className="mt-2">
             <AlertTriangle className="h-4 w-4" />
@@ -523,6 +554,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </Alert>
         )}
         
+        {/* Troubleshooting Panel */}
         <div className="mt-2 p-3 border border-amber-300 bg-amber-50 text-amber-800 rounded-md">
           <p className="font-medium flex items-center">
             <AlertTriangle className="h-4 w-4 mr-1" />
@@ -546,14 +578,30 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </ul>
         </div>
 
+        {/* Test Run Button */}
         <Button 
-          onClick={handleTest} 
-          disabled={isLoading || isExtracting}
+          onClick={() => {
+            if (extractionText) {
+              onRunTest({ extractionText });
+              toast({
+                title: "Test Complete",
+                description: "Extraction test completed with provided text",
+              });
+            } else {
+              toast({
+                title: "No Text Available",
+                description: "Please extract text first or paste it manually",
+                variant: "destructive"
+              });
+            }
+          }}
+          disabled={!extractionText || isLoading || isExtracting}
+          className="w-full"
         >
-          {isLoading || isExtracting ? (
+          {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {isExtracting ? "Extracting..." : "Running..."}
+              Running Test...
             </>
           ) : (
             "Run Extraction Test"
@@ -561,12 +609,35 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         </Button>
         
         {/* Preview of extracted text */}
-        {extractionText && !isExtracting && (
+        {extractionText && (
           <div className="mt-4 p-4 border rounded-md bg-gray-50">
-            <h3 className="text-md font-medium mb-2">Extracted Text Preview</h3>
-            <pre className="whitespace-pre-wrap font-mono text-sm overflow-auto max-h-96 bg-white p-3 border rounded">
-              {extractionText}
-            </pre>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-md font-medium">Extracted Text Preview</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowExtractedText(!showExtractedText)}
+                className="h-8 px-2"
+              >
+                {showExtractedText ? (
+                  <>
+                    <X className="h-4 w-4 mr-1" /> Hide
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-1" /> Show
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {showExtractedText && (
+              <ScrollArea className="h-96">
+                <pre className="whitespace-pre-wrap font-mono text-sm p-3 border rounded bg-white">
+                  {extractionText}
+                </pre>
+              </ScrollArea>
+            )}
           </div>
         )}
       </CardContent>

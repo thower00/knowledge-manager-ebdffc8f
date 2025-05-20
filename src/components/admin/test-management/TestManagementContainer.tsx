@@ -1,96 +1,76 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExtractionTab } from "./tabs/ExtractionTab";
 import { ProcessingTab } from "./tabs/ProcessingTab";
+import { ExtractionTab } from "./tabs/ExtractionTab";
 import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { TestResultDisplay } from "./TestResultDisplay";
 
 export function TestManagement() {
-  const [activeTab, setActiveTab] = useState("extraction");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState("");
-
-  const handleRunTest = async (testType: string, testData: any) => {
-    setIsLoading(true);
-    setResult("");
-
-    // Simulate test execution
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    switch (testType) {
-      case "extraction":
-        setResult(`
-Document Title: ${testData.testUrl ? new URL(testData.testUrl).pathname.split('/').pop() : "Sample Document"}
-Extracted Text: 
------------------------------------------
-${testData.extractionText || "Sample extracted content from PDF file."}
------------------------------------------
-Content successfully extracted from document.
-Extraction completed in 1.2 seconds.
-`);
-        break;
-      case "processing":
-        setResult(`
-Processing Results:
------------------------------------------
-Input Length: ${testData.processingInput.length} characters
-Chunks Created: ${Math.ceil(testData.processingInput.length / 200)}
-Processing Time: 0.5 seconds
------------------------------------------
-Text successfully processed and chunked.
-`);
-        break;
-      case "embeddings":
-        setResult(`
-Embedding Results:
------------------------------------------
-Model: ${testData.selectedModel}
-Dimensions: ${testData.dimension}
-Vector: [0.023, -0.112, 0.442, ... ${parseInt(testData.dimension) - 3} more dimensions]
------------------------------------------
-Text successfully embedded into vector representation.
-`);
-        break;
-      default:
-        setResult("Unknown test type");
+  const [activeTab, setActiveTab] = useState("extraction"); // Changed default to extraction
+  const [isTestRunning, setIsTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState<string>("");
+  
+  const handleRunTest = (data: any) => {
+    setIsTestRunning(true);
+    
+    // Process test data based on the active tab
+    try {
+      // Handle results for different tabs
+      if (activeTab === "processing") {
+        setTestResult(JSON.stringify(data, null, 2));
+      } else if (activeTab === "extraction" || activeTab === "embeddings") {
+        // For extraction or embeddings, just show what we received
+        const result = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+        setTestResult(result);
+      }
+    } catch (error) {
+      console.error("Error processing test result:", error);
+      setTestResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsTestRunning(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3">
+      <Tabs 
+        defaultValue="extraction" 
+        value={activeTab} 
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
+        <TabsList className="grid grid-cols-3 mb-4">
           <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
-          <TabsTrigger value="processing">Text Processing</TabsTrigger>
-          <TabsTrigger value="embeddings">Vector Embeddings</TabsTrigger>
+          <TabsTrigger value="processing">Document Processing</TabsTrigger>
+          <TabsTrigger value="embeddings">Embeddings</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="extraction" className="mt-4 space-y-4">
+        
+        <TabsContent value="extraction">
           <ExtractionTab 
-            isLoading={isLoading && activeTab === "extraction"} 
-            onRunTest={(data) => handleRunTest("extraction", data)} 
+            isLoading={isTestRunning} 
+            onRunTest={handleRunTest} 
           />
         </TabsContent>
-
-        <TabsContent value="processing" className="mt-4 space-y-4">
+        
+        <TabsContent value="processing">
           <ProcessingTab 
-            isLoading={isLoading && activeTab === "processing"} 
-            onRunTest={(data) => handleRunTest("processing", data)} 
+            isLoading={isTestRunning} 
+            onRunTest={handleRunTest}
           />
         </TabsContent>
-
-        <TabsContent value="embeddings" className="mt-4 space-y-4">
+        
+        <TabsContent value="embeddings">
           <EmbeddingsTab 
-            isLoading={isLoading && activeTab === "embeddings"} 
-            onRunTest={(data) => handleRunTest("embeddings", data)} 
+            isLoading={isTestRunning} 
+            onRunTest={handleRunTest} 
           />
         </TabsContent>
       </Tabs>
-
-      {result && <TestResultDisplay result={result} />}
+      
+      {testResult && (
+        <TestResultDisplay result={testResult} />
+      )}
     </div>
   );
 }
