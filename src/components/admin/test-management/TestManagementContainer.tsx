@@ -1,7 +1,6 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DocumentExtraction } from "../document-extraction/DocumentExtraction";
 import { ExtractionTab } from "./tabs/ExtractionTab";
 import { ProcessingTab } from "./tabs/ProcessingTab";
 import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
@@ -22,7 +21,7 @@ export function TestManagement() {
     switch (testType) {
       case "extraction":
         setResult(`
-Document Title: Quarterly Report
+Document Title: ${testData.testUrl ? new URL(testData.testUrl).pathname.split('/').pop() : "Sample Document"}
 Extracted Text: 
 -----------------------------------------
 ${testData.extractionText || "Sample extracted content from PDF file."}
@@ -63,11 +62,10 @@ Text successfully embedded into vector representation.
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4">
+        <TabsList className="grid grid-cols-3">
           <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
           <TabsTrigger value="processing">Text Processing</TabsTrigger>
           <TabsTrigger value="embeddings">Vector Embeddings</TabsTrigger>
-          <TabsTrigger value="pdf-extraction">PDF Extraction</TabsTrigger>
         </TabsList>
 
         <TabsContent value="extraction" className="mt-4 space-y-4">
@@ -89,10 +87,6 @@ Text successfully embedded into vector representation.
             isLoading={isLoading && activeTab === "embeddings"} 
             onRunTest={(data) => handleRunTest("embeddings", data)} 
           />
-        </TabsContent>
-
-        <TabsContent value="pdf-extraction" className="mt-4 space-y-4">
-          <DocumentExtraction />
         </TabsContent>
       </Tabs>
 

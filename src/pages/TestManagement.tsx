@@ -1,46 +1,23 @@
 
 import { Helmet } from "react-helmet-async";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { Navigate } from "react-router-dom";
-import { TestManagement as TestManagementComponent } from "@/components/admin/test-management/TestManagementContainer";
+import { TestManagement } from "@/components/admin/test-management/TestManagementContainer";
 
-export default function TestManagement() {
-  const { isAdmin, isLoading } = useAuth();
-  const { toast } = useToast();
-
-  // Show loading state while checking authorization
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading...</span>
-      </div>
-    );
-  }
-
-  // If user is not admin, redirect
-  if (!isAdmin) {
-    toast({
-      variant: "destructive",
-      title: "Access Denied",
-      description: "You don't have permission to access this page.",
-    });
-    return <Navigate to="/" replace />;
-  }
-
+export default function TestManagementPage() {
   return (
     <>
       <Helmet>
         <title>Test Management | Knowledge Manager</title>
       </Helmet>
-      <div className="container py-8 space-y-6">
-        <h1 className="text-3xl font-bold">Test Management</h1>
-        
-        <div className="space-y-4">
-          <TestManagementComponent />
+      
+      <div className="container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight">Test Management</h1>
+          <p className="text-muted-foreground">
+            Test and verify various system functionalities.
+          </p>
         </div>
+        
+        <TestManagement />
       </div>
     </>
   );

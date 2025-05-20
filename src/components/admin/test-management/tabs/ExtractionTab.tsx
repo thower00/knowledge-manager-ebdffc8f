@@ -12,13 +12,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, Info, CheckCircle, ExternalLink } from "lucide-react";
+import { AlertTriangle, Info, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { validatePdfUrl, convertGoogleDriveUrl } from "@/components/admin/document-extraction/utils/urlUtils";
+import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
+import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 
 interface ExtractionTabProps {
   isLoading: boolean;
-  onRunTest: (data: { extractionText: string }) => void;
+  onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
 }
 
 export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
@@ -26,6 +28,10 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [testUrl, setTestUrl] = useState("");
   const [testUrlError, setTestUrlError] = useState<string | null>(null);
   const [testUrlValid, setTestUrlValid] = useState<boolean>(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const [proxyConnected, setProxyConnected] = useState<boolean | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const validateUrl = (url: string) => {
@@ -60,6 +66,21 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     return true;
   };
 
+  // Check proxy connection on mount
+  useEffect(() => {
+    const checkProxyConnection = async () => {
+      try {
+        await fetchDocumentViaProxy("", "connection_test", 0);
+        setProxyConnected(true);
+      } catch (error) {
+        console.error("Proxy connection failed:", error);
+        setProxyConnected(false);
+      }
+    };
+    
+    checkProxyConnection();
+  }, []);
+
   // Validate URL when it changes
   useEffect(() => {
     if (testUrl) {
@@ -67,24 +88,77 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     }
   }, [testUrl]);
 
-  const handleTest = () => {
-    if (testUrl) {
-      if (!validateUrl(testUrl)) {
-        return;
-      }
-      
-      // If using test URL, show a guide to check PDF worker loading
-      toast({
-        title: "Testing with URL",
-        description: "Check the browser console for PDF worker loading messages",
-      });
+  const handleExtractFromUrl = async () => {
+    if (!testUrl || !validateUrl(testUrl)) {
+      return;
     }
     
-    onRunTest({ extractionText });
-    toast({
-      title: "Test completed",
-      description: "Extraction test completed successfully",
-    });
+    setIsExtracting(true);
+    setExtractionProgress(0);
+    setExtractionError(null);
+    
+    try {
+      // Extract the document title from the URL for better user feedback
+      const urlObj = new URL(testUrl);
+      const fileName = urlObj.pathname.split('/').pop() || "document.pdf";
+      
+      setExtractionProgress(10);
+      
+      // Fetch the document via proxy
+      const documentData = await fetchDocumentViaProxy(testUrl, fileName);
+      setExtractionProgress(40);
+      
+      // Extract text from the document
+      const text = await extractPdfText(documentData, (progress) => {
+        // Map the progress from the PDF extraction (which goes from 5-95)
+        // to our overall progress (40-90)
+        const overallProgress = 40 + Math.floor((progress - 5) * 0.5);
+        setExtractionProgress(overallProgress);
+      });
+      
+      setExtractionProgress(95);
+      
+      // Update the extraction text
+      setExtractionText(text);
+      
+      // Complete the process
+      setExtractionProgress(100);
+      toast({
+        title: "Extraction Completed",
+        description: `Successfully extracted text from ${fileName}`,
+      });
+      
+      // Call the onRunTest callback with the extracted text
+      onRunTest({ extractionText: text, testUrl });
+    } catch (error) {
+      console.error("Extraction error:", error);
+      setExtractionError(error instanceof Error ? error.message : String(error));
+      toast({
+        title: "Extraction Failed",
+        description: error instanceof Error ? error.message : "Failed to extract text from document",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleTest = () => {
+    if (testUrl) {
+      handleExtractFromUrl();
+    } else if (extractionText) {
+      onRunTest({ extractionText });
+      toast({
+        title: "Test completed",
+        description: "Extraction test completed with provided text",
+      });
+    } else {
+      toast({
+        title: "No input",
+        description: "Please provide either a URL or text to extract",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -114,10 +188,20 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             placeholder="https://example.com/sample.pdf"
             className={testUrlValid ? "border-green-400 focus-visible:ring-green-400" : ""}
           />
-          <p className="text-sm text-muted-foreground flex items-center">
-            <Info className="h-4 w-4 mr-1 inline" />
-            Enter direct URL to a PDF document (must be publicly accessible)
-          </p>
+          
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground flex items-center">
+              <Info className="h-4 w-4 mr-1 inline" />
+              Enter direct URL to a PDF document
+            </p>
+            
+            {proxyConnected !== null && (
+              <div className="flex items-center text-sm">
+                <span className={`h-2 w-2 rounded-full mr-2 ${proxyConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span>{proxyConnected ? 'Proxy Available' : 'Proxy Unavailable'}</span>
+              </div>
+            )}
+          </div>
           
           {testUrlValid && (
             <Alert variant="default" className="bg-green-50 border-green-300 text-green-800 mt-2">
@@ -131,6 +215,27 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="ml-2">{testUrlError}</AlertDescription>
             </Alert>
+          )}
+          
+          {extractionError && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="ml-2">{extractionError}</AlertDescription>
+            </Alert>
+          )}
+          
+          {isExtracting && (
+            <div className="mt-2 space-y-2">
+              <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300 ease-in-out" 
+                  style={{ width: `${extractionProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                {extractionProgress}% complete
+              </p>
+            </div>
           )}
           
           <div className="mt-2 p-3 bg-blue-50 text-blue-800 rounded-md">
@@ -180,9 +285,16 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
         <Button 
           onClick={handleTest} 
-          disabled={isLoading || (testUrl && !!testUrlError)}
+          disabled={isLoading || isExtracting || (testUrl && !!testUrlError)}
         >
-          {isLoading ? "Running..." : "Run Extraction Test"}
+          {isLoading || isExtracting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {isExtracting ? "Extracting..." : "Running..."}
+            </>
+          ) : (
+            "Run Extraction Test"
+          )}
         </Button>
       </CardContent>
     </Card>

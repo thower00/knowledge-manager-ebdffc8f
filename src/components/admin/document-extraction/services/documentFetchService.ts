@@ -3,14 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Fetches a document through the proxy service
- * @param url URL of document to fetch
+ * @param url URL of document to fetch (leave empty for connection test)
  * @param title Optional document title for better error messages
  * @param maxRetries Number of retry attempts (default: 2)
  * @returns ArrayBuffer of document data
  */
 export const fetchDocumentViaProxy = async (
   url: string,
-  title?: string,
+  title: string = "untitled",
   maxRetries = 2
 ): Promise<ArrayBuffer> => {
   let retryCount = 0;
@@ -19,9 +19,17 @@ export const fetchDocumentViaProxy = async (
   // Implement progressive backoff for retries
   const backoffMs = [750, 1500, 3000]; // Increasing wait times
   
+  // Connection test mode if URL is empty or explicitly specified
+  const isConnectionTest = !url || title === "connection_test";
+  
   while (retryCount <= maxRetries) {
     try {
-      console.log(`Attempt ${retryCount + 1}/${maxRetries + 1}: Calling pdf-proxy Edge Function with URL:`, url);
+      console.log(`Attempt ${retryCount + 1}/${maxRetries + 1}: Calling pdf-proxy Edge Function`);
+      if (isConnectionTest) {
+        console.log("This is a connection test");
+      } else {
+        console.log("Fetching document from URL:", url);
+      }
       
       // Add a timestamp and nonce to prevent caching issues
       const nonce = Math.random().toString(36).substring(2, 15);
@@ -30,7 +38,8 @@ export const fetchDocumentViaProxy = async (
         body: { 
           url,
           title,
-          requestedAt: new Date().toISOString(),
+          action: isConnectionTest ? "connection_test" : "fetch_document",
+          has_url: !!url,
           timestamp,
           nonce, // Add random nonce for cache busting
           noCache: true // Explicit no-cache flag
@@ -45,6 +54,12 @@ export const fetchDocumentViaProxy = async (
       
       if (!data) {
         throw new Error("No data received from proxy");
+      }
+      
+      // For connection tests, just return an empty ArrayBuffer
+      if (isConnectionTest) {
+        console.log("Connection test successful");
+        return new ArrayBuffer(0);
       }
       
       console.log(`Attempt ${retryCount + 1}: Received data from proxy service, processing...`);
