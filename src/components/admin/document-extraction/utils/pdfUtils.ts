@@ -115,11 +115,11 @@ export const extractPdfText = async (
     // Load the PDF document with additional parameters to handle corrupted files
     if (progressCallback) progressCallback(30);
     
+    // Fix for TypeScript error: Use the correct DocumentInitParameters
     const loadingTask = pdfjsLib.getDocument({
       data: pdfData,
-      // Add options to better handle problematic PDFs
+      // Remove the unsupported nativeImageDecoderSupport property
       disableFontFace: true,
-      nativeImageDecoderSupport: "none",
       ignoreErrors: true
     });
     
@@ -180,7 +180,8 @@ export const extractPdfText = async (
             })
           ]);
           
-          const textContent = await textContentPromise as pdfjsLib.TextContent;
+          // Fix for TypeScript error: Use a more generic type for textContent
+          const textContent = await textContentPromise as any; // Using 'any' to bypass strict type checking
           
           // Join text items to form page text
           const pageText = textContent.items
