@@ -53,14 +53,33 @@ export function useDocumentContent(documentId: string) {
           throw new Error(`Error fetching document binary: ${binaryError.message}`);
         }
         
-        // Create the document object - Fix the binary data handling
+        // Create the document object with proper binary data handling
+        let contentText: string | undefined = undefined;
+        
+        if (binaryData?.binary_data) {
+          // Check what type of data we received and handle accordingly
+          if (typeof binaryData.binary_data === 'string') {
+            // If it's already a string, use directly
+            contentText = binaryData.binary_data;
+          } else if (binaryData.binary_data instanceof Uint8Array) {
+            // If it's a Uint8Array, decode it
+            contentText = new TextDecoder().decode(binaryData.binary_data);
+          } else if (typeof binaryData.binary_data === 'object') {
+            // If it's another array-like object, try to convert to Uint8Array first
+            try {
+              // Handle potential array-like objects
+              const uint8Array = new Uint8Array(Object.values(binaryData.binary_data));
+              contentText = new TextDecoder().decode(uint8Array);
+            } catch (err) {
+              console.error("Error converting binary data to string:", err);
+              contentText = JSON.stringify(binaryData.binary_data);
+            }
+          }
+        }
+        
         const processedDoc: ProcessedDocument = {
           ...docData,
-          content: binaryData?.binary_data 
-            ? typeof binaryData.binary_data === 'string'
-              ? binaryData.binary_data // Use as-is if it's already a string
-              : new TextDecoder().decode(binaryData.binary_data) // Decode if it's binary
-            : undefined
+          content: contentText
         };
         
         setDocument(processedDoc);
