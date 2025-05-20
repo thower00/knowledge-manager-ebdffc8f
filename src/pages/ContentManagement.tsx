@@ -15,17 +15,18 @@ export default function ContentManagement() {
   });
   const { toast } = useToast();
 
-  // Effect to ensure components are loaded
+  // Effect to ensure components are loaded and persist tab state
   useEffect(() => {
-    console.log("ContentManagement component mounted");
+    console.log("ContentManagement component mounted, active tab:", activeTab);
     
     // Save active tab to localStorage whenever it changes
     localStorage.setItem("contentActiveTab", activeTab);
     
-    // Force a refresh of the component state
+    // Force refresh of the component state after a short delay
     const timer = setTimeout(() => {
-      console.log("Ensuring components are properly rendered");
-    }, 500);
+      console.log("Refreshing ContentManagement component state");
+      setActiveTab(prevTab => prevTab); // Force state update to ensure render
+    }, 100);
     
     return () => clearTimeout(timer);
   }, [activeTab]);
@@ -33,11 +34,6 @@ export default function ContentManagement() {
   const handleTabChange = (value: string) => {
     console.log(`Tab changed to: ${value}`);
     setActiveTab(value);
-    
-    // Notify when chunking tab is selected to ensure it's loaded
-    if (value === "chunking") {
-      console.log("Chunking tab selected");
-    }
   };
 
   return (
@@ -58,6 +54,7 @@ export default function ContentManagement() {
           value={activeTab} 
           onValueChange={handleTabChange}
           className="w-full"
+          defaultValue="documents"
         >
           <TabsList className="mb-4">
             <TabsTrigger value="documents">Documents</TabsTrigger>

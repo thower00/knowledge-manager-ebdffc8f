@@ -7,45 +7,61 @@ import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
 export function ConfigurationTabs() {
   // Use localStorage to persist the active tab between renders
   const [activeTab, setActiveTab] = useState(() => {
+    // Get saved tab or default to document-processing
     const savedTab = localStorage.getItem("configActiveTab");
     return savedTab || "document-processing";
   });
 
-  // Save active tab to localStorage whenever it changes
+  // Effect to ensure components are properly loaded and initialized
   useEffect(() => {
-    localStorage.setItem("configActiveTab", activeTab);
-    console.log("Active tab changed to:", activeTab);
-  }, [activeTab]);
-
-  // Force re-render on component mount to ensure proper initialization
-  useEffect(() => {
-    console.log("ConfigurationTabs mounted, active tab:", activeTab);
+    console.log("ConfigurationTabs component mounted, active tab:", activeTab);
     
-    // Small delay to allow initial rendering to complete
+    // Save active tab to localStorage whenever it changes
+    localStorage.setItem("configActiveTab", activeTab);
+    
+    // Small delay to ensure proper initialization
     const timer = setTimeout(() => {
       console.log("Forcing ConfigurationTabs refresh");
-      setActiveTab(tab => tab); // Force a state update
+      setActiveTab(prev => prev); // Force state update
     }, 100);
     
     return () => clearTimeout(timer);
   }, []);
 
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    console.log(`Tab changed to: ${value}`);
+    setActiveTab(value);
+    localStorage.setItem("configActiveTab", value);
+  };
+
   return (
     <Tabs 
       value={activeTab}
-      onValueChange={setActiveTab}
+      onValueChange={handleTabChange}
       className="w-full"
+      defaultValue="document-processing"
     >
       <TabsList className="grid w-full grid-cols-2 mb-6">
         <TabsTrigger value="document-processing">Document Processing Settings</TabsTrigger>
         <TabsTrigger value="google-drive">Google Drive Integration</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="document-processing" forceMount hidden={activeTab !== "document-processing"}>
+      <TabsContent 
+        value="document-processing" 
+        forceMount 
+        hidden={activeTab !== "document-processing"}
+        className={activeTab === "document-processing" ? "block" : "hidden"}
+      >
         <DocumentProcessingSettings activeTab={activeTab} />
       </TabsContent>
       
-      <TabsContent value="google-drive" forceMount hidden={activeTab !== "google-drive"}>
+      <TabsContent 
+        value="google-drive" 
+        forceMount 
+        hidden={activeTab !== "google-drive"}
+        className={activeTab === "google-drive" ? "block" : "hidden"}
+      >
         <GoogleDriveIntegration activeTab={activeTab} />
       </TabsContent>
     </Tabs>

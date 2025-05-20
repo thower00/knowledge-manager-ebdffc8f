@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MODEL_PROVIDERS, getModelDefaults } from "./utils/modelProviders";
@@ -14,9 +14,10 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   const { config, setConfig } = useConfig();
   const { provider, specificModelId } = config;
   
-  // Track if component is mounted to prevent state updates after unmounting
+  // Track if component is mounted
   const isMounted = useRef(true);
   
+  // Force re-render on mount to ensure UI shows correct values
   useEffect(() => {
     console.log("ModelSelector mounted with provider:", provider, "model:", specificModelId);
     
@@ -101,7 +102,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   // Find the currently selected model
   const selectedModel = MODEL_PROVIDERS[provider]?.models.find(m => m.id === specificModelId);
   
-  // Generate a key for the selection content to force re-render when provider changes
+  // Generate a unique key for each render to force content refresh
   const selectContentKey = `model-select-${provider}-${Date.now()}`;
   
   return (
@@ -112,11 +113,12 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
           value={provider}
           onValueChange={handleProviderChange}
           disabled={isLoading}
+          defaultValue="openai"
         >
           <SelectTrigger id="provider" className="bg-background">
             <SelectValue placeholder="Select provider" />
           </SelectTrigger>
-          <SelectContent className="bg-background">
+          <SelectContent className="bg-background max-h-[300px]">
             {Object.entries(MODEL_PROVIDERS).map(([id, providerConfig]) => (
               <SelectItem key={id} value={id}>{providerConfig.name}</SelectItem>
             ))}
@@ -134,13 +136,16 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
           value={specificModelId}
           onValueChange={handleModelChange}
           disabled={isLoading}
+          defaultValue={MODEL_PROVIDERS[provider]?.models[0]?.id || ""}
         >
           <SelectTrigger id="specificModelId" className="bg-background">
             <SelectValue placeholder="Select model" />
           </SelectTrigger>
-          <SelectContent className="max-h-[300px] bg-background">
+          <SelectContent className="max-h-[300px] bg-background overflow-y-auto">
             {MODEL_PROVIDERS[provider]?.models.map(model => (
-              <SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>
+              <SelectItem key={model.id} value={model.id}>
+                {model.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
