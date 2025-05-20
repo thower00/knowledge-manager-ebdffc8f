@@ -1,11 +1,21 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentProcessingSettings } from "./DocumentProcessingSettings";
 import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
 
 export function ConfigurationTabs() {
-  const [activeTab, setActiveTab] = useState("document-processing");
+  // Use localStorage to persist the active tab between renders
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem("configActiveTab");
+    return savedTab || "document-processing";
+  });
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("configActiveTab", activeTab);
+    console.log("Active tab changed to:", activeTab);
+  }, [activeTab]);
 
   return (
     <Tabs 
@@ -19,11 +29,11 @@ export function ConfigurationTabs() {
         <TabsTrigger value="google-drive">Google Drive Integration</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="document-processing">
+      <TabsContent value="document-processing" forceMount>
         <DocumentProcessingSettings activeTab={activeTab} />
       </TabsContent>
       
-      <TabsContent value="google-drive">
+      <TabsContent value="google-drive" forceMount>
         <GoogleDriveIntegration activeTab={activeTab} />
       </TabsContent>
     </Tabs>

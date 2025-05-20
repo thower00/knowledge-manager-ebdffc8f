@@ -14,7 +14,17 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   const { config, setConfig } = useConfig();
   const { provider, specificModelId } = config;
   
+  // Track if component is mounted to prevent state updates after unmounting
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  
   const applyModelDefaults = (providerId: string, modelId: string) => {
+    if (!isMounted) return;
+    
     const defaults = getModelDefaults(providerId, modelId);
     console.log(`Applying defaults for ${providerId}/${modelId}:`, defaults);
     
@@ -27,6 +37,8 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleProviderChange = (newProvider: string) => {
+    if (!isMounted) return;
+    
     console.log(`Changing provider to: ${newProvider}`);
     // Get the first model from the selected provider
     const firstModel = MODEL_PROVIDERS[newProvider]?.models[0]?.id || "";
@@ -46,6 +58,8 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleModelChange = (modelId: string) => {
+    if (!isMounted) return;
+    
     console.log(`Changing model to: ${modelId}`);
     setConfig(prev => ({
       ...prev,
@@ -58,6 +72,8 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   
   // Ensure we have a valid provider and model selected
   useEffect(() => {
+    if (!isMounted) return;
+    
     if (!provider || !MODEL_PROVIDERS[provider]) {
       // Use a default provider if current is invalid
       const defaultProvider = "openai";
@@ -69,7 +85,7 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
         handleModelChange(firstModel);
       }
     }
-  }, [provider, specificModelId]);
+  }, [provider, specificModelId, isMounted]);
   
   // Find the currently selected model
   const selectedModel = MODEL_PROVIDERS[provider]?.models.find(m => m.id === specificModelId);
@@ -83,10 +99,10 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
           onValueChange={handleProviderChange}
           disabled={isLoading}
         >
-          <SelectTrigger id="provider">
+          <SelectTrigger id="provider" className="bg-background">
             <SelectValue placeholder="Select provider" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-background">
             {Object.entries(MODEL_PROVIDERS).map(([id, providerConfig]) => (
               <SelectItem key={id} value={id}>{providerConfig.name}</SelectItem>
             ))}
@@ -104,10 +120,10 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
           onValueChange={handleModelChange}
           disabled={isLoading}
         >
-          <SelectTrigger id="specificModelId">
+          <SelectTrigger id="specificModelId" className="bg-background">
             <SelectValue placeholder="Select model" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[300px] bg-background">
             {MODEL_PROVIDERS[provider]?.models.map(model => (
               <SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>
             ))}

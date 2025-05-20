@@ -9,10 +9,15 @@ export function useConfigLoader(activeTab: string) {
   const { setConfig, setIsLoading } = useConfig();
   const { toast } = useToast();
 
-  // Load existing configuration when component mounts
+  // Load existing configuration when component mounts or activeTab changes to document-processing
   useEffect(() => {
+    let mounted = true;
+    
     async function fetchConfig() {
+      if (!mounted || activeTab !== "document-processing") return;
+      
       try {
+        console.log("Fetching document processing configuration...");
         setIsLoading(true);
         // Fetch document processing settings from database
         const { data, error } = await supabase
@@ -32,7 +37,7 @@ export function useConfigLoader(activeTab: string) {
         }
         
         // If configuration exists, populate the form
-        if (data?.value) {
+        if (data?.value && mounted) {
           console.log("Loaded configuration:", data.value);
           const configValue = data.value as any;
           
@@ -53,19 +58,25 @@ export function useConfigLoader(activeTab: string) {
             customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
             providerApiKeys: configValue.providerApiKeys || {}
           });
-        } else {
+        } else if (mounted) {
           // Reset to default config if nothing is found
+          console.log("No configuration found, using defaults");
           setConfig(DEFAULT_CONFIG);
         }
       } catch (err: any) {
         console.error("Error in fetchConfig:", err);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     }
     
-    if (activeTab === "document-processing") {
-      fetchConfig();
-    }
+    fetchConfig();
+    
+    // Cleanup function to prevent state updates after unmounting
+    return () => {
+      mounted = false;
+    };
   }, [activeTab, toast, setConfig, setIsLoading]);
 }

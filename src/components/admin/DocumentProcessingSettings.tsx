@@ -31,7 +31,7 @@ function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string })
   }, [activeTab]);
   
   return (
-    <Card>
+    <Card className="transition-all">
       <CardHeader>
         <CardTitle>Document Processing Settings</CardTitle>
         <CardDescription>
