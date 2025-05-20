@@ -8,37 +8,18 @@ export function ConfigurationTabs() {
   // Use localStorage to persist the active tab between renders
   const [activeTab, setActiveTab] = useState(() => {
     // Get saved tab or default to document-processing
-    const savedTab = localStorage.getItem("configActiveTab");
-    return savedTab || "document-processing";
+    return localStorage.getItem("configActiveTab") || "document-processing";
   });
 
-  // Effect to ensure components are properly loaded and initialized
   useEffect(() => {
-    console.log("ConfigurationTabs component mounted, active tab:", activeTab);
-    
-    // Save active tab to localStorage whenever it changes
+    console.log("ConfigurationTabs: active tab set to:", activeTab);
     localStorage.setItem("configActiveTab", activeTab);
-    
-    // Small delay to ensure proper initialization
-    const timer = setTimeout(() => {
-      console.log("Forcing ConfigurationTabs refresh");
-      setActiveTab(prev => prev); // Force state update
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Handle tab change
-  const handleTabChange = (value: string) => {
-    console.log(`Tab changed to: ${value}`);
-    setActiveTab(value);
-    localStorage.setItem("configActiveTab", value);
-  };
+  }, [activeTab]);
 
   return (
     <Tabs 
       value={activeTab}
-      onValueChange={handleTabChange}
+      onValueChange={setActiveTab}
       className="w-full"
       defaultValue="document-processing"
     >
@@ -47,21 +28,11 @@ export function ConfigurationTabs() {
         <TabsTrigger value="google-drive">Google Drive Integration</TabsTrigger>
       </TabsList>
       
-      <TabsContent 
-        value="document-processing" 
-        forceMount 
-        hidden={activeTab !== "document-processing"}
-        className={activeTab === "document-processing" ? "block" : "hidden"}
-      >
+      <TabsContent value="document-processing">
         <DocumentProcessingSettings activeTab={activeTab} />
       </TabsContent>
       
-      <TabsContent 
-        value="google-drive" 
-        forceMount 
-        hidden={activeTab !== "google-drive"}
-        className={activeTab === "google-drive" ? "block" : "hidden"}
-      >
+      <TabsContent value="google-drive">
         <GoogleDriveIntegration activeTab={activeTab} />
       </TabsContent>
     </Tabs>

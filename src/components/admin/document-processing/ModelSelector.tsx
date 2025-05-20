@@ -14,46 +14,24 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   const { config, setConfig } = useConfig();
   const { provider, specificModelId } = config;
   
-  // Track if component is mounted
-  const isMounted = useRef(true);
-  
   // Force re-render on mount to ensure UI shows correct values
   useEffect(() => {
     console.log("ModelSelector mounted with provider:", provider, "model:", specificModelId);
     
-    // Set isMounted ref to true on mount
-    isMounted.current = true;
-    
     // Check if we have valid provider and model
     if (!provider || !MODEL_PROVIDERS[provider]) {
-      console.log("Invalid provider, resetting to default");
+      console.log("Invalid provider, setting to default: openai");
       handleProviderChange("openai");
     } else if (!specificModelId) {
-      console.log("No model selected, selecting default");
+      console.log("No model selected, selecting default for provider:", provider);
       const firstModel = MODEL_PROVIDERS[provider]?.models[0]?.id;
       if (firstModel) {
         handleModelChange(firstModel);
       }
     }
-    
-    // Force a refresh after a short delay to ensure UI renders correctly
-    const timer = setTimeout(() => {
-      if (isMounted.current) {
-        console.log("Forcing ModelSelector refresh");
-        setConfig(prev => ({ ...prev })); // Force a state update
-      }
-    }, 200);
-    
-    // Cleanup function to prevent state updates after unmounting
-    return () => {
-      clearTimeout(timer);
-      isMounted.current = false;
-    };
   }, []);
   
   const applyModelDefaults = (providerId: string, modelId: string) => {
-    if (!isMounted.current) return;
-    
     const defaults = getModelDefaults(providerId, modelId);
     console.log(`Applying defaults for ${providerId}/${modelId}:`, defaults);
     
@@ -66,8 +44,6 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleProviderChange = (newProvider: string) => {
-    if (!isMounted.current) return;
-    
     console.log(`Changing provider to: ${newProvider}`);
     // Get the first model from the selected provider
     const firstModel = MODEL_PROVIDERS[newProvider]?.models[0]?.id || "";
@@ -87,8 +63,6 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   };
   
   const handleModelChange = (modelId: string) => {
-    if (!isMounted.current) return;
-    
     console.log(`Changing model to: ${modelId}`);
     setConfig(prev => ({
       ...prev,
@@ -102,18 +76,17 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
   // Find the currently selected model
   const selectedModel = MODEL_PROVIDERS[provider]?.models.find(m => m.id === specificModelId);
   
-  // Generate a unique key for each render to force content refresh
-  const selectContentKey = `model-select-${provider}-${Date.now()}`;
+  console.log("Rendering ModelSelector with provider:", provider, "and model:", specificModelId);
+  console.log("Available models for provider:", MODEL_PROVIDERS[provider]?.models);
   
   return (
     <div className="space-y-6">
       <div className="grid gap-2">
         <Label htmlFor="provider">Embedding Provider</Label>
         <Select
-          value={provider}
+          value={provider || "openai"}
           onValueChange={handleProviderChange}
           disabled={isLoading}
-          defaultValue="openai"
         >
           <SelectTrigger id="provider" className="bg-background">
             <SelectValue placeholder="Select provider" />
@@ -132,11 +105,9 @@ export function ModelSelector({ isLoading }: ModelSelectorProps) {
       <div className="grid gap-2">
         <Label htmlFor="specificModelId">Specific Model</Label>
         <Select
-          key={selectContentKey}
-          value={specificModelId}
+          value={specificModelId || (MODEL_PROVIDERS[provider]?.models[0]?.id || "")}
           onValueChange={handleModelChange}
           disabled={isLoading}
-          defaultValue={MODEL_PROVIDERS[provider]?.models[0]?.id || ""}
         >
           <SelectTrigger id="specificModelId" className="bg-background">
             <SelectValue placeholder="Select model" />

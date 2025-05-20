@@ -35,6 +35,8 @@ export function ChunkingTab() {
     setPreviewDocument(documentId);
   };
 
+  console.log("ChunkingTab rendering with", documents.length, "documents");
+
   return (
     <div className="space-y-6">
       <Card>

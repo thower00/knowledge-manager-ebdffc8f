@@ -15,16 +15,9 @@ export function useConfigLoader(activeTab: string) {
     const isMounted = useRef(true);
     
     async function fetchConfig() {
-      if (!isMounted.current || activeTab !== "document-processing") return;
-      
       try {
         console.log("Fetching document processing configuration...");
         setIsLoading(true);
-        
-        // Reset fetch flag to ensure we re-fetch when tab is active
-        if (activeTab === "document-processing") {
-          configFetched.current = false;
-        }
         
         // Fetch document processing settings from database
         const { data, error } = await supabase
@@ -68,21 +61,11 @@ export function useConfigLoader(activeTab: string) {
             providerApiKeys: configValue.providerApiKeys || {}
           });
           
-          // Mark as fetched to prevent duplicate fetches
           configFetched.current = true;
-          
-          // Force a refresh after a short delay to ensure UI updates
-          setTimeout(() => {
-            if (isMounted.current) {
-              setConfig(prev => ({ ...prev }));
-            }
-          }, 200);
         } else if (isMounted.current) {
           // Reset to default config if nothing is found
           console.log("No configuration found, using defaults");
           setConfig(DEFAULT_CONFIG);
-          
-          // Mark as fetched to prevent duplicate fetches
           configFetched.current = true;
         }
       } catch (err: any) {
@@ -94,23 +77,17 @@ export function useConfigLoader(activeTab: string) {
       }
     }
     
-    // Fetch config when component mounts or tab changes to document-processing
+    // Only fetch config for the document-processing tab and when not already fetched
     if (activeTab === "document-processing" && !configFetched.current) {
       fetchConfig();
     }
     
-    // Reset the fetch flag if the activeTab changes away from document-processing
-    if (activeTab !== "document-processing") {
-      configFetched.current = false;
-    }
-    
-    // Cleanup function to prevent state updates after unmounting
     return () => {
       isMounted.current = false;
     };
   }, [activeTab, toast, setConfig, setIsLoading]);
 
-  // Reset fetch flag when component unmounts and remounts
+  // Reset fetch flag when component unmounts
   useEffect(() => {
     return () => {
       configFetched.current = false;

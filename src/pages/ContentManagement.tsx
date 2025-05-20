@@ -10,31 +10,15 @@ import { useToast } from "@/components/ui/use-toast";
 export default function ContentManagement() {
   // Use localStorage to persist the active tab between renders
   const [activeTab, setActiveTab] = useState(() => {
-    const savedTab = localStorage.getItem("contentActiveTab");
-    return savedTab || "documents";
+    return localStorage.getItem("contentActiveTab") || "documents";
   });
   const { toast } = useToast();
 
-  // Effect to ensure components are loaded and persist tab state
+  // Effect to store the active tab in localStorage
   useEffect(() => {
-    console.log("ContentManagement component mounted, active tab:", activeTab);
-    
-    // Save active tab to localStorage whenever it changes
+    console.log("ContentManagement: active tab changed to:", activeTab);
     localStorage.setItem("contentActiveTab", activeTab);
-    
-    // Force refresh of the component state after a short delay
-    const timer = setTimeout(() => {
-      console.log("Refreshing ContentManagement component state");
-      setActiveTab(prevTab => prevTab); // Force state update to ensure render
-    }, 100);
-    
-    return () => clearTimeout(timer);
   }, [activeTab]);
-
-  const handleTabChange = (value: string) => {
-    console.log(`Tab changed to: ${value}`);
-    setActiveTab(value);
-  };
 
   return (
     <>
@@ -52,7 +36,7 @@ export default function ContentManagement() {
         
         <Tabs 
           value={activeTab} 
-          onValueChange={handleTabChange}
+          onValueChange={setActiveTab}
           className="w-full"
           defaultValue="documents"
         >
@@ -61,7 +45,8 @@ export default function ContentManagement() {
             <TabsTrigger value="chunking">Chunking</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="documents" className="space-y-4" forceMount hidden={activeTab !== "documents"}>
+          {/* Documents Tab */}
+          <TabsContent value="documents" className="space-y-4">
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle>Document Management</CardTitle>
@@ -84,7 +69,8 @@ export default function ContentManagement() {
             <DocumentsTab />
           </TabsContent>
           
-          <TabsContent value="chunking" className="space-y-4" forceMount hidden={activeTab !== "chunking"}>
+          {/* Chunking Tab */}
+          <TabsContent value="chunking" className="space-y-4">
             <ChunkingTab />
           </TabsContent>
         </Tabs>
