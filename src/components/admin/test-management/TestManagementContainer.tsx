@@ -1,10 +1,9 @@
-
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { ProcessingTab } from "./tabs/ProcessingTab";
 import { ExtractionTab } from "./tabs/ExtractionTab";
-import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { TestResultDisplay } from "./TestResultDisplay";
+import { useState } from "react";
 
 export function TestManagement() {
   const [activeTab, setActiveTab] = useState("extraction"); // Changed default to extraction
