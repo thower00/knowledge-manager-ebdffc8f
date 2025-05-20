@@ -8,17 +8,34 @@ import { ChunkingTab } from "@/components/content/chunking/ChunkingTab";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function ContentManagement() {
-  // Use localStorage to persist the active tab between renders
+  // Use localStorage to persist the active tab between renders with error handling
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem("contentActiveTab") || "documents";
+    try {
+      const savedTab = localStorage.getItem("contentActiveTab");
+      console.log("Initial content tab from localStorage:", savedTab);
+      return savedTab || "documents";
+    } catch (e) {
+      console.error("Error accessing localStorage:", e);
+      return "documents";
+    }
   });
+  
   const { toast } = useToast();
 
   // Effect to store the active tab in localStorage
   useEffect(() => {
-    console.log("ContentManagement: active tab changed to:", activeTab);
-    localStorage.setItem("contentActiveTab", activeTab);
+    try {
+      console.log("ContentManagement: active tab changed to:", activeTab);
+      localStorage.setItem("contentActiveTab", activeTab);
+    } catch (e) {
+      console.error("Error writing to localStorage:", e);
+    }
   }, [activeTab]);
+
+  // Debug rendering of the component
+  useEffect(() => {
+    console.log("ContentManagement component rendered with activeTab:", activeTab);
+  }, []);
 
   return (
     <>
@@ -69,7 +86,7 @@ export default function ContentManagement() {
             <DocumentsTab />
           </TabsContent>
           
-          {/* Chunking Tab */}
+          {/* Chunking Tab - Always render to prevent hooks issues */}
           <TabsContent value="chunking" className="space-y-4">
             <ChunkingTab />
           </TabsContent>

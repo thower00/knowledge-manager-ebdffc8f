@@ -7,13 +7,22 @@ import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
 export function ConfigurationTabs() {
   // Use localStorage to persist the active tab between renders
   const [activeTab, setActiveTab] = useState(() => {
-    // Get saved tab or default to document-processing
-    return localStorage.getItem("configActiveTab") || "document-processing";
+    try {
+      // Get saved tab or default to document-processing
+      return localStorage.getItem("configActiveTab") || "document-processing";
+    } catch (e) {
+      console.error("Error accessing localStorage:", e);
+      return "document-processing";
+    }
   });
 
   useEffect(() => {
-    console.log("ConfigurationTabs: active tab set to:", activeTab);
-    localStorage.setItem("configActiveTab", activeTab);
+    try {
+      console.log("ConfigurationTabs: active tab set to:", activeTab);
+      localStorage.setItem("configActiveTab", activeTab);
+    } catch (e) {
+      console.error("Error writing to localStorage:", e);
+    }
   }, [activeTab]);
 
   return (

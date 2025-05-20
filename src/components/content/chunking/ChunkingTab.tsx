@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentSelector } from "./DocumentSelector";
 import { ChunkingPreview } from "./ChunkingPreview";
@@ -34,6 +34,11 @@ export function ChunkingTab() {
   const handlePreviewChunking = (documentId: string) => {
     setPreviewDocument(documentId);
   };
+
+  useEffect(() => {
+    console.log("ChunkingTab mounted");
+    return () => console.log("ChunkingTab unmounted");
+  }, []);
 
   console.log("ChunkingTab rendering with", documents.length, "documents");
 

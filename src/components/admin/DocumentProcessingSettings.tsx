@@ -21,6 +21,7 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
   );
 }
 
+// This is a separate component to ensure the hook is called inside a function component
 function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string }) {
   // Load configuration when component mounts or activeTab changes
   useConfigLoader(activeTab);

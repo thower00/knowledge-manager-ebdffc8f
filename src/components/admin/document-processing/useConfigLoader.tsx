@@ -8,10 +8,12 @@ import { getProviderFromModel } from "./utils/modelProviders";
 export function useConfigLoader(activeTab: string) {
   const { setConfig, setIsLoading } = useConfig();
   const { toast } = useToast();
+  // Create a local ref that doesn't persist between renders
   const configFetched = useRef(false);
 
   // Load existing configuration when component mounts or activeTab changes to document-processing
   useEffect(() => {
+    // Move this inside the effect to prevent invalid hook calls
     const isMounted = useRef(true);
     
     async function fetchConfig() {
