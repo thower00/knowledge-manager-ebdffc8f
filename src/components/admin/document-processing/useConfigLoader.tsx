@@ -8,12 +8,12 @@ import { getProviderFromModel } from "./utils/modelProviders";
 export function useConfigLoader(activeTab: string) {
   const { setConfig, setIsLoading } = useConfig();
   const { toast } = useToast();
-  // Create a local ref that doesn't persist between renders
+  // Create a local ref that persists between renders
   const configFetched = useRef(false);
 
   // Load existing configuration when component mounts or activeTab changes to document-processing
   useEffect(() => {
-    // Move this inside the effect to prevent invalid hook calls
+    // Create a local ref for component mount state that's scoped to this effect
     const isMounted = useRef(true);
     
     async function fetchConfig() {
@@ -84,15 +84,20 @@ export function useConfigLoader(activeTab: string) {
       fetchConfig();
     }
     
+    // Cleanup function to prevent memory leaks
     return () => {
       isMounted.current = false;
     };
   }, [activeTab, toast, setConfig, setIsLoading]);
 
-  // Reset fetch flag when component unmounts
+  // Reset fetch flag when component unmounts or tab changes
   useEffect(() => {
     return () => {
-      configFetched.current = false;
+      // This will ensure we reset our fetch status when the component unmounts
+      // or when the activeTab changes (which would trigger a re-mount)
+      if (activeTab !== "document-processing") {
+        configFetched.current = false;
+      }
     };
-  }, []);
+  }, [activeTab]);
 }
