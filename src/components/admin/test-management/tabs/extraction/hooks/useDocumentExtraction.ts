@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
 import { useUrlValidation } from "./useUrlValidation";
 import { useExtractionProcess } from "./useExtractionProcess";
+import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
+import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
 
 interface UseDocumentExtractionProps {
   onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
