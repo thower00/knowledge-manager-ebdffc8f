@@ -2,7 +2,7 @@
 import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { validatePdfUrl, convertGoogleDriveUrl } from "../utils/urlUtils";
 
@@ -13,6 +13,7 @@ export const useDocumentExtraction = () => {
   const { data: documents, isLoading } = useProcessedDocumentsFetch();
   const { connectionStatus, connectionError, checkConnection } = useProxyConnectionStatus();
   const { toast } = useToast();
+  const [storeInDatabase, setStoreInDatabase] = useState(false);
   
   const {
     selectedDocumentId,
@@ -22,16 +23,13 @@ export const useDocumentExtraction = () => {
     extractionProgress,
     extractedText,
     error,
-    retryExtraction,
-    storeInDatabase,
-    setStoreInDatabase
+    retryExtraction
   } = useTextExtraction();
 
   // Wrapper for extractTextFromDocument that handles connection checking and URL conversion
   const extractTextFromDocument = useCallback(async (documentId: string) => {
     console.log("Extract text requested for document:", documentId);
     console.log("Current connection status:", connectionStatus);
-    console.log("Using database storage:", storeInDatabase);
     
     // Select the document from the list
     const selectedDocument = documents?.find(doc => doc.id === documentId);
@@ -74,13 +72,7 @@ export const useDocumentExtraction = () => {
       }
     }
     
-    // If database storage is enabled, we can proceed regardless of connection status
-    if (storeInDatabase) {
-      console.log("Database storage enabled, proceeding with extraction regardless of proxy status");
-      return extractText(documentId, documents);
-    }
-    
-    // Otherwise, verify connection status before extraction
+    // Verify connection status before extraction
     if (connectionStatus === "error" || connectionStatus === "idle") {
       console.log("Connection status needs verification before extraction");
       
@@ -94,15 +86,15 @@ export const useDocumentExtraction = () => {
         toast({
           variant: "destructive",
           title: "Connection Unavailable",
-          description: "Cannot connect to the proxy service. Please try again later or enable database storage."
+          description: "Cannot connect to the proxy service. Please try again later."
         });
         return;
       }
     }
     
-    console.log("Connection is good or database storage is enabled, proceeding with extraction");
+    console.log("Connection is good, proceeding with extraction");
     return extractText(documentId, documents);
-  }, [connectionStatus, checkConnection, extractText, documents, storeInDatabase, toast]);
+  }, [connectionStatus, checkConnection, extractText, documents, toast]);
 
   return {
     documents,

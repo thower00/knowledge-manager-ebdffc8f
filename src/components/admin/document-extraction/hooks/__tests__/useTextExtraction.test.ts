@@ -1,6 +1,7 @@
+
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useTextExtraction } from '../useTextExtraction';
-import { fetchDocumentViaProxy, fetchDocumentFromDatabase } from '../../services/documentFetchService';
+import { fetchDocumentViaProxy } from '../../services/documentFetchService';
 import { extractPdfText } from '../../utils/pdfUtils';
 import { ProcessedDocument } from '@/types/document';
 import { createMockPdfArrayBuffer } from '../../utils/__tests__/testUtils';
@@ -9,7 +10,6 @@ import { jest, describe, test, expect, beforeEach } from '../../../../../setupTe
 // Mock service functions
 jest.mock('../../services/documentFetchService', () => ({
   fetchDocumentViaProxy: jest.fn(),
-  fetchDocumentFromDatabase: jest.fn(),
 }));
 
 jest.mock('../../utils/pdfUtils', () => ({
@@ -52,7 +52,6 @@ describe('useTextExtraction Hook', () => {
     
     // Default mock implementations
     (fetchDocumentViaProxy as jest.MockedFunction<typeof fetchDocumentViaProxy>).mockResolvedValue(createMockPdfArrayBuffer());
-    (fetchDocumentFromDatabase as jest.MockedFunction<typeof fetchDocumentFromDatabase>).mockResolvedValue(createMockPdfArrayBuffer());
     (extractPdfText as jest.MockedFunction<typeof extractPdfText>).mockResolvedValue('Extracted text content');
   });
 
@@ -70,7 +69,7 @@ describe('useTextExtraction Hook', () => {
     expect(result.current.extractionProgress).toBe(0);
     expect(result.current.extractedText).toBe('');
     expect(result.current.isExtracting).toBe(true);
-    expect(fetchDocumentViaProxy).toHaveBeenCalledWith('https://example.com/test.pdf', undefined, undefined, false);
+    expect(fetchDocumentViaProxy).toHaveBeenCalledWith('https://example.com/test.pdf', undefined);
   });
 
   test('should handle document database extraction successfully', async () => {
@@ -94,7 +93,7 @@ describe('useTextExtraction Hook', () => {
     });
     
     expect(result.current.isExtracting).toBe(true);
-    expect(fetchDocumentViaProxy).toHaveBeenCalledWith(mockDocuments[0].url, mockDocuments[0].title, mockDocuments[0].id, false);
+    expect(fetchDocumentViaProxy).toHaveBeenCalledWith(mockDocuments[0].url, mockDocuments[0].title);
     
     // Wait for extraction to complete
     await act(async () => {

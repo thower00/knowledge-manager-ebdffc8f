@@ -6,12 +6,10 @@ import { ExtractionProgress } from "./ExtractionProgress";
 import { ExtractedTextDisplay } from "./ExtractedTextDisplay";
 import { ExtractionError } from "./ExtractionError";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
+import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 
 export function DocumentExtraction() {
   const {
@@ -72,7 +70,6 @@ export function DocumentExtraction() {
             isExtracting={isExtracting}
             isProxyAvailable={isProxyAvailable}
             isCheckingConnection={isCheckingConnection}
-            storeInDatabase={storeInDatabase}
           />
           
           {/* Connection status indicator */}
@@ -115,24 +112,6 @@ export function DocumentExtraction() {
               </Button>
             )}
           </div>
-          
-          {/* Document Binary Storage Toggle */}
-          <div className="mt-4 flex items-center space-x-2">
-            <Switch 
-              id="store-binary" 
-              checked={storeInDatabase}
-              onCheckedChange={setStoreInDatabase}
-            />
-            <Label htmlFor="store-binary">Store document binary in database</Label>
-          </div>
-          
-          {storeInDatabase && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Document binary will be stored in the database for faster access in the future.
-              {selectedDocument && !error && extractedText && 
-                " The document has been stored and will be retrieved from the database on next extraction."}
-            </p>
-          )}
         </CardContent>
       </Card>
 

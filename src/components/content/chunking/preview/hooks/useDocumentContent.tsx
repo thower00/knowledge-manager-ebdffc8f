@@ -9,6 +9,7 @@ interface ProcessedDocument {
   content?: string;
   status: string;
   mime_type: string;
+  url?: string;
   created_at: string;
   processed_at: string | null;
 }

@@ -23,7 +23,6 @@ interface DocumentSelectorProps {
   onExtractClick: () => void;
   isProxyAvailable: boolean;
   isCheckingConnection: boolean;
-  storeInDatabase?: boolean;
 }
 
 export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
@@ -35,7 +34,6 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
   onExtractClick,
   isProxyAvailable,
   isCheckingConnection,
-  storeInDatabase = false,
 }) => {
   // Track URL validity for the selected document
   const [urlStatus, setUrlStatus] = useState<{
@@ -73,7 +71,7 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
   const canExtract = selectedDocumentId && 
                     !isExtracting && 
                     (urlStatus.isValid || urlStatus.canAutoFix) && 
-                    (isProxyAvailable || storeInDatabase || isCheckingConnection);
+                    (isProxyAvailable || isCheckingConnection);
 
   return (
     <div className="space-y-4">
@@ -133,17 +131,10 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
             </div>
           )}
           
-          {!isCheckingConnection && !isProxyAvailable && !storeInDatabase && (
+          {!isCheckingConnection && !isProxyAvailable && (
             <div className="flex items-center text-sm text-red-600">
               <AlertTriangle className="h-4 w-4 mr-1" />
               <span>Proxy service unavailable</span>
-            </div>
-          )}
-          
-          {!isCheckingConnection && !isProxyAvailable && storeInDatabase && (
-            <div className="flex items-center text-sm text-amber-600">
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              <span>Proxy unavailable, using database storage</span>
             </div>
           )}
           
@@ -188,9 +179,9 @@ export const DocumentSelector: React.FC<DocumentSelectorProps> = ({
                 <p>Please select a document first</p>
               </TooltipContent>
             )}
-            {!canExtract && !isProxyAvailable && !storeInDatabase && (
+            {!canExtract && !isProxyAvailable && (
               <TooltipContent>
-                <p>Proxy service is unavailable. Try enabling database storage.</p>
+                <p>Proxy service is unavailable.</p>
               </TooltipContent>
             )}
           </Tooltip>

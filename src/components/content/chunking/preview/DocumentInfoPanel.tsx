@@ -8,6 +8,7 @@ interface ProcessedDocument {
   content?: string;
   status: string;
   mime_type: string;
+  url?: string;
   created_at: string;
   processed_at: string | null;
 }
@@ -44,6 +45,7 @@ export function DocumentInfoPanel({
             size="sm" 
             className="flex items-center" 
             onClick={onViewFullDocument}
+            disabled={!document.url}
           >
             <Eye className="mr-2 h-4 w-4" />
             View Full Document
