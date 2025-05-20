@@ -31,7 +31,8 @@ export const fetchDocumentViaProxy = async (
           title,
           requestedAt: new Date().toISOString(),
           timestamp: Date.now(),
-          nonce // Add random nonce for cache busting
+          nonce, // Add random nonce for cache busting
+          noCache: true // Explicit no-cache flag
         }
       });
 
@@ -84,6 +85,8 @@ export const fetchDocumentViaProxy = async (
             errorMessage = "The request timed out. The document may be too large or the server is not responding.";
           } else if (errorMessage.includes("Access denied") && errorMessage.includes("Google Drive")) {
             errorMessage = "Access denied. Make sure the Google Drive document is shared with 'Anyone with the link'.";
+          } else if (errorMessage.includes("pdf.worker")) {
+            errorMessage = "Failed to load PDF processing components. This may be due to network restrictions or content filtering.";
           }
         }
         

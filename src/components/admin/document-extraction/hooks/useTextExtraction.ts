@@ -74,6 +74,8 @@ export const useTextExtraction = () => {
         if (pdfError instanceof Error) {
           if (pdfError.message.includes("Failed to fetch") && pdfError.message.includes("pdf.worker")) {
             errorMessage = "Failed to load PDF processing worker. This may be due to network issues or content filtering. Try again later or on a different network.";
+          } else if (pdfError.message.includes("Setting up fake worker failed")) {
+            errorMessage = "Failed to initialize PDF processing components. This is likely due to network restrictions or content filtering.";
           } else {
             errorMessage = pdfError.message;
           }
@@ -95,7 +97,7 @@ export const useTextExtraction = () => {
           errorMessage = "The request timed out. The document may be too large or the server is not responding.";
         } else if (error.message.includes("Failed to decode")) {
           errorMessage = "Failed to decode the document data. The file might be corrupted or in an unsupported format.";
-        } else if (error.message.includes("pdf.worker")) {
+        } else if (error.message.includes("pdf.worker") || error.message.includes("fake worker")) {
           errorMessage = "Failed to load PDF processing components. This may be due to network restrictions or content filtering.";
         } else {
           errorMessage = error.message;

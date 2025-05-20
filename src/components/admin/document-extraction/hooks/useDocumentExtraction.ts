@@ -13,7 +13,6 @@ export const useDocumentExtraction = () => {
   const { data: documents, isLoading } = useProcessedDocumentsFetch();
   const { connectionStatus, connectionError, checkConnection } = useProxyConnectionStatus();
   const { toast } = useToast();
-  const [storeInDatabase, setStoreInDatabase] = useState(false);
   
   const {
     selectedDocumentId,
@@ -109,8 +108,6 @@ export const useDocumentExtraction = () => {
     retryExtraction,
     connectionStatus,
     connectionError,
-    checkConnection,
-    storeInDatabase,
-    setStoreInDatabase
+    checkConnection
   };
 };

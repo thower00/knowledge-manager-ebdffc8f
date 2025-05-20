@@ -5,7 +5,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,Cache-Control,Pragma",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -47,7 +47,10 @@ function handleConnectionTest(reqBody: any) {
     { 
       status: 200, 
       headers: { 
-        "Content-Type": "application/json", 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
         ...corsHeaders 
       } 
     }
@@ -74,7 +77,8 @@ serve(async (req: Request) => {
       has_url: !!requestBody.url,
       title: requestBody.title || "untitled",
       timestamp: requestBody.timestamp || null,
-      nonce: requestBody.nonce || null
+      nonce: requestBody.nonce || null,
+      noCache: requestBody.noCache || false
     }));
     
     // Handle connection test requests - Always respond with success for test requests
@@ -87,7 +91,14 @@ serve(async (req: Request) => {
     if (!url) {
       return new Response(
         JSON.stringify({ error: "Missing URL parameter" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        { 
+          status: 400, 
+          headers: { 
+            "Content-Type": "application/json", 
+            "Cache-Control": "no-store, no-cache",
+            ...corsHeaders 
+          } 
+        }
       );
     }
     
@@ -97,12 +108,20 @@ serve(async (req: Request) => {
     console.log(`Proxying request for ${title || "document"} at URL: ${optimizedUrl}`);
     
     // Fetch the document with proper headers for Google Drive
+    const headers = new Headers({
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    });
+    
+    // Add cache-busting if requested
+    if (requestBody.noCache) {
+      headers.append("Cache-Control", "no-cache, no-store");
+      headers.append("Pragma", "no-cache");
+    }
+    
     const response = await fetch(optimizedUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-      },
+      headers,
       // Add reasonable timeout
-      signal: AbortSignal.timeout(20000) // 20 second timeout
+      signal: AbortSignal.timeout(25000) // 25 second timeout
     });
     
     if (!response.ok) {
@@ -114,13 +133,27 @@ serve(async (req: Request) => {
           JSON.stringify({ 
             error: "Access denied. Make sure the Google Drive document is shared with 'Anyone with the link'." 
           }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          { 
+            status: 403, 
+            headers: { 
+              "Content-Type": "application/json", 
+              "Cache-Control": "no-store, no-cache",
+              ...corsHeaders 
+            } 
+          }
         );
       }
       
       return new Response(
         JSON.stringify({ error: `Failed to fetch document: ${response.status} ${response.statusText}` }),
-        { status: response.status, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        { 
+          status: response.status, 
+          headers: { 
+            "Content-Type": "application/json", 
+            "Cache-Control": "no-store, no-cache",
+            ...corsHeaders 
+          } 
+        }
       );
     }
     
@@ -166,6 +199,9 @@ serve(async (req: Request) => {
         headers: { 
           "Content-Type": "application/json", 
           "X-Processing-Time": processingTime.toString(),
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
           ...corsHeaders 
         } 
       }
@@ -184,6 +220,7 @@ serve(async (req: Request) => {
         status: 500, 
         headers: { 
           "Content-Type": "application/json", 
+          "Cache-Control": "no-store, no-cache",
           ...corsHeaders 
         } 
       }
