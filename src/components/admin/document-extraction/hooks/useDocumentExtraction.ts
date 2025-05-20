@@ -2,7 +2,7 @@
 import { useProcessedDocumentsFetch } from "./useProcessedDocumentsFetch";
 import { useTextExtraction } from "./useTextExtraction";
 import { useProxyConnectionStatus } from "./useProxyConnectionStatus";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { validatePdfUrl, convertGoogleDriveUrl } from "../utils/urlUtils";
 
@@ -50,7 +50,7 @@ export const useDocumentExtraction = () => {
       // If URL was converted, show a toast message and update the document URL
       if (wasConverted) {
         toast({
-          variant: "default",  // Changed from "success" to "default" as it's an allowed variant
+          variant: "default",
           title: "URL Converted",
           description: "Google Drive URL automatically converted to direct download format."
         });

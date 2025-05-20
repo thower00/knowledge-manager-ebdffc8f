@@ -25,12 +25,13 @@ export const fetchDocumentViaProxy = async (
       
       // Add a timestamp and nonce to prevent caching issues
       const nonce = Math.random().toString(36).substring(2, 15);
+      const timestamp = Date.now();
       const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
         body: { 
           url,
           title,
           requestedAt: new Date().toISOString(),
-          timestamp: Date.now(),
+          timestamp,
           nonce, // Add random nonce for cache busting
           noCache: true // Explicit no-cache flag
         }

@@ -72,12 +72,16 @@ export const useTextExtraction = () => {
         
         // Check for common PDF.js worker errors
         if (pdfError instanceof Error) {
-          if (pdfError.message.includes("Failed to fetch") && pdfError.message.includes("pdf.worker")) {
+          const errorMsg = pdfError.message;
+          
+          if (errorMsg.includes("Failed to fetch") && errorMsg.includes("pdf.worker")) {
             errorMessage = "Failed to load PDF processing worker. This may be due to network issues or content filtering. Try again later or on a different network.";
-          } else if (pdfError.message.includes("Setting up fake worker failed")) {
+          } else if (errorMsg.includes("Setting up fake worker")) {
             errorMessage = "Failed to initialize PDF processing components. This is likely due to network restrictions or content filtering.";
+          } else if (errorMsg.includes("worker") || errorMsg.includes("Worker")) {
+            errorMessage = "PDF worker error: " + errorMsg;
           } else {
-            errorMessage = pdfError.message;
+            errorMessage = errorMsg;
           }
         }
         
@@ -89,18 +93,20 @@ export const useTextExtraction = () => {
       let errorMessage = "Failed to extract text from the document";
       if (error instanceof Error) {
         // Special handling for common PDF.js errors
-        if (error.message.includes("Invalid PDF structure")) {
+        const errorMsg = error.message;
+        
+        if (errorMsg.includes("Invalid PDF structure")) {
           errorMessage = "The file is not a valid PDF document.";
-        } else if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+        } else if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
           errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
-        } else if (error.message.includes("timeout") || error.message.includes("timed out")) {
+        } else if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
           errorMessage = "The request timed out. The document may be too large or the server is not responding.";
-        } else if (error.message.includes("Failed to decode")) {
+        } else if (errorMsg.includes("Failed to decode")) {
           errorMessage = "Failed to decode the document data. The file might be corrupted or in an unsupported format.";
-        } else if (error.message.includes("pdf.worker") || error.message.includes("fake worker")) {
+        } else if (errorMsg.includes("pdf.worker") || errorMsg.includes("fake worker")) {
           errorMessage = "Failed to load PDF processing components. This may be due to network restrictions or content filtering.";
         } else {
-          errorMessage = error.message;
+          errorMessage = errorMsg;
         }
       }
       
