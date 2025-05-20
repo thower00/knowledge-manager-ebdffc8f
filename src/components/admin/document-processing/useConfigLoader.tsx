@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, DEFAULT_CONFIG } from "./ConfigContext";
@@ -8,95 +8,90 @@ import { getProviderFromModel } from "./utils/modelProviders";
 export function useConfigLoader(activeTab: string) {
   const { setConfig, setIsLoading } = useConfig();
   const { toast } = useToast();
-  // Create a local ref that persists between renders
-  const configFetched = useRef(false);
+  // Use state instead of ref for tracking if config has been fetched
+  const [configFetched, setConfigFetched] = useState(false);
+
+  // Define fetchConfig function using useCallback to prevent recreating it on every render
+  const fetchConfig = useCallback(async () => {
+    try {
+      console.log("Fetching document processing configuration...");
+      setIsLoading(true);
+      
+      // Fetch document processing settings from database
+      const { data, error } = await supabase
+        .from('configurations')
+        .select('*')
+        .eq('key', 'document_processing')
+        .maybeSingle();
+        
+      if (error) {
+        console.error("Error fetching configuration:", error);
+        toast({
+          variant: "destructive",
+          title: "Error loading configuration",
+          description: `Failed to load configuration: ${error.message}`
+        });
+        return;
+      }
+      
+      // If configuration exists, populate the form
+      if (data?.value) {
+        console.log("Loaded configuration:", data.value);
+        const configValue = data.value as any;
+        
+        // Determine the provider based on the model or specificModelId
+        const provider = configValue.provider || getProviderFromModel(configValue.specificModelId || configValue.embeddingModel);
+        const specificModelId = configValue.specificModelId || configValue.embeddingModel === provider ? 
+          (provider === "openai" ? "text-embedding-ada-002" : "local-model") : configValue.embeddingModel;
+        
+        setConfig({
+          apiKey: configValue.apiKey || DEFAULT_CONFIG.apiKey,
+          provider: provider,
+          embeddingModel: configValue.embeddingModel || DEFAULT_CONFIG.embeddingModel,
+          specificModelId: specificModelId,
+          chunkSize: configValue.chunkSize || DEFAULT_CONFIG.chunkSize,
+          chunkOverlap: configValue.chunkOverlap || DEFAULT_CONFIG.chunkOverlap,
+          chunkStrategy: configValue.chunkStrategy || DEFAULT_CONFIG.chunkStrategy,
+          storagePath: configValue.storagePath || DEFAULT_CONFIG.storagePath,
+          customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
+          providerApiKeys: configValue.providerApiKeys || {}
+        });
+        
+        setConfigFetched(true);
+      } else {
+        // Reset to default config if nothing is found
+        console.log("No configuration found, using defaults");
+        setConfig(DEFAULT_CONFIG);
+        setConfigFetched(true);
+      }
+    } catch (err: any) {
+      console.error("Error in fetchConfig:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setConfig, setIsLoading, toast]);
 
   // Load existing configuration when component mounts or activeTab changes to document-processing
   useEffect(() => {
-    // Create a local ref for component mount state that's scoped to this effect
-    const isMounted = useRef(true);
-    
-    async function fetchConfig() {
-      try {
-        console.log("Fetching document processing configuration...");
-        setIsLoading(true);
-        
-        // Fetch document processing settings from database
-        const { data, error } = await supabase
-          .from('configurations')
-          .select('*')
-          .eq('key', 'document_processing')
-          .maybeSingle();
-          
-        if (error) {
-          console.error("Error fetching configuration:", error);
-          if (isMounted.current) {
-            toast({
-              variant: "destructive",
-              title: "Error loading configuration",
-              description: `Failed to load configuration: ${error.message}`
-            });
-          }
-          return;
-        }
-        
-        // If configuration exists, populate the form
-        if (data?.value && isMounted.current) {
-          console.log("Loaded configuration:", data.value);
-          const configValue = data.value as any;
-          
-          // Determine the provider based on the model or specificModelId
-          const provider = configValue.provider || getProviderFromModel(configValue.specificModelId || configValue.embeddingModel);
-          const specificModelId = configValue.specificModelId || configValue.embeddingModel === provider ? 
-            (provider === "openai" ? "text-embedding-ada-002" : "local-model") : configValue.embeddingModel;
-          
-          setConfig({
-            apiKey: configValue.apiKey || DEFAULT_CONFIG.apiKey,
-            provider: provider,
-            embeddingModel: configValue.embeddingModel || DEFAULT_CONFIG.embeddingModel,
-            specificModelId: specificModelId,
-            chunkSize: configValue.chunkSize || DEFAULT_CONFIG.chunkSize,
-            chunkOverlap: configValue.chunkOverlap || DEFAULT_CONFIG.chunkOverlap,
-            chunkStrategy: configValue.chunkStrategy || DEFAULT_CONFIG.chunkStrategy,
-            storagePath: configValue.storagePath || DEFAULT_CONFIG.storagePath,
-            customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
-            providerApiKeys: configValue.providerApiKeys || {}
-          });
-          
-          configFetched.current = true;
-        } else if (isMounted.current) {
-          // Reset to default config if nothing is found
-          console.log("No configuration found, using defaults");
-          setConfig(DEFAULT_CONFIG);
-          configFetched.current = true;
-        }
-      } catch (err: any) {
-        console.error("Error in fetchConfig:", err);
-      } finally {
-        if (isMounted.current) {
-          setIsLoading(false);
-        }
-      }
-    }
+    let mounted = true; // Track mounted state locally
     
     // Only fetch config for the document-processing tab and when not already fetched
-    if (activeTab === "document-processing" && !configFetched.current) {
+    if (activeTab === "document-processing" && !configFetched) {
       fetchConfig();
     }
     
     // Cleanup function to prevent memory leaks
     return () => {
-      isMounted.current = false;
+      mounted = false;
     };
-  }, [activeTab, toast, setConfig, setIsLoading]);
+  }, [activeTab, fetchConfig, configFetched]);
 
-  // Reset fetch flag when component unmounts or tab changes
+  // Reset fetch flag when component unmounts or tab changes away from document-processing
   useEffect(() => {
     return () => {
-      // This will ensure we reset our fetch status when the component unmounts
-      // or when the activeTab changes (which would trigger a re-mount)
+      // This will ensure we reset our fetch status when the tab changes away from document-processing
       if (activeTab !== "document-processing") {
-        configFetched.current = false;
+        setConfigFetched(false);
       }
     };
   }, [activeTab]);
