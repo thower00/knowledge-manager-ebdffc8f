@@ -42,6 +42,25 @@ serve(async (req: Request) => {
   
   try {
     const requestBody = await req.json();
+    
+    // Handle connection test requests
+    if (requestBody.action === "connection_test") {
+      console.log("Connection test request received");
+      return new Response(
+        JSON.stringify({ 
+          status: "connected",
+          message: "PDF proxy service is available" 
+        }),
+        { 
+          status: 200, 
+          headers: { 
+            "Content-Type": "application/json", 
+            ...corsHeaders 
+          } 
+        }
+      );
+    }
+    
     const { url, title } = requestBody;
     
     if (!url) {
@@ -92,7 +111,6 @@ serve(async (req: Request) => {
     // Get the document data as an array buffer
     const documentData = await response.arrayBuffer();
     
-    // No longer storing in database, just return the data
     // Convert array buffer to base64 for transmission
     const base64Data = btoa(
       new Uint8Array(documentData).reduce((data, byte) => data + String.fromCharCode(byte), '')

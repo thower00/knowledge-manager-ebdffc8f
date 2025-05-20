@@ -31,7 +31,10 @@ export const useProxyConnectionStatus = () => {
     while (currentRetry <= retries) {
       try {
         const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
-          body: { action: "connection_test" }
+          body: { 
+            action: "connection_test",
+            timestamp: new Date().toISOString() // Add timestamp to prevent caching
+          }
         });
 
         if (functionError) {
@@ -39,6 +42,7 @@ export const useProxyConnectionStatus = () => {
         }
 
         if (data && data.status === "connected") {
+          console.log("Proxy service connection successful:", data.message || "Connected");
           setConnectionStatus('connected');
           setConnectionError(null);
           return 'connected';
@@ -81,11 +85,17 @@ export const useProxyConnectionStatus = () => {
 
   // Initial connection check on mount
   useEffect(() => {
-    checkConnection();
+    const initialCheck = async () => {
+      // Add slight delay to ensure component is fully mounted
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await checkConnection();
+    };
+    
+    initialCheck();
     
     // Check connection every 5 minutes to ensure it's still available
     const intervalId = setInterval(() => {
-      checkConnection(true);
+      checkConnection(false);
     }, 5 * 60 * 1000);
     
     return () => clearInterval(intervalId);

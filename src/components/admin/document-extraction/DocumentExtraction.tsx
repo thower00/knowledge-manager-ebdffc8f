@@ -8,7 +8,7 @@ import { ExtractionError } from "./ExtractionError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Info, RefreshCw, Loader2 } from "lucide-react";
 import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 
 export function DocumentExtraction() {
@@ -25,9 +25,7 @@ export function DocumentExtraction() {
     retryExtraction,
     connectionStatus,
     connectionError,
-    checkConnection,
-    storeInDatabase,
-    setStoreInDatabase
+    checkConnection
   } = useDocumentExtraction();
   
   // Derived state based on connection status
@@ -100,17 +98,25 @@ export function DocumentExtraction() {
                 </Tooltip>
               </TooltipProvider>
             )}
-            {connectionStatus === 'error' && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleCheckConnection} 
-                className="ml-2 h-7 text-xs"
-                disabled={isCheckingConnection}
-              >
-                Retry Connection
-              </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCheckConnection} 
+              className="h-7 text-xs"
+              disabled={isCheckingConnection}
+            >
+              {isCheckingConnection ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Check Connection
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
