@@ -72,6 +72,18 @@ async function initPdfWorker() {
 }
 
 /**
+ * Check if the buffer is likely a PDF based on its initial bytes
+ * @param buffer ArrayBuffer to check
+ * @returns boolean indicating if the file is likely a PDF
+ */
+function isPdfBuffer(buffer: ArrayBuffer): boolean {
+  // PDF files start with "%PDF-"
+  const header = new Uint8Array(buffer, 0, 5);
+  const headerString = String.fromCharCode(...header);
+  return headerString === '%PDF-';
+}
+
+/**
  * Extract text from a PDF document
  * @param pdfData ArrayBuffer containing the PDF data
  * @param progressCallback Optional callback to report progress
@@ -84,6 +96,12 @@ export const extractPdfText = async (
   // Initialize progress reporting
   if (progressCallback) progressCallback(5);
   
+  // Validate that the input is actually a PDF
+  if (!isPdfBuffer(pdfData)) {
+    console.error("The provided data does not appear to be a PDF (missing PDF header)");
+    throw new Error("The file does not appear to be a valid PDF document. It may be corrupted or in an unsupported format.");
+  }
+  
   // Initialize the worker before processing
   try {
     await initPdfWorker();
@@ -94,11 +112,30 @@ export const extractPdfText = async (
   }
   
   try {
-    // Load the PDF document
+    // Load the PDF document with additional parameters to handle corrupted files
     if (progressCallback) progressCallback(30);
     
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-    const pdf = await loadingTask.promise;
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      // Add options to better handle problematic PDFs
+      disableFontFace: true,
+      nativeImageDecoderSupport: "none",
+      ignoreErrors: true
+    });
+    
+    // Set a timeout for the loading task
+    const loadingPromise = Promise.race([
+      loadingTask.promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          // Abort the loading task if possible
+          loadingTask.destroy().catch(() => {});
+          reject(new Error("PDF loading timed out after 30 seconds. The document might be too large or corrupted."));
+        }, 30000); // 30 second timeout
+      })
+    ]);
+    
+    const pdf = await loadingPromise as pdfjsLib.PDFDocumentProxy;
     console.log("PDF document loaded with", pdf.numPages, "pages");
     
     // Set progress after loading document
@@ -107,31 +144,73 @@ export const extractPdfText = async (
     // Extract text from each page
     let fullText = '';
     const totalPages = pdf.numPages;
+    let processedPages = 0;
+    
+    // Create an array of promises for processing pages concurrently (but limited)
+    const pagePromises = [];
+    const maxConcurrentPages = 3; // Process up to 3 pages concurrently
     
     for (let i = 1; i <= totalPages; i++) {
-      // Get the page
-      const page = await pdf.getPage(i);
-      
-      // Extract the text content
-      const textContent = await page.getTextContent();
-      
-      // Join text items to form page text
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      // Append to the full text
-      fullText += pageText + '\n\n';
-      
-      // Update progress if callback is provided
-      if (progressCallback) {
-        const progress = 40 + Math.floor((i / totalPages) * 55);
-        progressCallback(progress);
+      // Process pages in batches to avoid memory issues
+      if (pagePromises.length >= maxConcurrentPages) {
+        // Wait for at least one page to finish before starting another
+        await Promise.race(pagePromises);
+        // Remove completed promises
+        for (let j = 0; j < pagePromises.length; j++) {
+          if (pagePromises[j].status === 'fulfilled') {
+            pagePromises.splice(j, 1);
+            j--;
+          }
+        }
       }
       
-      // Clean up page resources
-      page.cleanup();
+      // Create a promise for processing this page
+      const pagePromise = (async (pageNum) => {
+        try {
+          // Get the page
+          const page = await pdf.getPage(pageNum);
+          
+          // Extract the text content with timeout
+          const textContentPromise = Promise.race([
+            page.getTextContent(),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error(`Page ${pageNum} text extraction timed out`));
+              }, 15000); // 15 second timeout per page
+            })
+          ]);
+          
+          const textContent = await textContentPromise as pdfjsLib.TextContent;
+          
+          // Join text items to form page text
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          
+          // Append to the full text with page number
+          return `--- Page ${pageNum} ---\n${pageText}`;
+        } catch (error) {
+          console.error(`Error extracting text from page ${pageNum}:`, error);
+          return `--- Page ${pageNum} - Error ---\nFailed to extract text: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        } finally {
+          // Update progress regardless of success/failure
+          processedPages++;
+          if (progressCallback) {
+            const progress = 40 + Math.floor((processedPages / totalPages) * 55);
+            progressCallback(progress);
+          }
+        }
+      })(i);
+      
+      pagePromises.push(pagePromise);
     }
+    
+    // Wait for all remaining pages to finish
+    const pageTexts = await Promise.all(pagePromises);
+    fullText = pageTexts.join('\n\n');
+    
+    // Clean up PDF resources
+    pdf.destroy().catch(e => console.error("Error destroying PDF:", e));
     
     // Set completion progress
     if (progressCallback) progressCallback(95);
@@ -148,6 +227,8 @@ export const extractPdfText = async (
         errorMessage = "PDF worker error: " + error.message;
       } else if (error.message.includes("Invalid PDF")) {
         errorMessage = "The file is not a valid PDF document.";
+      } else if (error.message.includes("timed out")) {
+        errorMessage = error.message;
       } else {
         errorMessage = error.message;
       }

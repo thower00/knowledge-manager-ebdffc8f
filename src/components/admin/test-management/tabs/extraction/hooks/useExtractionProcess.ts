@@ -5,6 +5,9 @@ import { ProcessedDocument } from "@/types/document";
 import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 
+// Default timeout (in milliseconds)
+const DEFAULT_EXTRACTION_TIMEOUT = 60000; // 60 seconds
+
 export const useExtractionProcess = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionText, setExtractionText] = useState("");
@@ -12,6 +15,7 @@ export const useExtractionProcess = () => {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [proxyConnected, setProxyConnected] = useState<boolean | null>(null);
   const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
+  const [timeoutId, setTimeoutId] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Check proxy connection
@@ -27,6 +31,45 @@ export const useExtractionProcess = () => {
     }
   };
 
+  // Create a timeout that will trigger if the extraction takes too long
+  const createExtractionTimeout = (documentTitle: string) => {
+    // Clear any existing timeout
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
+    
+    // Create a new timeout
+    const newTimeoutId = window.setTimeout(() => {
+      console.error(`Extraction timeout reached for document: ${documentTitle}`);
+      
+      // Reset extraction state
+      setIsExtracting(false);
+      setExtractionProgress(0);
+      
+      // Set error message
+      setExtractionError(`Extraction timed out after ${DEFAULT_EXTRACTION_TIMEOUT/1000} seconds. The PDF might be corrupted, too large, or in an unsupported format.`);
+      
+      // Show toast to user
+      toast({
+        title: "Extraction Timeout",
+        description: `The extraction process for "${documentTitle}" took too long and was terminated.`,
+        variant: "destructive"
+      });
+    }, DEFAULT_EXTRACTION_TIMEOUT);
+    
+    setTimeoutId(newTimeoutId);
+    
+    return newTimeoutId;
+  };
+
+  // Clear the extraction timeout
+  const clearExtractionTimeout = () => {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      setTimeoutId(null);
+    }
+  };
+
   // Extract text from a single document
   const extractFromDocument = async (document: ProcessedDocument) => {
     if (!document || !document.url) {
@@ -39,8 +82,9 @@ export const useExtractionProcess = () => {
     }
 
     try {
-      // Set initial progress
+      // Set initial progress and create timeout
       setExtractionProgress(10);
+      createExtractionTimeout(document.title);
       
       // Fetch the document via proxy
       console.log(`Starting extraction for document: ${document.title} (${document.url})`);
@@ -56,10 +100,16 @@ export const useExtractionProcess = () => {
         setExtractionProgress(overallProgress);
       });
       
+      // Clear the timeout since extraction completed successfully
+      clearExtractionTimeout();
+      
       // Complete the extraction
       setExtractionProgress(100);
       return text;
     } catch (error) {
+      // Clear the timeout since we have an error
+      clearExtractionTimeout();
+      
       console.error(`Error extracting from document ${document.title}:`, error);
       throw error;
     }
@@ -79,6 +129,8 @@ export const useExtractionProcess = () => {
     currentDocumentIndex,
     setCurrentDocumentIndex,
     checkProxyConnection,
-    extractFromDocument
+    extractFromDocument,
+    createExtractionTimeout,
+    clearExtractionTimeout
   };
 };

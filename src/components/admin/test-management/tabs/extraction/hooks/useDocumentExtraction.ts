@@ -47,7 +47,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     currentDocumentIndex,
     setCurrentDocumentIndex,
     checkProxyConnection,
-    extractFromDocument
+    extractFromDocument,
+    createExtractionTimeout,
+    clearExtractionTimeout
   } = useExtractionProcess();
 
   const { toast } = useToast();
@@ -56,6 +58,11 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   useEffect(() => {
     checkProxyConnection();
     fetchDocuments();
+
+    // Clean up any timeout when component unmounts
+    return () => {
+      clearExtractionTimeout();
+    };
   }, []);
 
   // Extract text from a URL
@@ -75,6 +82,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       
       setExtractionProgress(10);
       
+      // Create a timeout for this extraction
+      createExtractionTimeout(fileName);
+      
       // Fetch the document via proxy
       const documentData = await fetchDocumentViaProxy(testUrl, fileName);
       setExtractionProgress(40);
@@ -85,6 +95,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
         const overallProgress = 40 + Math.floor((progress / 100) * 55);
         setExtractionProgress(overallProgress);
       });
+      
+      // Clear timeout as extraction completed successfully
+      clearExtractionTimeout();
       
       // Update the extraction text
       setExtractionText(text);
@@ -99,6 +112,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       // Call the onRunTest callback with the extracted text
       onRunTest({ extractionText: text, testUrl });
     } catch (error) {
+      // Clear timeout as we have an error
+      clearExtractionTimeout();
+      
       console.error("Extraction error:", error);
       setExtractionError(error instanceof Error ? error.message : String(error));
       toast({
@@ -141,7 +157,15 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       if (documentsToProcess.length === 1) {
         // Single document extraction
         const document = documentsToProcess[0];
+        
+        // Create a timeout for this document
+        createExtractionTimeout(document.title);
+        
         const text = await extractFromDocument(document);
+        
+        // Clear timeout as extraction completed successfully
+        clearExtractionTimeout();
+        
         setExtractionText(text);
         
         toast({
@@ -161,10 +185,20 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
           setCurrentDocumentIndex(i);
           
           try {
+            // Create a timeout for this document
+            createExtractionTimeout(doc.title);
+            
             const text = await extractFromDocument(doc);
+            
+            // Clear timeout as extraction completed successfully
+            clearExtractionTimeout();
+            
             allText += `\n\n--- Document: ${doc.title} ---\n\n${text}`;
             successCount++;
           } catch (error) {
+            // Clear timeout as we have an error
+            clearExtractionTimeout();
+            
             failureCount++;
             allText += `\n\n--- Document: ${doc.title} (FAILED) ---\n\nFailed to extract: ${error instanceof Error ? error.message : String(error)}`;
           }
@@ -184,6 +218,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
         onRunTest({ extractionText: allText });
       }
     } catch (error) {
+      // Clear timeout as we have an error
+      clearExtractionTimeout();
+      
       console.error("Extraction error:", error);
       setExtractionError(error instanceof Error ? error.message : String(error));
       

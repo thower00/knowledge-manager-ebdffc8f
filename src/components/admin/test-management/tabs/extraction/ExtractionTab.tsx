@@ -54,6 +54,23 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     documentsToProcess,
   } = useDocumentExtraction({ onRunTest });
 
+  // Function to handle retry based on current context
+  const handleRetry = () => {
+    if (testUrl && testUrlValid) {
+      // If there's a valid URL, retry URL extraction
+      handleExtractFromUrl();
+    } else if (selectedDocumentIds.length > 0 || extractAllDocuments) {
+      // If there are selected documents, retry database extraction
+      handleExtractFromDatabase();
+    } else {
+      toast({
+        title: "Cannot Retry",
+        description: "Please provide a valid URL or select documents first",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -106,7 +123,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         {/* Error Display */}
         {extractionError && (
           <ExtractionErrorDisplay 
-            extractionError={extractionError} 
+            extractionError={extractionError}
+            onRetry={handleRetry}
           />
         )}
         
