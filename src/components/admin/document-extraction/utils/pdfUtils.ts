@@ -1,4 +1,3 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure the worker sources - using multiple fallback options
@@ -115,13 +114,11 @@ export const extractPdfText = async (
     // Load the PDF document with additional parameters to handle corrupted files
     if (progressCallback) progressCallback(30);
     
-    // Fix for TypeScript error: Use the correct DocumentInitParameters
+    // Fix for TypeScript error: Use the correct DocumentInitParameters with type assertion
     const loadingTask = pdfjsLib.getDocument({
       data: pdfData,
-      // Remove the unsupported nativeImageDecoderSupport property
       disableFontFace: true,
-      ignoreErrors: true
-    });
+    } as pdfjsLib.DocumentInitParameters);
     
     // Set a timeout for the loading task
     const loadingPromise = Promise.race([
