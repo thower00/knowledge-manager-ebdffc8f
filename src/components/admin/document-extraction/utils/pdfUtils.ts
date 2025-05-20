@@ -1,3 +1,4 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure the worker sources - using multiple fallback options
@@ -114,11 +115,11 @@ export const extractPdfText = async (
     // Load the PDF document with additional parameters to handle corrupted files
     if (progressCallback) progressCallback(30);
     
-    // Fix for TypeScript error: Use the correct DocumentInitParameters with type assertion
+    // Create object with options for PDF loading without explicit type reference
     const loadingTask = pdfjsLib.getDocument({
       data: pdfData,
       disableFontFace: true,
-    } as pdfjsLib.DocumentInitParameters);
+    });
     
     // Set a timeout for the loading task
     const loadingPromise = Promise.race([
@@ -177,8 +178,8 @@ export const extractPdfText = async (
             })
           ]);
           
-          // Fix for TypeScript error: Use a more generic type for textContent
-          const textContent = await textContentPromise as any; // Using 'any' to bypass strict type checking
+          // Use any type to bypass strict type checking issues
+          const textContent = await textContentPromise as any; 
           
           // Join text items to form page text
           const pageText = textContent.items
