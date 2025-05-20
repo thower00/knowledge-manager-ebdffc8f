@@ -27,7 +27,7 @@ export function useDocumentContent(documentId: string) {
       setError(null);
       
       try {
-        // First fetch the document metadata
+        // Fetch the document metadata
         const { data: docData, error: docError } = await supabase
           .from('processed_documents')
           .select('*')
@@ -42,49 +42,9 @@ export function useDocumentContent(documentId: string) {
           throw new Error('Document not found');
         }
         
-        // Then fetch the binary data
-        const { data: binaryData, error: binaryError } = await supabase
-          .from('document_binaries')
-          .select('binary_data, content_type')
-          .eq('document_id', documentId)
-          .maybeSingle();
-          
-        if (binaryError && binaryError.code !== 'PGRST116') { // Not found is ok
-          throw new Error(`Error fetching document binary: ${binaryError.message}`);
-        }
-        
-        // Create the document object with proper binary data handling
-        let contentText: string | undefined = undefined;
-        
-        if (binaryData?.binary_data) {
-          // Check what type of data we received and handle accordingly
-          if (typeof binaryData.binary_data === 'string') {
-            // If it's already a string, use directly
-            contentText = binaryData.binary_data;
-          } else if (ArrayBuffer.isView(binaryData.binary_data)) {
-            // If it's an ArrayBuffer view (like Uint8Array), decode it
-            try {
-              contentText = new TextDecoder().decode(binaryData.binary_data as ArrayBufferLike);
-            } catch (err) {
-              console.error("Error decoding binary data:", err);
-              contentText = JSON.stringify(binaryData.binary_data);
-            }
-          } else if (typeof binaryData.binary_data === 'object' && binaryData.binary_data !== null) {
-            // If it's another array-like object, try to convert to Uint8Array first
-            try {
-              // Handle potential array-like objects
-              const uint8Array = new Uint8Array(Object.values(binaryData.binary_data));
-              contentText = new TextDecoder().decode(uint8Array);
-            } catch (err) {
-              console.error("Error converting binary data to string:", err);
-              contentText = JSON.stringify(binaryData.binary_data);
-            }
-          }
-        }
-        
         const processedDoc: ProcessedDocument = {
           ...docData,
-          content: contentText
+          content: undefined // We don't have content directly stored in the database
         };
         
         setDocument(processedDoc);
@@ -105,27 +65,15 @@ export function useDocumentContent(documentId: string) {
   }, [documentId, toast]);
   
   const viewFullDocument = () => {
-    if (document) {
-      // Create a new window with the document content
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`
-          <html>
-            <head>
-              <title>${document.title}</title>
-              <style>
-                body { font-family: system-ui, sans-serif; line-height: 1.5; padding: 2rem; max-width: 800px; margin: 0 auto; }
-                pre { white-space: pre-wrap; background: #f1f1f1; padding: 1rem; border-radius: 4px; }
-              </style>
-            </head>
-            <body>
-              <h1>${document.title}</h1>
-              <pre>${document.content || 'No content available'}</pre>
-            </body>
-          </html>
-        `);
-        win.document.close();
-      }
+    if (document && document.url) {
+      // Open the document in a new window using its Google Drive URL
+      window.open(document.url, '_blank');
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Cannot view document",
+        description: "Document URL is not available."
+      });
     }
   };
 

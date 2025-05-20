@@ -1,7 +1,6 @@
 
 import {
-  fetchDocumentViaProxy,
-  fetchDocumentFromDatabase
+  fetchDocumentViaProxy
 } from '../documentFetchService';
 import { jest, describe, test, expect, beforeEach } from '../../../../../setupTests';
 
@@ -11,16 +10,7 @@ type SupabaseFunctionResponse<T> = {
   error: { message: string } | null;
 };
 
-type SupabaseDatabaseResponse<T> = {
-  data: T | null;
-  error: { message: string } | null;
-};
-
 // Create typed mock for supabase
-const mockSupabaseFrom = jest.fn();
-const mockSupabaseSelect = jest.fn();
-const mockSupabaseEq = jest.fn();
-const mockSupabaseMaybeSingle = jest.fn<() => Promise<SupabaseDatabaseResponse<any>>>();
 const mockSupabaseFunctionsInvoke = jest.fn<(functionName: string, options: any) => Promise<SupabaseFunctionResponse<any>>>();
 
 // Mock the supabase client
@@ -30,12 +20,6 @@ jest.mock('@/integrations/supabase/client', () => {
       functions: {
         invoke: mockSupabaseFunctionsInvoke,
       },
-      from: mockSupabaseFrom.mockReturnValue({
-        select: mockSupabaseSelect.mockReturnThis(),
-        eq: mockSupabaseEq.mockReturnThis(),
-        maybeSingle: mockSupabaseMaybeSingle,
-        update: jest.fn().mockReturnThis(),
-      }),
     },
   };
 });
@@ -117,61 +101,6 @@ describe('documentFetchService', () => {
       
       // Expect function to throw
       await expect(fetchDocumentViaProxy('https://example.com/doc.pdf')).rejects.toThrow('Failed to decode document data');
-    });
-  });
-
-  describe('fetchDocumentFromDatabase', () => {
-    // Simulated base64 PDF data
-    const mockBase64Data = 'JVBERi0xLjMK';
-    
-    test('should successfully fetch document from database', async () => {
-      // Mock successful database query
-      mockSupabaseMaybeSingle.mockResolvedValueOnce({
-        data: {
-          binary_data: mockBase64Data,
-          content_type: 'application/pdf'
-        },
-        error: null
-      } as SupabaseDatabaseResponse<{binary_data: string, content_type: string}>);
-      
-      // Call the function
-      const result = await fetchDocumentFromDatabase('doc123');
-      
-      // Verify correct database query
-      expect(mockSupabaseFrom).toHaveBeenCalledWith('document_binaries');
-      expect(mockSupabaseMaybeSingle).toHaveBeenCalled();
-      
-      // Verify result is correct
-      expect(result).toBeInstanceOf(ArrayBuffer);
-      expect(result?.byteLength).toBe(4);
-    });
-    
-    test('should return null when database query returns error', async () => {
-      // Mock error from database
-      mockSupabaseMaybeSingle.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'Database error' }
-      } as SupabaseDatabaseResponse<null>);
-      
-      // Call the function
-      const result = await fetchDocumentFromDatabase('doc123');
-      
-      // Verify result is null on error
-      expect(result).toBeNull();
-    });
-    
-    test('should return null when no document found', async () => {
-      // Mock no document found
-      mockSupabaseMaybeSingle.mockResolvedValueOnce({
-        data: null,
-        error: null
-      } as SupabaseDatabaseResponse<null>);
-      
-      // Call the function
-      const result = await fetchDocumentFromDatabase('doc123');
-      
-      // Verify result is null when no document
-      expect(result).toBeNull();
     });
   });
 });

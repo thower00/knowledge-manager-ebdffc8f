@@ -43,12 +43,24 @@ export function ChunkingPreviewContent({ documentId, config }: ChunkingPreviewCo
     );
   }
 
-  if (!document?.content) {
+  if (!document) {
     return (
       <CardContent>
         <ErrorState 
-          message="Document Content Unavailable"
-          description="The document content could not be retrieved. It may not be stored in the database."
+          message="Document Not Found"
+          description="The requested document could not be found."
+          onRetry={handleRetry}
+        />
+      </CardContent>
+    );
+  }
+
+  if (chunks.length === 0) {
+    return (
+      <CardContent>
+        <ErrorState 
+          message="No Chunks Generated"
+          description="No content chunks could be generated for this document. The document may be empty or not properly processed."
           onRetry={handleRetry}
         />
       </CardContent>

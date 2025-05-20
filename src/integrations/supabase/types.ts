@@ -36,41 +36,6 @@ export type Database = {
         }
         Relationships: []
       }
-      document_binaries: {
-        Row: {
-          binary_data: string
-          content_type: string
-          created_at: string
-          document_id: string | null
-          file_size: number
-          id: string
-        }
-        Insert: {
-          binary_data: string
-          content_type: string
-          created_at?: string
-          document_id?: string | null
-          file_size: number
-          id?: string
-        }
-        Update: {
-          binary_data?: string
-          content_type?: string
-          created_at?: string
-          document_id?: string | null
-          file_size?: number
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_binaries_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "processed_documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       document_chunks: {
         Row: {
           chunk_index: number

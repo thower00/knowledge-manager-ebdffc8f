@@ -3,10 +3,7 @@ import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
 import { extractPdfText } from "../utils/pdfUtils";
-import { 
-  fetchDocumentViaProxy, 
-  fetchDocumentFromDatabase 
-} from "../services/documentFetchService";
+import { fetchDocumentViaProxy } from "../services/documentFetchService";
 
 /**
  * Hook for handling document text extraction logic
@@ -17,7 +14,6 @@ export const useTextExtraction = () => {
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractionProgress, setExtractionProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [storeInDatabase, setStoreInDatabase] = useState(false);
   const { toast } = useToast();
 
   // Extract text from a PDF document
@@ -49,29 +45,14 @@ export const useTextExtraction = () => {
       // Set initial progress
       setExtractionProgress(5);
       
-      // First try to get the document from the database if enabled
-      let documentData: ArrayBuffer | null = null;
-      
-      if (storeInDatabase) {
-        documentData = await fetchDocumentFromDatabase(documentId);
-        if (documentData) {
-          setExtractionProgress(20);
-          console.log("Using document data from database");
-        }
-      }
-      
-      // If not found in database or database storage not enabled, fetch via proxy
-      if (!documentData) {
-        console.log("Fetching document via proxy:", selectedDocument.url);
-        setExtractionProgress(10);
-        documentData = await fetchDocumentViaProxy(
-          selectedDocument.url, 
-          selectedDocument.title,
-          documentId,
-          storeInDatabase
-        );
-        setExtractionProgress(30);
-      }
+      // Fetch document via proxy
+      console.log("Fetching document via proxy:", selectedDocument.url);
+      setExtractionProgress(10);
+      const documentData = await fetchDocumentViaProxy(
+        selectedDocument.url, 
+        selectedDocument.title
+      );
+      setExtractionProgress(30);
       
       // Extract text from the PDF data
       const extractedContent = await extractPdfText(documentData, setExtractionProgress);
@@ -130,8 +111,6 @@ export const useTextExtraction = () => {
     extractionProgress,
     extractedText,
     error,
-    retryExtraction,
-    storeInDatabase,
-    setStoreInDatabase,
+    retryExtraction
   };
 };

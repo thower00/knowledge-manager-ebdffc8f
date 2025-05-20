@@ -1,93 +1,35 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
+console.warn('documentBinaryService.ts: This module has been deprecated as binary data storage has been removed.');
+
 /**
- * Check if a document binary exists in the database
- * @param documentId ID of the document to check
- * @returns Promise resolving to boolean indicating if document binary exists
+ * This is a placeholder for compatibility. This functionality has been removed.
+ * @deprecated Document binary storage has been removed
  */
-export async function checkDocumentBinaryExists(documentId: string): Promise<boolean> {
-  try {
-    const { count, error } = await supabase
-      .from('document_binaries')
-      .select('*', { count: 'exact', head: true })
-      .eq('document_id', documentId);
-    
-    if (error) {
-      console.error("Error checking document binary existence:", error);
-      return false;
-    }
-    
-    return count !== null && count > 0;
-  } catch (error) {
-    console.error("Exception in checkDocumentBinaryExists:", error);
-    return false;
-  }
+export async function checkDocumentBinaryExists(): Promise<boolean> {
+  console.warn('checkDocumentBinaryExists: This function is deprecated as binary data storage has been removed.');
+  return false;
 }
 
 /**
- * Get statistics about document binaries in the database
- * @returns Promise resolving to object containing statistics
+ * This is a placeholder for compatibility. This functionality has been removed.
+ * @deprecated Document binary storage has been removed
  */
 export async function getDocumentBinaryStats() {
-  try {
-    // Get total count of document binaries
-    const { count: totalCount, error: countError } = await supabase
-      .from('document_binaries')
-      .select('*', { count: 'exact', head: true });
-    
-    if (countError) {
-      throw countError;
-    }
-    
-    // Get total size by summing the file_size column
-    const { data: sizeData, error: sizeError } = await supabase
-      .from('document_binaries')
-      .select('file_size');
-    
-    if (sizeError) {
-      throw sizeError;
-    }
-    
-    // Calculate total size by summing the file_size values
-    const totalSize = sizeData ? sizeData.reduce((sum, item) => sum + Number(item.file_size || 0), 0) : 0;
-    
-    return {
-      totalCount: totalCount || 0,
-      totalSize: totalSize,
-      averageSize: totalCount && totalSize ? Number(totalSize) / Number(totalCount) : 0
-    };
-  } catch (error) {
-    console.error("Error fetching document binary stats:", error);
-    return {
-      totalCount: 0,
-      totalSize: 0,
-      averageSize: 0,
-      error: error instanceof Error ? error.message : "Unknown error"
-    };
-  }
+  console.warn('getDocumentBinaryStats: This function is deprecated as binary data storage has been removed.');
+  return {
+    totalCount: 0,
+    totalSize: 0,
+    averageSize: 0,
+    error: "Document binary storage has been removed"
+  };
 }
 
 /**
- * Delete a document binary from the database
- * @param documentId ID of the document whose binary should be deleted
- * @returns Promise resolving to boolean indicating success
+ * This is a placeholder for compatibility. This functionality has been removed.
+ * @deprecated Document binary storage has been removed
  */
-export async function deleteDocumentBinary(documentId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('document_binaries')
-      .delete()
-      .eq('document_id', documentId);
-    
-    if (error) {
-      console.error("Error deleting document binary:", error);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error("Exception in deleteDocumentBinary:", error);
-    return false;
-  }
+export async function deleteDocumentBinary(): Promise<boolean> {
+  console.warn('deleteDocumentBinary: This function is deprecated as binary data storage has been removed.');
+  return false;
 }
