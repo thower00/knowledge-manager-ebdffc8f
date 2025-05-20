@@ -38,6 +38,11 @@ export function DocumentInfoPanel({
           <p className="text-sm text-muted-foreground">
             Document will be divided into <span className="font-semibold">{chunksCount}</span> chunks
           </p>
+          {document.url && (
+            <p className="text-xs text-muted-foreground break-all">
+              <span className="font-medium">Source:</span> {document.url}
+            </p>
+          )}
         </div>
         <div>
           <Button 

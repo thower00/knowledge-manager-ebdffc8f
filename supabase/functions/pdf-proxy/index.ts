@@ -9,6 +9,27 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
+// Helper function to convert Google Drive URLs to direct download format if needed
+function optimizeGoogleDriveUrl(url: string): string {
+  if (!url.includes('drive.google.com')) {
+    return url;
+  }
+
+  // Already in proper format
+  if (url.includes('alt=media')) {
+    return url;
+  }
+
+  // Convert from /file/d/ID/view to proper format
+  const fileIdMatch = url.match(/\/file\/d\/([^\/]+)/);
+  if (fileIdMatch && fileIdMatch[1]) {
+    const fileId = fileIdMatch[1];
+    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+  }
+
+  return url;
+}
+
 // Edge function to proxy PDF requests to avoid CORS issues
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -30,10 +51,13 @@ serve(async (req: Request) => {
       );
     }
     
-    console.log(`Proxying request for ${title || "document"} at URL: ${url}`);
+    // Optimize Google Drive URLs for direct access
+    const optimizedUrl = optimizeGoogleDriveUrl(url);
     
-    // Fetch the document
-    const response = await fetch(url, {
+    console.log(`Proxying request for ${title || "document"} at URL: ${optimizedUrl}`);
+    
+    // Fetch the document with proper headers for Google Drive
+    const response = await fetch(optimizedUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
       }
@@ -41,10 +65,28 @@ serve(async (req: Request) => {
     
     if (!response.ok) {
       console.error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+      
+      // Special handling for Google Drive errors
+      if (optimizedUrl.includes('drive.google.com') && response.status === 403) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Access denied. Make sure the Google Drive document is shared with 'Anyone with the link'." 
+          }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: `Failed to fetch document: ${response.status} ${response.statusText}` }),
         { status: response.status, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
+    }
+    
+    // Check if the response is actually a PDF
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.includes('application/pdf') && !contentType.includes('binary')) {
+      console.warn(`Warning: Document might not be a PDF, content-type: ${contentType}`);
+      // We'll continue anyway, as Google Drive sometimes returns wrong content types
     }
     
     // Get the document data as an array buffer

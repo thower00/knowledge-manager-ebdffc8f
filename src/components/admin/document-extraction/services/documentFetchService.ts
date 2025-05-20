@@ -18,7 +18,6 @@ export const fetchDocumentViaProxy = async (
       body: { 
         url,
         title,
-        // Removed storeInDatabase related parameters
         requestedAt: new Date().toISOString()
       }
     });
@@ -63,11 +62,11 @@ export const fetchDocumentViaProxy = async (
         errorMessage = "Network error: Unable to connect to the proxy service. Please check your internet connection and try again.";
       } else if (errorMessage.includes("timeout") || errorMessage.includes("timed out")) {
         errorMessage = "The request timed out. The document may be too large or the server is not responding.";
+      } else if (errorMessage.includes("Access denied") && errorMessage.includes("Google Drive")) {
+        errorMessage = "Access denied. Make sure the Google Drive document is shared with 'Anyone with the link'.";
       }
     }
     
     throw new Error(errorMessage);
   }
 };
-
-// Removed fetchDocumentFromDatabase function as it's no longer needed
