@@ -5,8 +5,12 @@ import { ProcessedDocument } from "@/types/document";
 import { extractPdfText } from "@/components/admin/document-extraction/utils/pdfUtils";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 
-// Default timeout (in milliseconds)
-const DEFAULT_EXTRACTION_TIMEOUT = 60000; // 60 seconds
+// Default extraction configuration
+const EXTRACTION_CONFIG = {
+  loadingTimeout: 60000,   // 60 seconds for the whole document loading
+  pageTimeout: 20000,      // 20 seconds per page
+  maxConcurrentPages: 2    // Process max 2 pages concurrently to reduce memory usage
+};
 
 export const useExtractionProcess = () => {
   const [isExtracting, setIsExtracting] = useState(false);
@@ -38,6 +42,10 @@ export const useExtractionProcess = () => {
       window.clearTimeout(timeoutId);
     }
     
+    // Create a new timeout - 10 seconds longer than the PDF loading timeout
+    // to account for proxy fetching and other operations
+    const timeoutValue = EXTRACTION_CONFIG.loadingTimeout + 10000;
+    
     // Create a new timeout
     const newTimeoutId = window.setTimeout(() => {
       console.error(`Extraction timeout reached for document: ${documentTitle}`);
@@ -47,7 +55,7 @@ export const useExtractionProcess = () => {
       setExtractionProgress(0);
       
       // Set error message
-      setExtractionError(`Extraction timed out after ${DEFAULT_EXTRACTION_TIMEOUT/1000} seconds. The PDF might be corrupted, too large, or in an unsupported format.`);
+      setExtractionError(`Extraction timed out after ${Math.round(timeoutValue/1000)} seconds. The PDF might be corrupted, too large, or in an unsupported format.`);
       
       // Show toast to user
       toast({
@@ -55,7 +63,7 @@ export const useExtractionProcess = () => {
         description: `The extraction process for "${documentTitle}" took too long and was terminated.`,
         variant: "destructive"
       });
-    }, DEFAULT_EXTRACTION_TIMEOUT);
+    }, timeoutValue);
     
     setTimeoutId(newTimeoutId);
     
@@ -93,12 +101,16 @@ export const useExtractionProcess = () => {
       // Update progress after fetch completes
       setExtractionProgress(40);
       
-      // Extract text from the document
-      const text = await extractPdfText(documentData, (progress) => {
-        // Map the progress to our overall progress (40-95)
-        const overallProgress = 40 + Math.floor((progress / 100) * 55);
-        setExtractionProgress(overallProgress);
-      });
+      // Extract text from the document with configured timeouts
+      const text = await extractPdfText(
+        documentData, 
+        (progress) => {
+          // Map the progress to our overall progress (40-95)
+          const overallProgress = 40 + Math.floor((progress / 100) * 55);
+          setExtractionProgress(overallProgress);
+        },
+        EXTRACTION_CONFIG
+      );
       
       // Clear the timeout since extraction completed successfully
       clearExtractionTimeout();

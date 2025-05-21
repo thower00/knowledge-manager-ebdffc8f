@@ -83,16 +83,35 @@ function isPdfBuffer(buffer: ArrayBuffer): boolean {
   return headerString === '%PDF-';
 }
 
+// Configuration options for PDF extraction
+interface PdfExtractionOptions {
+  loadingTimeout?: number;  // Timeout for PDF loading in milliseconds
+  pageTimeout?: number;     // Timeout for page text extraction in milliseconds
+  maxConcurrentPages?: number; // Maximum pages to process concurrently
+}
+
+// Default extraction options
+const DEFAULT_OPTIONS: PdfExtractionOptions = {
+  loadingTimeout: 45000,    // 45 seconds
+  pageTimeout: 20000,       // 20 seconds
+  maxConcurrentPages: 3     // Process up to 3 pages concurrently
+};
+
 /**
  * Extract text from a PDF document
  * @param pdfData ArrayBuffer containing the PDF data
  * @param progressCallback Optional callback to report progress
+ * @param options Configuration options for the extraction process
  * @returns Extracted text from the PDF
  */
 export const extractPdfText = async (
   pdfData: ArrayBuffer,
-  progressCallback?: (progress: number) => void
+  progressCallback?: (progress: number) => void,
+  options?: PdfExtractionOptions
 ): Promise<string> => {
+  // Merge provided options with defaults
+  const extractionOptions = { ...DEFAULT_OPTIONS, ...options };
+  
   // Initialize progress reporting
   if (progressCallback) progressCallback(5);
   
@@ -115,11 +134,14 @@ export const extractPdfText = async (
     // Load the PDF document with additional parameters to handle corrupted files
     if (progressCallback) progressCallback(30);
     
-    // Create object with options for PDF loading without explicit type reference
+    // Create object with options for PDF loading
     const loadingTask = pdfjsLib.getDocument({
       data: pdfData,
       disableFontFace: true,
     });
+    
+    // Log the timeout value we're using
+    console.log(`PDF loading with timeout: ${extractionOptions.loadingTimeout}ms`);
     
     // Set a timeout for the loading task
     const loadingPromise = Promise.race([
@@ -128,8 +150,8 @@ export const extractPdfText = async (
         setTimeout(() => {
           // Abort the loading task if possible
           loadingTask.destroy().catch(() => {});
-          reject(new Error("PDF loading timed out after 30 seconds. The document might be too large or corrupted."));
-        }, 30000); // 30 second timeout
+          reject(new Error(`PDF loading timed out after ${Math.round(extractionOptions.loadingTimeout! / 1000)} seconds. The document might be too large or corrupted.`));
+        }, extractionOptions.loadingTimeout);
       })
     ]);
     
@@ -146,11 +168,11 @@ export const extractPdfText = async (
     
     // Create an array of promises for processing pages concurrently (but limited)
     const pagePromises = [];
-    const maxConcurrentPages = 3; // Process up to 3 pages concurrently
+    const maxConcurrentPages = extractionOptions.maxConcurrentPages;
     
     for (let i = 1; i <= totalPages; i++) {
       // Process pages in batches to avoid memory issues
-      if (pagePromises.length >= maxConcurrentPages) {
+      if (pagePromises.length >= maxConcurrentPages!) {
         // Wait for at least one page to finish before starting another
         await Promise.race(pagePromises);
         // Remove completed promises
@@ -173,8 +195,8 @@ export const extractPdfText = async (
             page.getTextContent(),
             new Promise<never>((_, reject) => {
               setTimeout(() => {
-                reject(new Error(`Page ${pageNum} text extraction timed out`));
-              }, 15000); // 15 second timeout per page
+                reject(new Error(`Page ${pageNum} text extraction timed out after ${Math.round(extractionOptions.pageTimeout! / 1000)} seconds`));
+              }, extractionOptions.pageTimeout);
             })
           ]);
           
