@@ -17,15 +17,17 @@ import {
 async function getPdfMetadata(pdfDoc: pdfjsLib.PDFDocumentProxy): Promise<PdfMetadata> {
   try {
     const metadata = await pdfDoc.getMetadata();
+    const info = metadata.info as Record<string, any> || {};
+    
     return {
-      title: metadata.info?.Title,
-      author: metadata.info?.Author,
-      subject: metadata.info?.Subject,
-      keywords: metadata.info?.Keywords,
-      creator: metadata.info?.Creator,
-      producer: metadata.info?.Producer,
-      creationDate: metadata.info?.CreationDate ? new Date(metadata.info.CreationDate) : undefined,
-      modificationDate: metadata.info?.ModDate ? new Date(metadata.info.ModDate) : undefined,
+      title: info?.Title as string | undefined,
+      author: info?.Author as string | undefined,
+      subject: info?.Subject as string | undefined,
+      keywords: info?.Keywords as string | undefined,
+      creator: info?.Creator as string | undefined,
+      producer: info?.Producer as string | undefined,
+      creationDate: info?.CreationDate ? new Date(info.CreationDate as string) : undefined,
+      modificationDate: info?.ModDate ? new Date(info.ModDate as string) : undefined,
       pageCount: pdfDoc.numPages
     };
   } catch (error) {
