@@ -1,4 +1,3 @@
-
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
@@ -16,6 +15,8 @@ interface ExtractionProcess {
   extractFromDocument: (document: ProcessedDocument) => Promise<string>;
   createExtractionTimeout: (documentTitle: string) => number;
   clearExtractionTimeout: () => void;
+  currentDocumentIndex?: number;
+  setCurrentDocumentIndex: (index: number) => void;
 }
 
 interface UseExtractionHandlersProps {
@@ -48,7 +49,9 @@ export const useExtractionHandlers = ({
     setExtractionText,
     extractFromDocument,
     createExtractionTimeout,
-    clearExtractionTimeout
+    clearExtractionTimeout,
+    currentDocumentIndex,
+    setCurrentDocumentIndex
   } = extractionProcess;
 
   // Extract text from a URL
