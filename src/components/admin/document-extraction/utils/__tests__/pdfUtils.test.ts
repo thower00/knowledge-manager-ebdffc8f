@@ -1,5 +1,5 @@
 
-import { extractPdfText } from '../pdfUtils';
+import { extractPdfText } from '../pdfExtraction';
 import { createMockPdfArrayBuffer } from './testUtils';
 import * as pdfjs from 'pdfjs-dist';
 import { jest, describe, test, expect, beforeEach, resetMocks } from '../../../../../setupTests';
