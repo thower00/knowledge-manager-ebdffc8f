@@ -6,13 +6,13 @@
  * to document fetching and text extraction.
  */
 import { validatePdfUrl, convertGoogleDriveUrl } from '../urlUtils';
-import { fetchDocumentViaProxy } from '../services/documentFetchService';
+import { fetchDocumentViaProxy } from '../../../services/documentFetchService';
 import { extractPdfText } from '../pdfExtraction';
 import { createMockPdfArrayBuffer } from './testUtils';
 import { jest, describe, test, expect, beforeEach } from '../../../../../setupTests';
 
 // Mock the fetch service and PDF extraction
-jest.mock('../services/documentFetchService', () => ({
+jest.mock('../../../services/documentFetchService', () => ({
   fetchDocumentViaProxy: jest.fn(),
 }));
 
