@@ -1,6 +1,8 @@
+
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
+import { ExtractionOptionsType } from "../ExtractionOptions";
 
 // Define the types for the extraction process interface
 interface ExtractionProcess {
@@ -12,11 +14,12 @@ interface ExtractionProcess {
   setExtractionError: (value: string | null) => void;
   extractionText: string;
   setExtractionText: (value: string) => void;
-  extractFromDocument: (document: ProcessedDocument) => Promise<string>;
-  createExtractionTimeout: (documentTitle: string) => number;
+  extractFromDocument: (document: ProcessedDocument, options?: ExtractionOptionsType) => Promise<string>;
+  createExtractionTimeout: (documentTitle: string, timeoutSeconds?: number) => number;
   clearExtractionTimeout: () => void;
   currentDocumentIndex?: number;
   setCurrentDocumentIndex: (index: number) => void;
+  abortController?: AbortController | null;
 }
 
 interface UseExtractionHandlersProps {
@@ -27,6 +30,7 @@ interface UseExtractionHandlersProps {
   extractAllDocuments: boolean;
   documentsToProcess: ProcessedDocument[];
   extractionProcess: ExtractionProcess;
+  extractionOptions: ExtractionOptionsType;
   onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
 }
 
@@ -38,6 +42,7 @@ export const useExtractionHandlers = ({
   extractAllDocuments,
   documentsToProcess,
   extractionProcess,
+  extractionOptions,
   onRunTest
 }: UseExtractionHandlersProps) => {
   const { toast } = useToast();
@@ -72,7 +77,7 @@ export const useExtractionHandlers = ({
       setExtractionProgress(10);
       
       // Create a timeout for this extraction
-      createExtractionTimeout(fileName);
+      createExtractionTimeout(fileName, extractionOptions.timeout);
       
       // Create a mock document object for the URL
       const urlDocument: ProcessedDocument = {
@@ -88,7 +93,7 @@ export const useExtractionHandlers = ({
       };
       
       // Use the extractFromDocument method from the extraction process
-      const text = await extractFromDocument(urlDocument);
+      const text = await extractFromDocument(urlDocument, extractionOptions);
       
       // Clear timeout as extraction completed successfully
       clearExtractionTimeout();
@@ -119,9 +124,20 @@ export const useExtractionHandlers = ({
     } finally {
       setIsExtracting(false);
     }
-  }, [testUrl, validateUrl, extractFromDocument, setIsExtracting, setExtractionProgress, 
-      setExtractionText, setExtractionError, createExtractionTimeout, clearExtractionTimeout, 
-      toast, onRunTest]);
+  }, [
+    testUrl, 
+    validateUrl, 
+    extractFromDocument, 
+    setIsExtracting, 
+    setExtractionProgress, 
+    setExtractionText, 
+    setExtractionError, 
+    createExtractionTimeout, 
+    clearExtractionTimeout,
+    extractionOptions, 
+    toast, 
+    onRunTest
+  ]);
 
   // Extract text from selected database documents
   const handleExtractFromDatabase = useCallback(async () => {
@@ -154,9 +170,9 @@ export const useExtractionHandlers = ({
         const document = documentsToProcess[0];
         
         // Create a timeout for this document
-        createExtractionTimeout(document.title);
+        createExtractionTimeout(document.title, extractionOptions.timeout);
         
-        const text = await extractFromDocument(document);
+        const text = await extractFromDocument(document, extractionOptions);
         
         // Clear timeout as extraction completed successfully
         clearExtractionTimeout();
@@ -177,13 +193,13 @@ export const useExtractionHandlers = ({
         
         for (let i = 0; i < documentsToProcess.length; i++) {
           const doc = documentsToProcess[i];
-          extractionProcess.setCurrentDocumentIndex(i);
+          setCurrentDocumentIndex(i);
           
           try {
             // Create a timeout for this document
-            createExtractionTimeout(doc.title);
+            createExtractionTimeout(doc.title, extractionOptions.timeout);
             
-            const text = await extractFromDocument(doc);
+            const text = await extractFromDocument(doc, extractionOptions);
             
             // Clear timeout as extraction completed successfully
             clearExtractionTimeout();
@@ -227,9 +243,22 @@ export const useExtractionHandlers = ({
     } finally {
       setIsExtracting(false);
     }
-  }, [selectedDocumentIds, extractAllDocuments, documentsToProcess, extractFromDocument,
-    setIsExtracting, setExtractionProgress, setExtractionText, setExtractionError,
-    createExtractionTimeout, clearExtractionTimeout, extractionProcess, toast, onRunTest]);
+  }, [
+    selectedDocumentIds, 
+    extractAllDocuments, 
+    documentsToProcess, 
+    extractFromDocument,
+    setIsExtracting, 
+    setExtractionProgress, 
+    setExtractionText, 
+    setExtractionError,
+    createExtractionTimeout, 
+    clearExtractionTimeout, 
+    extractionOptions,
+    setCurrentDocumentIndex, 
+    toast, 
+    onRunTest
+  ]);
 
   return {
     handleExtractFromUrl,

@@ -1,16 +1,24 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
 import { useUrlValidation } from "./useUrlValidation";
 import { useExtractionProcess } from "./useExtractionProcess";
 import { useExtractionHandlers } from "./useExtractionHandlers";
+import { ExtractionOptionsType } from "../ExtractionOptions";
 
 interface UseDocumentExtractionProps {
   onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
 }
 
 export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps) => {
+  // Initialize extraction options with defaults
+  const [extractionOptions, setExtractionOptions] = useState<ExtractionOptionsType>({
+    extractFirstPagesOnly: false,
+    pageLimit: 10,
+    timeout: 60
+  });
+
   // Use individual hooks for different aspects of functionality
   const documentSelection = useDocumentSelection();
   const urlValidation = useUrlValidation();
@@ -25,6 +33,7 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     extractAllDocuments: documentSelection.extractAllDocuments,
     documentsToProcess: documentSelection.documentsToProcess,
     extractionProcess,
+    extractionOptions,
     onRunTest
   });
 
@@ -57,6 +66,10 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     toggleSelectAll: documentSelection.toggleSelectAll,
     refreshDocuments: documentSelection.refreshDocuments,
     documentsToProcess: documentSelection.documentsToProcess,
+    
+    // Extraction options
+    extractionOptions,
+    setExtractionOptions,
     
     // Extraction process
     isExtracting: extractionProcess.isExtracting,

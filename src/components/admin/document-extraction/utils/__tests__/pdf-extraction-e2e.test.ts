@@ -43,8 +43,7 @@ describe('PDF Extraction E2E Process', () => {
     expect(fetchDocumentViaProxy).toHaveBeenCalledWith(
       testUrl,
       undefined,
-      undefined,
-      false
+      undefined
     );
     
     // Step 3: Extract text
@@ -75,8 +74,7 @@ describe('PDF Extraction E2E Process', () => {
     expect(fetchDocumentViaProxy).toHaveBeenCalledWith(
       convertedUrl,
       undefined,
-      undefined,
-      false
+      undefined
     );
     
     // Step 5: Extract text

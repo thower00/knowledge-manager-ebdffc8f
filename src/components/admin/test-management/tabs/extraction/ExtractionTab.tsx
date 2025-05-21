@@ -18,6 +18,7 @@ import { ExtractionProgress } from "./ExtractionProgress";
 import { ExtractionErrorDisplay } from "./ExtractionErrorDisplay";
 import { TroubleshootingPanel } from "./TroubleshootingPanel";
 import { ExtractedTextPreview } from "./ExtractedTextPreview";
+import { ExtractionOptions } from "./ExtractionOptions";
 
 import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
 
@@ -40,6 +41,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     extractionProgress,
     extractionError,
     proxyConnected,
+    extractionOptions,
+    setExtractionOptions,
     handleExtractFromUrl,
     handleExtractFromDatabase,
     selectedDocumentIds,
@@ -104,6 +107,13 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           testUrlValid={testUrlValid}
           testUrlError={testUrlError}
           handleExtractFromUrl={handleExtractFromUrl}
+          isExtracting={isExtracting}
+        />
+        
+        {/* Extraction Options Component */}
+        <ExtractionOptions
+          options={extractionOptions}
+          setOptions={setExtractionOptions}
           isExtracting={isExtracting}
         />
 
