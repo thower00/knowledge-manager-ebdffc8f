@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { convertGoogleDriveUrl } from "../utils/urlUtils";
 
 /**
  * Fetches a document through the proxy service
@@ -22,6 +23,16 @@ export const fetchDocumentViaProxy = async (
   // Connection test mode if URL is empty or explicitly specified
   const isConnectionTest = !url || title === "connection_test";
   
+  // Ensure Google Drive URLs are in the correct format
+  if (!isConnectionTest && url.includes('drive.google.com')) {
+    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
+    if (wasConverted) {
+      console.log(`Google Drive URL converted from: ${url}`);
+      console.log(`To direct download URL: ${convertedUrl}`);
+      url = convertedUrl;
+    }
+  }
+  
   while (retryCount <= maxRetries) {
     try {
       console.log(`Attempt ${retryCount + 1}/${maxRetries + 1}: Calling pdf-proxy Edge Function`);
@@ -34,8 +45,26 @@ export const fetchDocumentViaProxy = async (
       // Add a timestamp and nonce to prevent caching issues
       const nonce = Math.random().toString(36).substring(2, 15);
       const timestamp = Date.now();
-      const { data, error: functionError } = await supabase.functions.invoke("pdf-proxy", {
-        body: { 
+      
+      // Access the anon key directly from a constant - this is a public key
+      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
+      
+      // Get the auth token
+      const authSession = await supabase.auth.getSession();
+      const authToken = authSession.data.session?.access_token || '';
+      
+      // Use direct fetch for better control and debugging
+      const proxyUrl = 'https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/pdf-proxy';
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'apikey': apiKey,
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
+        body: JSON.stringify({ 
           url,
           title,
           action: isConnectionTest ? "connection_test" : "fetch_document",
@@ -43,14 +72,17 @@ export const fetchDocumentViaProxy = async (
           timestamp,
           nonce, // Add random nonce for cache busting
           noCache: true // Explicit no-cache flag
-        }
+        })
       });
 
       // Explicit error checking for Edge Function call
-      if (functionError) {
-        console.error(`Attempt ${retryCount + 1}: Edge function error:`, functionError);
-        throw new Error(`Proxy service error: ${functionError.message || "Unknown error"}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Proxy error (${response.status}): ${errorText}`);
+        throw new Error(`Proxy error: ${response.status} - ${errorText || "Unknown error"}`);
       }
+      
+      const data = await response.json();
       
       if (!data) {
         throw new Error("No data received from proxy");

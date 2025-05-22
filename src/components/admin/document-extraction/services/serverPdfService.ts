@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDocumentViaProxy } from "./documentFetchService";
+import { convertGoogleDriveUrl } from "../utils/urlUtils";
 
 interface ServerPdfExtractionOptions {
   maxPages?: number;
@@ -129,10 +130,15 @@ export async function fetchAndExtractPdfServerSide(
     // Report initial progress
     if (progressCallback) progressCallback(5);
     
+    // Convert Google Drive URL if needed - critical for access
+    const { url: convertedUrl } = convertGoogleDriveUrl(documentUrl);
+    console.log(`Original URL: ${documentUrl}`);
+    console.log(`Converted URL: ${convertedUrl}`);
+    
     // Fetch the document via proxy
     let documentData: ArrayBuffer;
     try {
-      documentData = await fetchDocumentViaProxy(documentUrl, documentTitle);
+      documentData = await fetchDocumentViaProxy(convertedUrl, documentTitle);
     } catch (proxyError) {
       console.error("Error fetching document via proxy:", proxyError);
       throw new Error(`Failed to fetch document: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`);

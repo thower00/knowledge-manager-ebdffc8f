@@ -26,6 +26,12 @@ function optimizeGoogleDriveUrl(url: string): string {
     const fileId = fileIdMatch[1];
     return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
   }
+  
+  // Try to extract any ID-looking string
+  const anyIdMatch = url.match(/([a-zA-Z0-9_-]{25,})/);
+  if (anyIdMatch && anyIdMatch[1]) {
+    return `https://drive.google.com/uc?export=download&id=${anyIdMatch[1]}&alt=media`;
+  }
 
   return url;
 }
@@ -118,11 +124,35 @@ serve(async (req: Request) => {
       headers.append("Pragma", "no-cache");
     }
     
-    const response = await fetch(optimizedUrl, {
-      headers,
-      // Add reasonable timeout
-      signal: AbortSignal.timeout(25000) // 25 second timeout
-    });
+    // Enhanced error handling for fetch
+    let response;
+    try {
+      response = await fetch(optimizedUrl, {
+        headers,
+        // Add reasonable timeout
+        signal: AbortSignal.timeout(25000) // 25 second timeout
+      });
+    } catch (fetchError) {
+      console.error("Fetch operation failed:", fetchError);
+      return new Response(
+        JSON.stringify({ 
+          error: `Failed to fetch document: ${fetchError.message || "Network error"}`,
+          details: {
+            url: optimizedUrl,
+            originalUrl: url !== optimizedUrl ? url : undefined,
+            wasOptimized: url !== optimizedUrl
+          }
+        }),
+        { 
+          status: 502, 
+          headers: { 
+            "Content-Type": "application/json", 
+            "Cache-Control": "no-store, no-cache",
+            ...corsHeaders 
+          } 
+        }
+      );
+    }
     
     if (!response.ok) {
       console.error(`Failed to fetch document: ${response.status} ${response.statusText}`);

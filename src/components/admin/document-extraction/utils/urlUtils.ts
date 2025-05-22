@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for URL validation and processing
  */
@@ -26,15 +27,7 @@ export const validatePdfUrl = (url: string): {
   if (url.includes('drive.google.com')) {
     const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
     
-    // If the URL wasn't converted and doesn't have alt=media, it's not valid
-    if (!convertedUrl.includes('alt=media') && !wasConverted) {
-      return { 
-        isValid: false, 
-        message: "Google Drive URL must be in direct download format (include '?alt=media')"
-      };
-    }
-    
-    // If it was successfully converted or already has alt=media, it's valid
+    // Consider any Google Drive URL valid as we'll try to convert it during processing
     return { isValid: true, message: null };
   }
   
@@ -73,7 +66,7 @@ export const convertGoogleDriveUrl = (url: string): {
     return { url, wasConverted: false }; // Not a Google Drive URL
   }
   
-  // Already in direct download format
+  // Already in direct download format with alt=media
   if (url.includes('alt=media')) {
     return { url, wasConverted: false };
   }
@@ -129,6 +122,17 @@ export const convertGoogleDriveUrl = (url: string): {
     return { 
       url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 
+    };
+  }
+  
+  // If we can't parse the URL but it's a Google Drive URL, try our best guess
+  const anyIdPattern = /([a-zA-Z0-9_-]{25,})/;
+  const anyMatch = url.match(anyIdPattern);
+  if (anyMatch && anyMatch[1]) {
+    fileId = anyMatch[1];
+    return {
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      wasConverted: true
     };
   }
   
