@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 
 import { DatabaseDocumentSelector } from "./DatabaseDocumentSelector";
 import { UrlExtractionInput } from "./UrlExtractionInput";
@@ -21,6 +21,7 @@ import { ExtractedTextPreview } from "./ExtractedTextPreview";
 import { ExtractionOptions } from "./ExtractionOptions";
 
 import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ExtractionTabProps {
   isLoading: boolean;
@@ -55,6 +56,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     refreshDocuments,
     currentDocumentIndex,
     documentsToProcess,
+    processingFunctionAvailable,
     // Progressive extraction states
     pagesProcessed,
     totalPages,
@@ -89,6 +91,27 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Server-side processing status */}
+        {!processingFunctionAvailable && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Server-side PDF processing unavailable</AlertTitle>
+            <AlertDescription>
+              The server-side PDF processing function isn't responding. Extraction may not work correctly.
+              Try refreshing the page or contact support if this persists.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {processingFunctionAvailable && (
+          <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
+            <AlertTitle>Server-side PDF processing enabled</AlertTitle>
+            <AlertDescription>
+              Using high-performance server-side PDF processing for better reliability.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Database Document Selector Component */}
         <DatabaseDocumentSelector 
           dbDocuments={dbDocuments}
@@ -192,4 +215,4 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       </CardContent>
     </Card>
   );
-}
+};
