@@ -33,33 +33,75 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     
     try {
       setCheckingProcessingFunction(true);
+      console.log("Checking PDF processing function availability...");
       
-      // Try to invoke the function with a minimal request to check if it exists
+      // Simplified approach - just try to invoke the function with a simple check payload
       const { data, error } = await supabase.functions.invoke("process-pdf", {
-        body: { checkAvailability: true },
+        body: { 
+          checkAvailability: true,
+          timestamp: Date.now() // Add timestamp to prevent caching
+        },
         headers: {
           'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
           'X-Check-Availability': 'true'
         }
       });
       
       if (error) {
-        console.warn("Server-side PDF processing function check failed:", error);
+        console.error("Server-side PDF processing function check failed:", error);
         setProcessingFunctionAvailable(false);
-      } else {
-        console.log("Server-side PDF processing function is available:", data);
-        setProcessingFunctionAvailable(true);
+        return false;
       }
+      
+      console.log("Server-side PDF processing function check response:", data);
+      
+      // Verify the response indicates availability
+      const isAvailable = data && (data.available === true || data.success === true);
+      
+      setProcessingFunctionAvailable(isAvailable);
+      return isAvailable;
     } catch (error) {
-      console.warn("Error checking PDF processing function:", error);
+      console.error("Error checking PDF processing function:", error);
       setProcessingFunctionAvailable(false);
+      return false;
     } finally {
       setCheckingProcessingFunction(false);
     }
   };
   
+  // Add retry mechanism for checking function availability
   useEffect(() => {
-    checkProcessingFunction();
+    const checkWithRetry = async () => {
+      // Don't retry if we've already determined availability
+      if (processingFunctionAvailable !== null) return;
+      
+      const maxRetries = 2;
+      let currentRetry = 0;
+      
+      while (currentRetry <= maxRetries) {
+        const available = await checkProcessingFunction();
+        
+        if (available) {
+          // Function is available, no need to retry
+          return;
+        }
+        
+        // Wait before retrying
+        if (currentRetry < maxRetries) {
+          const delay = Math.pow(2, currentRetry) * 1000;
+          console.log(`Retrying function check in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          currentRetry++;
+        } else {
+          // We've exhausted retries
+          console.warn("PDF processing function unavailable after retries");
+          break;
+        }
+      }
+    };
+    
+    checkWithRetry();
   }, []);
 
   // Use individual hooks for different aspects of functionality

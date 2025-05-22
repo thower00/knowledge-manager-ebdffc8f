@@ -5,18 +5,19 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey",
+  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Simple PDF text extraction function using a third-party service
-// This avoids browser-specific dependencies that Deno doesn't support
-async function extractTextFromPdf(base64Data, options = {}) {
+// Simple PDF text extraction function
+async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
     if (!base64Data || base64Data === "check") {
       return {
         text: "PDF processing service is available",
         success: true,
+        available: true,
+        message: "Service is ready",
         pages: [],
         totalPages: 0,
         processedPages: 0
@@ -24,7 +25,7 @@ async function extractTextFromPdf(base64Data, options = {}) {
     }
     
     // Simple text extraction from binary data
-    // Using a simulated approach since we can't use PDF.js directly
+    // This is a simplified approach since we can't use PDF.js directly in Deno
     const pdfBytes = atob(base64Data);
     
     // Find text markers in the PDF binary
@@ -55,8 +56,19 @@ async function extractTextFromPdf(base64Data, options = {}) {
       extractedText = processedMatches.join(" ");
     }
     
+    // If we couldn't extract text using the above method, use a more aggressive pattern
+    if (!extractedText || extractedText.length < 50) {
+      // Try another pattern for text extraction
+      const anotherPattern = /(\w+[\s,.]){3,}/g;
+      const moreMatches = pdfBytes.match(anotherPattern);
+      
+      if (moreMatches && moreMatches.length > 0) {
+        extractedText = moreMatches.join(" ");
+      }
+    }
+    
     // Determine how many pages to process based on options
-    const maxPages = options.maxPages ? Math.min(options.maxPages, pageCount) : pageCount;
+    const maxPages = options?.maxPages ? Math.min(options.maxPages, pageCount) : pageCount;
     
     // Create a structured response
     const processedPages = [];
@@ -85,7 +97,8 @@ async function extractTextFromPdf(base64Data, options = {}) {
       pages: processedPages,
       totalPages: pageCount,
       processedPages: maxPages,
-      success: true
+      success: true,
+      available: true
     };
   } catch (error) {
     console.error("Error extracting text:", error);
@@ -93,7 +106,7 @@ async function extractTextFromPdf(base64Data, options = {}) {
   }
 }
 
-serve(async (req: Request) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { 
@@ -103,11 +116,13 @@ serve(async (req: Request) => {
   }
   
   try {
-    // Check if this is just an availability check
+    // Check if this is just an availability check from request header
     if (req.headers.get("x-check-availability") === "true") {
+      console.log("Availability check received via header");
       return new Response(
         JSON.stringify({ 
           available: true, 
+          success: true,
           message: "PDF processing service is available" 
         }),
         { 
@@ -120,21 +135,48 @@ serve(async (req: Request) => {
       );
     }
     
-    const requestBody = await req.json();
+    // Parse the request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request JSON:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid JSON in request body",
+          details: parseError.message
+        }),
+        { 
+          status: 400, 
+          headers: { 
+            "Content-Type": "application/json", 
+            ...corsHeaders 
+          } 
+        }
+      );
+    }
+    
     const { pdfBase64, options = {}, checkAvailability = false } = requestBody;
     
-    // Handle simple availability check
+    // Handle simple availability check from request body
     if (checkAvailability) {
+      console.log("Availability check received via request body");
       return new Response(
         JSON.stringify({ 
           available: true, 
-          message: "PDF processing service is available" 
+          success: true,
+          message: "PDF processing service is available",
+          timestamp: new Date().toISOString()
         }),
         { 
           status: 200, 
           headers: { 
             "Content-Type": "application/json", 
-            ...corsHeaders 
+            ...corsHeaders,
+            // Add cache control headers to prevent caching
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
           } 
         }
       );
@@ -169,7 +211,7 @@ serve(async (req: Request) => {
         status: 200, 
         headers: { 
           "Content-Type": "application/json",
-          "Cache-Control": "no-store", 
+          "Cache-Control": "no-store, no-cache", 
           ...corsHeaders 
         } 
       }
