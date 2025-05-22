@@ -1,4 +1,10 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { 
+  isPdfData,
+  extractPdfMetadata,
+  extractTextWithTimeout
+} from "./text-extraction.ts";
 
 // Define proper CORS headers
 const corsHeaders = {
@@ -7,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Improved PDF text extraction function with better encoding support
+// Main function to extract text from PDF
 async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
@@ -37,350 +43,39 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Count PDF pages (very approximate)
-    const pageMarkers = pdfBytes.match(/\/Page\s*<<.*?>>/g);
-    let pageCount = pageMarkers ? pageMarkers.length : Math.max(1, Math.floor(pdfBytes.length / 5000));
-    console.log(`Estimated ${pageCount} pages in document`);
-    
-    // IMPROVED TEXT EXTRACTION WITH BETTER ENCODING HANDLING
-    let extractedText = "";
-    
-    // Try to detect PDF version for better handling
-    const pdfVersion = pdfBytes.substring(0, 10).match(/PDF-(\d+\.\d+)/);
-    console.log(`PDF version detected: ${pdfVersion ? pdfVersion[1] : 'unknown'}`);
-    
-    // Step 1: Find text encoding declaration
-    let encodingMatch = pdfBytes.match(/\/Encoding\s*\/([A-Za-z0-9-]+)/);
-    let encoding = encodingMatch ? encodingMatch[1] : "StandardEncoding";
-    console.log(`PDF encoding detected: ${encoding}`);
-    
-    // Step 2: Extract text using multiple methods for redundancy
-    
-    // Method 1: Look for text objects with proper encoding
-    const textObjectPattern = /BT\s*(.*?)\s*ET/gs;
-    const textObjects = [...pdfBytes.matchAll(textObjectPattern)];
-    
-    if (textObjects && textObjects.length > 0) {
-      console.log(`Found ${textObjects.length} text objects`);
-      
-      // Process and combine text objects
-      let objectText = "";
-      for (const [_, content] of textObjects) {
-        // Extract text strings
-        const textMatches = content.match(/\((.*?)\)/g);
-        if (textMatches) {
-          for (const match of textMatches) {
-            // Remove parentheses and decode PDF escape sequences
-            let text = match.substring(1, match.length - 1)
-              .replace(/\\n/g, '\n')
-              .replace(/\\r/g, '')
-              .replace(/\\\\/g, '\\')
-              .replace(/\\t/g, '\t')
-              .replace(/\\(\d{3})/g, (_, octal) => 
-                String.fromCharCode(parseInt(octal, 8))
-              );
-            
-            // Add space between text fragments that likely need it
-            if (objectText.length > 0 && 
-                !objectText.endsWith(' ') && 
-                !objectText.endsWith('\n') && 
-                !text.startsWith(' ') && 
-                !text.startsWith('\n')) {
-              objectText += ' ';
-            }
-            
-            objectText += text;
-          }
-        }
-      }
-      
-      if (objectText.length > 100) {
-        extractedText = objectText;
-        console.log("Successfully extracted text using text objects method");
-      }
+    // Check if this looks like a PDF
+    if (!isPdfData(pdfBytes)) {
+      console.warn("The data does not appear to be a PDF");
     }
     
-    // Method 2: Look for text streams if Method 1 didn't give good results
-    if (!extractedText || extractedText.length < 100) {
-      const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
-      const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
-      
-      if (textStreams && textStreams.length > 0) {
-        console.log(`Found ${textStreams.length} text streams`);
-        
-        // Take the longest streams as they likely contain the main text
-        const sortedStreams = textStreams
-          .map(match => match[1])
-          .filter(stream => stream.length > 50)
-          .sort((a, b) => b.length - a.length)
-          .slice(0, 10); // Take top 10 longest streams
-        
-        if (sortedStreams.length > 0) {
-          // Try to extract readable text from the streams
-          let streamText = "";
-          
-          for (const stream of sortedStreams) {
-            // Look for text patterns in the stream
-            const potentialText = stream.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-                                       .replace(/\s+/g, ' ')
-                                       .trim();
-            
-            if (potentialText.length > 100 && 
-                (potentialText.split(' ').length > 20)) {
-              streamText += potentialText + "\n\n";
-            }
-          }
-          
-          if (streamText.length > extractedText.length) {
-            extractedText = streamText;
-            console.log("Successfully extracted text using stream method");
-          }
-        }
-      }
-    }
+    // Extract metadata
+    const metadata = extractPdfMetadata(pdfBytes);
+    const pageCount = metadata.pageCount;
     
-    // Method 3: Extract text from parenthetical strings
-    if (!extractedText || extractedText.length < 100) {
-      const textMatches = pdfBytes.match(/\(([^)]{3,})\)/g);
-      if (textMatches && textMatches.length > 0) {
-        console.log(`Found ${textMatches.length} text matches in parentheses`);
-        
-        // Filter and clean text
-        const processedMatches = textMatches
-          .map(match => {
-            try {
-              // Remove the surrounding parentheses and decode PDF escapes
-              return match.substring(1, match.length - 1)
-                .replace(/\\n/g, '\n')
-                .replace(/\\r/g, '')
-                .replace(/\\\\/g, '\\')
-                .replace(/\\t/g, '\t')
-                .replace(/\\(\d{3})/g, (_, octal) => 
-                  String.fromCharCode(parseInt(octal, 8))
-                );
-            } catch (e) {
-              return '';
-            }
-          })
-          .filter(text => /[a-zA-Z0-9]/.test(text) && text.length > 2);
-        
-        // Join text with intelligent spacing
-        let joinedText = "";
-        let prevTextEndsWithWordBreak = true;
-        
-        for (const text of processedMatches) {
-          const startsWithWordBreak = /^[.,;:!? ]/.test(text);
-          
-          if (!prevTextEndsWithWordBreak && !startsWithWordBreak) {
-            joinedText += " " + text;
-          } else {
-            joinedText += text;
-          }
-          
-          prevTextEndsWithWordBreak = /[.,;:!? ]$/.test(text);
-        }
-        
-        if (joinedText.length > extractedText.length) {
-          extractedText = joinedText;
-          console.log("Successfully extracted text using parenthetical strings method");
-        }
-      }
-    }
-    
-    // Method 4: Try using content decoding for binary streams
-    if (!extractedText || extractedText.length < 100) {
-      // Look for content streams with specific filters
-      const contentStreamPattern = /\/Filter\s*\/([A-Za-z0-9]+).*?stream\s([\s\S]*?)\sendstream/g;
-      const contentStreams = [...pdfBytes.matchAll(contentStreamPattern)];
+    // Extract text with timeout protection
+    let extractedText;
+    try {
+      // Use a reasonable timeout to prevent function timeouts
+      extractedText = await extractTextWithTimeout(pdfBytes, 25000);
       
-      if (contentStreams && contentStreams.length > 0) {
-        console.log(`Found ${contentStreams.length} content streams with filters`);
-        
-        // Process each filtered stream
-        let decodedContent = "";
-        for (const [_, filterType, content] of contentStreams) {
-          // Simple extraction of ASCII text from binary streams
-          const textParts = content.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-                                 .replace(/\s+/g, ' ')
-                                 .split(' ')
-                                 .filter(word => word.length > 2 && /[a-zA-Z]{2,}/.test(word));
-          
-          if (textParts.length > 20) {
-            decodedContent += textParts.join(' ') + "\n\n";
-          }
-        }
-        
-        if (decodedContent.length > extractedText.length) {
-          extractedText = decodedContent;
-          console.log("Successfully extracted text using content stream decoding");
-        }
-      }
-    }
-    
-    // Method 5: Try different encodings on binary data - NEW ENHANCED APPROACH
-    if (!extractedText || extractedText.length < 100) {
-      try {
-        console.log("Using enhanced encoding approach for complex PDFs");
-        
-        // Try multiple encoding approaches
-        
-        // Approach 1: UTF-16BE (often used in PDFs)
-        let utf16Text = "";
-        try {
-          // Extract potential UTF-16BE text
-          const utf16Regex = /0(\w)0(\w)/g;
-          const utf16Matches = [...pdfBytes.matchAll(utf16Regex)];
-          if (utf16Matches && utf16Matches.length > 100) {
-            let chars = [];
-            for (const [_, byte1, byte2] of utf16Matches) {
-              const charCode = parseInt(byte1 + byte2, 16);
-              if (charCode >= 32 && charCode <= 126) {
-                chars.push(String.fromCharCode(charCode));
-              }
-            }
-            utf16Text = chars.join('');
-            
-            // Clean up and filter
-            const words = utf16Text.split(/\s+/).filter(word => word.length >= 3);
-            if (words.length > 50) {
-              extractedText = words.join(' ');
-              console.log("Successfully extracted text using UTF-16BE pattern matching");
-            }
-          }
-        } catch (e) {
-          console.error("UTF-16BE extraction failed", e);
-        }
-        
-        // Approach 2: Latin-1 (ISO-8859-1) decoding with improved character filtering
-        if (!extractedText || extractedText.length < 100) {
-          console.log("Trying Latin-1 decoding with improved filtering");
-          
-          // Process in chunks to handle large documents
-          const chunkSize = 10000;
-          let latinText = "";
-          
-          for (let startPos = 0; startPos < pdfBytes.length; startPos += chunkSize) {
-            const endPos = Math.min(startPos + chunkSize, pdfBytes.length);
-            const chunk = pdfBytes.substring(startPos, endPos);
-            
-            // Better character filtering - keep alphabets, numbers, punctuation
-            let chunkText = "";
-            for (let i = 0; i < chunk.length; i++) {
-              const charCode = chunk.charCodeAt(i) & 0xFF;
-              // Accept common Latin characters, numbers, and punctuation
-              if ((charCode >= 65 && charCode <= 90) ||   // A-Z
-                  (charCode >= 97 && charCode <= 122) ||  // a-z
-                  (charCode >= 48 && charCode <= 57) ||   // 0-9
-                  (charCode === 32) ||                    // space
-                  (charCode >= 33 && charCode <= 46) ||   // punctuation
-                  (charCode === 10) || (charCode === 13) || (charCode === 9)) { // newlines, tab
-                chunkText += String.fromCharCode(charCode);
-              } else {
-                chunkText += ' ';
-              }
-            }
-            
-            // Add to overall text
-            latinText += chunkText;
-          }
-          
-          // Process the latinText to merge words correctly
-          latinText = latinText.replace(/\s+/g, ' ').trim();
-          
-          // Check if we got meaningful text
-          const words = latinText.split(/\s+/).filter(word => 
-            word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
-          );
-          
-          if (words.length > 50) {
-            extractedText = words.join(' ');
-            console.log("Successfully extracted text using improved Latin-1 decoding");
-          }
-        }
-        
-        // Approach 3: Unicode code point extraction
-        if (!extractedText || extractedText.length < 100) {
-          console.log("Trying Unicode code point extraction");
-          
-          // Find sequences that might be unicode characters
-          const unicodeMatches = pdfBytes.match(/\\u[0-9a-fA-F]{4}/g);
-          if (unicodeMatches && unicodeMatches.length > 50) {
-            const unicodeText = unicodeMatches
-              .map(u => String.fromCharCode(parseInt(u.substring(2), 16)))
-              .join('');
-              
-            if (unicodeText.length > 100) {
-              extractedText = unicodeText;
-              console.log("Successfully extracted text using Unicode code points");
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Error during encoding conversion:", e);
-      }
-    }
-    
-    // Method 6: Last resort - character frequency analysis
-    if (!extractedText || extractedText.length < 100) {
-      console.log("Trying character frequency analysis as last resort");
-      
-      // Create a frequency map of characters in the document
-      const charFrequency = new Map();
-      for (let i = 0; i < pdfBytes.length; i++) {
-        const char = pdfBytes.charAt(i);
-        charFrequency.set(char, (charFrequency.get(char) || 0) + 1);
+      if (!extractedText || extractedText.length < 50) {
+        console.log("Couldn't extract meaningful text using standard methods");
+        return {
+          text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
+          success: false,
+          error: "Text extraction failed",
+          totalPages: pageCount,
+          processedPages: 0
+        };
       }
       
-      // Sort characters by frequency (most common first)
-      const sortedChars = [...charFrequency.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([char, _]) => char);
-      
-      // Keep only the most common characters that look like text
-      const likelyTextChars = sortedChars
-        .filter(char => {
-          const code = char.charCodeAt(0);
-          return (code >= 32 && code <= 126) || // ASCII printable
-                 (code === 9 || code === 10 || code === 13); // Tab, LF, CR
-        })
-        .slice(0, 75); // Keep top 75 most common text characters
-      
-      // Build a set of acceptable characters
-      const validChars = new Set(likelyTextChars);
-      
-      // Extract text using only the most common characters
-      let freqText = "";
-      for (let i = 0; i < pdfBytes.length; i++) {
-        const char = pdfBytes.charAt(i);
-        if (validChars.has(char)) {
-          freqText += char;
-        } else {
-          // Replace with space if not in our accepted set
-          freqText += ' ';
-        }
-      }
-      
-      // Clean up the text
-      freqText = freqText.replace(/\s+/g, ' ').trim();
-      
-      // See if we have enough meaningful words
-      const words = freqText.split(/\s+/).filter(word => 
-        word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
-      );
-      
-      if (words.length > 50) {
-        extractedText = words.join(' ');
-        console.log("Successfully extracted text using character frequency analysis");
-      }
-    }
-    
-    // If we still couldn't extract meaningful text, return a helpful error
-    if (!extractedText || extractedText.length < 50) {
-      console.log("Couldn't extract meaningful text using standard methods");
+      console.log(`Successfully extracted ${extractedText.length} characters of text`);
+    } catch (error) {
+      console.error("Text extraction error:", error);
       return {
-        text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
+        text: `Error extracting text: ${error.message || "Unknown error"}`,
         success: false,
-        error: "Text extraction failed",
+        error: error.message,
         totalPages: pageCount,
         processedPages: 0
       };
@@ -529,8 +224,25 @@ serve(async (req) => {
       timeout: options.timeout || 60
     }));
 
-    // Process the PDF
-    const result = await extractTextFromPdf(pdfBase64, options);
+    // Process the PDF with a timeout to prevent function timeouts
+    const processingPromise = extractTextFromPdf(pdfBase64, options);
+    
+    // Set a timeout that's shorter than the Supabase edge function limit (usually 60s)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("PDF processing timed out at the endpoint level"));
+      }, 45000); // 45 second timeout
+    });
+    
+    // Race the processing against the timeout
+    const result = await Promise.race([processingPromise, timeoutPromise])
+      .catch(error => {
+        console.error("PDF processing error:", error);
+        return { 
+          error: error.message || "PDF processing timed out",
+          success: false 
+        };
+      });
     
     // Return the extracted text
     return new Response(

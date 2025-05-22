@@ -47,21 +47,23 @@ export async function extractPdfTextServerSide(
         // Call the server-side function directly with fetch for better control
         console.log(`Attempt ${currentRetry + 1}: Calling server-side PDF processing function with options:`, options);
         
-        // Prepare authentication headers
-        const session = await supabase.auth.getSession();
-        const authToken = session.data.session?.access_token || '';
+        // Shorten the timeout to avoid UI hanging too long
+        const effectiveTimeout = Math.min(options?.timeout || 45, 45); // Cap at 45 seconds
         
-        // Access the anon key directly - this is a public key so it's fine to have in code
-        const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
+        // Prepare request data
+        const requestData = {
+          pdfBase64: base64Data,
+          options: {
+            ...options,
+            timeout: effectiveTimeout
+          },
+          timestamp: Date.now(),  // Add timestamp to avoid caching issues
+          nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
+        };
         
         // Use Supabase client for invoking the function
         const { data, error } = await supabase.functions.invoke('process-pdf', {
-          body: {
-            pdfBase64: base64Data,
-            options: options || {},
-            timestamp: Date.now(),  // Add timestamp to avoid caching issues
-            nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
-          }
+          body: requestData
         });
         
         if (error) {
@@ -69,14 +71,30 @@ export async function extractPdfTextServerSide(
           throw new Error(`Server-side PDF processing failed: ${error.message}`);
         }
         
-        if (!data || (!data.text && !data.success)) {
+        if (!data) {
+          throw new Error("No response data from PDF processor");
+        }
+        
+        if (data.error) {
+          throw new Error(`PDF processing error: ${data.error}`);
+        }
+        
+        if (!data.text && !data.success) {
           throw new Error("No text extracted from PDF");
         }
         
         // Report success
         if (progressCallback) progressCallback(100);
         
-        return data.text;
+        // Ensure the text is a string, not binary data
+        if (typeof data.text === 'string') {
+          console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
+          
+          // Return plain text
+          return data.text;
+        } else {
+          throw new Error("Invalid text format in response");
+        }
       } catch (error) {
         console.error(`Attempt ${currentRetry + 1} failed:`, error);
         lastError = error instanceof Error ? error : new Error(String(error));

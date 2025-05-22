@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
 import { fetchAndExtractPdfServerSide } from "@/components/admin/document-extraction/services/serverPdfService";
@@ -22,6 +22,16 @@ export const useServerExtractionProcess = () => {
   const [isProgressiveMode, setIsProgressiveMode] = useState(true);
   
   const { toast } = useToast();
+
+  // Effect to clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup timeout on unmount
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [timeoutId]);
 
   // Enhanced proxy connection check with more informative logging
   const checkProxyConnection = async () => {
@@ -80,21 +90,31 @@ export const useServerExtractionProcess = () => {
     // Convert seconds to milliseconds
     const timeoutValue = timeoutSeconds * 1000;
     
-    // Create a new timeout
+    // Create a new timeout - add a small buffer to the server timeout
     const newTimeoutId = window.setTimeout(() => {
       console.error(`Extraction timeout reached for document: ${documentTitle}`);
       
-      // Reset extraction state
-      setIsExtracting(false);
-      setExtractionProgress(0);
+      // Don't reset extraction state if we have text but may have timed out
+      // This allows seeing partial results
+      const hasPartialResults = extractionText && extractionText.length > 0;
+      
+      if (!hasPartialResults) {
+        // Reset extraction state only if we have no results
+        setIsExtracting(false);
+        setExtractionProgress(0);
+      } else {
+        // Mark as complete but with a warning if we have partial results
+        setIsExtracting(false);
+        setExtractionProgress(100);
+      }
       
       // Set error message
-      setExtractionError(`Extraction timed out after ${timeoutSeconds} seconds. The server might be overloaded or the PDF might be too complex.`);
+      setExtractionError(`Extraction timed out after ${timeoutSeconds} seconds. The server might be overloaded or the PDF might be too complex.${hasPartialResults ? " Partial results are shown." : ""}`);
       
       // Show toast to user
       toast({
         title: "Extraction Timeout",
-        description: `The extraction process for "${documentTitle}" took too long and was terminated.`,
+        description: `The extraction process for "${documentTitle}" took too long and was terminated.${hasPartialResults ? " Partial results are available." : ""}`,
         variant: "destructive"
       });
     }, timeoutValue);
@@ -130,8 +150,10 @@ export const useServerExtractionProcess = () => {
       // Set initial progress and create timeout
       setExtractionProgress(10);
       setExtractionStatus(`Fetching document from ${document.url}`);
-      const timeoutValue = options?.timeout || 90;
-      createExtractionTimeout(document.title, timeoutValue);
+      const timeoutValue = options?.timeout || 60;
+      
+      // Create client-side timeout that's a little longer than server-side
+      createExtractionTimeout(document.title, timeoutValue + 5);
       
       // Extract text using our server-side solution
       console.log(`Starting server-side extraction for document: ${document.title}`);
@@ -139,8 +161,12 @@ export const useServerExtractionProcess = () => {
       const extractionOptions = {
         maxPages: options?.extractFirstPagesOnly ? options.pageLimit : 0,
         streamMode: options?.extractionMode === 'progressive',
-        timeout: timeoutValue
+        // Reduce timeout slightly to ensure server responds before client times out
+        timeout: Math.max(15, timeoutValue - 3)
       };
+
+      // Clear any previous error
+      setExtractionError(null);
 
       try {
         const text = await fetchAndExtractPdfServerSide(
@@ -159,6 +185,32 @@ export const useServerExtractionProcess = () => {
             }
           }
         );
+        
+        // If we got text but it appears to be binary/corrupted
+        if (text && (text.includes('Ý') || text.includes('î') || text.includes('ò') || text.includes('ô'))) {
+          console.warn("Extracted text appears to be binary/encoded content");
+          
+          // Try to clean up the text - remove obvious binary segments
+          const cleanedText = text
+            .replace(/[^\x20-\x7E\n\r\t]/g, ' ')  // Replace non-ASCII with spaces
+            .replace(/\s+/g, ' ')                 // Collapse whitespace
+            .trim();
+          
+          if (cleanedText.length > 100) {
+            console.log("Returning cleaned text version");
+            
+            // Clear the timeout since extraction completed successfully
+            clearExtractionTimeout();
+            
+            // Complete the extraction
+            setExtractionProgress(100);
+            setExtractionStatus('Extraction completed with text cleanup');
+            
+            return cleanedText;
+          } else {
+            throw new Error("Extracted text appears to be binary data and could not be properly decoded to readable text");
+          }
+        }
         
         // Clear the timeout since extraction completed successfully
         clearExtractionTimeout();
