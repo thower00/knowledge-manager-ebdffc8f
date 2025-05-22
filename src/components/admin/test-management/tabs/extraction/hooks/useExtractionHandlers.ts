@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
@@ -143,8 +144,14 @@ export const useExtractionHandlers = (
 
   // Extract text from database documents
   const handleExtractFromDatabase = useCallback(async () => {
-    // Validate selected documents
-    if ((!selectedDocumentIds || selectedDocumentIds.length === 0) && !extractAllDocuments) {
+    // Log selection state to help debugging
+    console.log("Selected document IDs:", selectedDocumentIds);
+    console.log("Extract All Documents flag:", extractAllDocuments);
+    console.log("Available documents:", dbDocuments?.length || 0);
+    console.log("Documents to process:", documentsToProcess?.length || 0);
+    
+    // Validate selected documents - FIX: Check length or extract all flag
+    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
@@ -180,6 +187,7 @@ export const useExtractionHandlers = (
       
       // Determine which documents to process
       const docsToProcess = documentsToProcess;
+      console.log("Final documents to process:", docsToProcess);
       
       if (docsToProcess.length === 0) {
         setIsExtracting(false);

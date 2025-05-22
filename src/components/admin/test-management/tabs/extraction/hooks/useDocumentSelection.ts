@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ export const useDocumentSelection = () => {
     setIsLoadingDocuments(true);
     try {
       const documents = await fetchProcessedDocuments();
+      console.log("Fetched documents:", documents);
       setDbDocuments(documents.filter(doc => doc.status === 'completed'));
       setIsLoadingDocuments(false);
     } catch (error) {
@@ -35,6 +36,7 @@ export const useDocumentSelection = () => {
   };
 
   const toggleDocumentSelection = (documentId: string) => {
+    console.log("Toggling document selection:", documentId);
     setSelectedDocumentIds(prev => {
       if (prev.includes(documentId)) {
         return prev.filter(id => id !== documentId);
@@ -45,11 +47,16 @@ export const useDocumentSelection = () => {
   };
 
   const toggleSelectAll = () => {
+    console.log("Current selection:", selectedDocumentIds);
+    console.log("All documents:", dbDocuments.map(d => d.id));
+    
     if (selectedDocumentIds.length === dbDocuments.length) {
       // Deselect all
+      console.log("Deselecting all");
       setSelectedDocumentIds([]);
     } else {
       // Select all
+      console.log("Selecting all");
       setSelectedDocumentIds(dbDocuments.map(doc => doc.id));
     }
   };
@@ -58,6 +65,11 @@ export const useDocumentSelection = () => {
     fetchDocuments();
     setSelectedDocumentIds([]);
   };
+
+  // Fetch documents on mount
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   return {
     dbDocuments,

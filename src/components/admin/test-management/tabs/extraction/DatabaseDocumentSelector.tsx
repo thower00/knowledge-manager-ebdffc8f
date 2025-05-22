@@ -38,6 +38,13 @@ export const DatabaseDocumentSelector = ({
   documentsToProcess,
   proxyConnected,
 }: DatabaseDocumentSelectorProps) => {
+  // Debug: Log selection state when component renders
+  console.log("DatabaseDocumentSelector rendering with:", {
+    dbDocumentsCount: dbDocuments?.length || 0,
+    selectedDocumentIds,
+    extractAllDocuments
+  });
+
   return (
     <div className="space-y-2 p-4 border rounded-md bg-gray-50">
       <div className="flex items-center justify-between mb-2">
@@ -69,7 +76,7 @@ export const DatabaseDocumentSelector = ({
                 <Checkbox 
                   id="select-all" 
                   checked={selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0}
-                  onCheckedChange={toggleSelectAll}
+                  onCheckedChange={() => toggleSelectAll()}
                 />
                 <Label htmlFor="select-all" className="cursor-pointer">Select All Documents</Label>
               </div>
@@ -124,10 +131,8 @@ export const DatabaseDocumentSelector = ({
             id="extract-all" 
             checked={extractAllDocuments}
             onCheckedChange={(checked) => {
+              console.log("Extract all changed to:", checked);
               setExtractAllDocuments(checked === true);
-              if (checked) {
-                // Leave this logic here to match original functionality
-              }
             }}
           />
           <Label htmlFor="extract-all">Extract from all documents (ignores selection)</Label>
@@ -135,7 +140,14 @@ export const DatabaseDocumentSelector = ({
         
         <Button 
           className="w-full" 
-          onClick={handleExtractFromDatabase} 
+          onClick={() => {
+            console.log("Extract button clicked", {
+              selectedCount: selectedDocumentIds.length,
+              extractAll: extractAllDocuments,
+              disabled: (selectedDocumentIds.length === 0 && !extractAllDocuments) || isExtracting || dbDocuments.length === 0
+            });
+            handleExtractFromDatabase();
+          }} 
           disabled={(selectedDocumentIds.length === 0 && !extractAllDocuments) || isExtracting || dbDocuments.length === 0}
         >
           {isExtracting ? (
