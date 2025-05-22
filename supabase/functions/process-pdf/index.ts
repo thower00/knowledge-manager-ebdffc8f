@@ -1,9 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { 
   isPdfData,
   extractPdfMetadata,
-  extractTextWithTimeout
+  extractTextWithTimeout,
+  textContainsBinaryIndicators
 } from "./text-extraction.ts";
 
 // Define proper CORS headers
@@ -70,6 +70,19 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       }
       
       console.log(`Successfully extracted ${extractedText.length} characters of text`);
+      
+      // Check if the extracted text contains binary indicators
+      if (textContainsBinaryIndicators(extractedText)) {
+        console.log("Detected binary data in extracted text, applying additional cleaning");
+        
+        // Clean text by keeping only printable ASCII and common punctuation
+        extractedText = extractedText
+          .replace(/[^\x20-\x7E\r\n\t.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+          
+        console.log(`After cleaning: ${extractedText.length} characters of text remain`);
+      }
     } catch (error) {
       console.error("Text extraction error:", error);
       return {

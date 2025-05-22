@@ -90,8 +90,44 @@ export async function extractPdfTextServerSide(
         if (typeof data.text === 'string') {
           console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
           
-          // Return plain text
-          return data.text;
+          // Clean up binary/corrupted text - apply text cleaning to remove binary characters
+          let cleanedText = data.text;
+          
+          // Check if the text appears to contain binary data (common indicators)
+          const hasBinaryIndicators = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\xAD\u0600-\u0605\u061C\u06DD\u070F\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB]/.test(cleanedText) ||
+                                    cleanedText.includes('Ý') || 
+                                    cleanedText.includes('î') || 
+                                    cleanedText.includes('ò') || 
+                                    cleanedText.includes('ô');
+                                    
+          if (hasBinaryIndicators) {
+            console.log("Detected possible binary content, cleaning text...");
+            
+            // Replace non-printable and non-ASCII characters with spaces
+            cleanedText = cleanedText
+              .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only printable ASCII chars and line breaks
+              .replace(/\s+/g, ' ')                 // Collapse multiple whitespace
+              .trim();
+
+            // If most of the text was binary, it's possible the cleanup left very little content
+            if (cleanedText.length < data.text.length * 0.1) {
+              console.warn("Cleaning removed most of the text content, original might be heavily binary");
+              
+              // Try more aggressive filtering to extract readable content
+              const words = data.text.split(/\s+/)
+                .filter(word => /^[A-Za-z0-9.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]+$/.test(word) && word.length >= 2)
+                .join(' ');
+                
+              if (words.length > cleanedText.length) {
+                cleanedText = words;
+              }
+            }
+            
+            console.log(`Text cleaned: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);
+          }
+          
+          // Return cleaned text
+          return cleanedText;
         } else {
           throw new Error("Invalid text format in response");
         }

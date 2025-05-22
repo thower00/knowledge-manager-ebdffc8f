@@ -180,7 +180,7 @@ export function extractTextWithEncodings(pdfBytes: string): string {
       console.error("UTF-16BE extraction failed", e);
     }
     
-    // Approach 2: Latin-1 (ISO-8859-1) decoding
+    // Approach 2: Latin-1 (ISO-8859-1) decoding with strict filtering
     try {
       console.log("Trying Latin-1 decoding with improved filtering");
       
@@ -285,6 +285,44 @@ export function extractTextWithEncodings(pdfBytes: string): string {
       console.error("Error in frequency analysis:", error);
     }
     
+    // Approach 4: Unicode code point extraction (more aggressive)
+    try {
+      console.log("Trying Unicode code point extraction");
+      
+      // Collect all characters that look like they might be text
+      let textChars = [];
+      for (let i = 0; i < pdfBytes.length; i++) {
+        const code = pdfBytes.charCodeAt(i);
+        
+        // Only collect characters that are likely to be readable text
+        if ((code >= 32 && code <= 126) ||  // Basic Latin
+            (code >= 160 && code <= 255) ||  // Latin-1 Supplement
+            (code >= 192 && code <= 687) ||  // European scripts
+            (code >= 913 && code <= 1154) || // Greek and Coptic
+            (code === 10 || code === 13 || code === 9)) { // Line breaks and tab
+          textChars.push(String.fromCharCode(code));
+        } else {
+          // Use space for non-text characters
+          textChars.push(' ');
+        }
+      }
+      
+      // Join and clean up
+      let unicodeText = textChars.join('').replace(/\s+/g, ' ').trim();
+      
+      // Filter out words that don't contain at least one letter (to remove random punctuation)
+      const words = unicodeText.split(/\s+/)
+        .filter(word => word.length >= 3 && /[a-zA-Z]/.test(word))
+        .join(' ');
+        
+      if (words.length > 100) {
+        console.log("Successfully extracted text using Unicode code point analysis");
+        return words;
+      }
+    } catch (error) {
+      console.error("Error in Unicode extraction:", error);
+    }
+    
     return "";
   } catch (error) {
     console.error("Error in encoding extraction:", error);
@@ -337,6 +375,36 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
   ]);
 }
 
+// Clean and normalize text to remove binary data indicators
+function cleanAndNormalizeText(text: string): string {
+  if (!text || text.length === 0) return text;
+  
+  // First pass - remove clearly binary sequences
+  let cleaned = text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
+    .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF]/g, ' ')       // Keep ASCII and extended Latin
+    .replace(/\uFFFD/g, ' ');                               // Replace replacement character
+    
+  // Second pass - look for remaining problematic patterns
+  const hasBinaryIndicators = /[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³]/g.test(cleaned);
+  
+  if (hasBinaryIndicators) {
+    // More aggressive cleaning - only keep letters, numbers, common punctuation
+    const words = cleaned.split(/\s+/)
+      .filter(word => {
+        // Keep only words that contain at least one letter or number and are not gibberish
+        return word.length >= 2 && 
+               /[a-zA-Z0-9]/.test(word) && 
+               !/[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|§|¥|®|©]/.test(word);
+      })
+      .join(' ');
+      
+    return words;
+  }
+  
+  return cleaned;
+}
+
 // Wrapper that tries all extraction methods
 async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Try each method in order of reliability and take the best result
@@ -345,26 +413,30 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Method 1: Text Objects
   const textObjectsResult = extractTextFromTextObjects(pdfBytes);
   if (textObjectsResult && textObjectsResult.length > 100) {
-    results.push({ text: textObjectsResult, method: 'textObjects', score: textObjectsResult.length });
+    const cleaned = cleanAndNormalizeText(textObjectsResult);
+    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length });
   }
   
   // Method 2: Streams
   const streamsResult = extractTextFromStreams(pdfBytes);
   if (streamsResult && streamsResult.length > 100) {
-    results.push({ text: streamsResult, method: 'streams', score: streamsResult.length });
+    const cleaned = cleanAndNormalizeText(streamsResult);
+    results.push({ text: cleaned, method: 'streams', score: cleaned.length });
   }
   
   // Method 3: Parentheses
   const parenthesesResult = extractTextFromParentheses(pdfBytes);
   if (parenthesesResult && parenthesesResult.length > 100) {
-    results.push({ text: parenthesesResult, method: 'parentheses', score: parenthesesResult.length });
+    const cleaned = cleanAndNormalizeText(parenthesesResult);
+    results.push({ text: cleaned, method: 'parentheses', score: cleaned.length });
   }
   
   // Method 4: Various encodings
   const encodingsResult = extractTextWithEncodings(pdfBytes);
   if (encodingsResult && encodingsResult.length > 100) {
     // Give encodings a slight boost as they're often better for international text
-    results.push({ text: encodingsResult, method: 'encodings', score: encodingsResult.length * 1.2 });
+    const cleaned = cleanAndNormalizeText(encodingsResult);
+    results.push({ text: cleaned, method: 'encodings', score: cleaned.length * 1.2 });
   }
   
   // If we have results, select the best one based on score
@@ -381,4 +453,20 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   
   // If nothing worked, return empty string
   return "";
+}
+
+// Function to check if the extracted text looks like binary data
+export function textContainsBinaryIndicators(text: string): boolean {
+  if (!text || text.length < 10) return false;
+  
+  // Check for common indicators of binary/corrupted text
+  const binaryPatterns = [
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/,   // Control characters
+    /[\uD800-\uDFFF\uFFFE\uFFFF]/,             // Invalid unicode
+    /[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|§|¥|®|©]/,         // Common binary artifacts
+    /[\u0080-\u009F]/                          // More control characters
+  ];
+  
+  // If any pattern is found, consider it binary
+  return binaryPatterns.some(pattern => pattern.test(text));
 }

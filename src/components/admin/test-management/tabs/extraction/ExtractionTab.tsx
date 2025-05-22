@@ -192,10 +192,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           isExtracting={isExtracting}
         />
 
-        {/* Manual Text Input Component */}
+        {/* Manual Text Input Component - Only show if no extraction is in progress */}
         <ManualTextInput
           extractionText={extractionText}
           setExtractionText={setExtractionText}
+          isDisabled={isExtracting} // Disable during extraction to prevent confusion
         />
 
         {/* Extraction Progress Display */}

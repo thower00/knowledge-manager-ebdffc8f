@@ -5,11 +5,13 @@ import { Label } from "@/components/ui/label";
 interface ManualTextInputProps {
   extractionText: string;
   setExtractionText: (text: string) => void;
+  isDisabled?: boolean;
 }
 
 export const ManualTextInput = ({
   extractionText,
   setExtractionText,
+  isDisabled = false
 }: ManualTextInputProps) => {
   return (
     <div className="space-y-4">
@@ -20,7 +22,14 @@ export const ManualTextInput = ({
           onChange={(e) => setExtractionText(e.target.value)}
           placeholder="Paste document content to test extraction..."
           rows={5}
+          disabled={isDisabled}
+          className={isDisabled ? "bg-gray-100 cursor-not-allowed" : ""}
         />
+        {isDisabled && (
+          <p className="text-xs text-muted-foreground">
+            Manual text input is disabled during active extraction.
+          </p>
+        )}
       </div>
     </div>
   );
