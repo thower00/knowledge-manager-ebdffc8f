@@ -1,9 +1,11 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { 
   isPdfData,
   extractPdfMetadata,
   extractTextWithTimeout,
-  textContainsBinaryIndicators
+  textContainsBinaryIndicators,
+  cleanAndNormalizeText
 } from "./text-extraction.ts";
 
 // Define proper CORS headers
@@ -75,11 +77,8 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       if (textContainsBinaryIndicators(extractedText)) {
         console.log("Detected binary data in extracted text, applying additional cleaning");
         
-        // Clean text by keeping only printable ASCII and common punctuation
-        extractedText = extractedText
-          .replace(/[^\x20-\x7E\r\n\t.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        // Clean text more aggressively
+        extractedText = cleanAndNormalizeText(extractedText);
           
         console.log(`After cleaning: ${extractedText.length} characters of text remain`);
       }
@@ -234,7 +233,8 @@ serve(async (req) => {
     console.log("Received PDF processing request with options:", JSON.stringify({
       maxPages: options.maxPages || "all",
       streamMode: options.streamMode || false,
-      timeout: options.timeout || 60
+      timeout: options.timeout || 60,
+      forceTextMode: options.forceTextMode || false
     }));
 
     // Process the PDF with a timeout to prevent function timeouts

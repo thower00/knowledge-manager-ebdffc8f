@@ -13,7 +13,6 @@ import { Loader2, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
 import { DatabaseDocumentSelector } from "./DatabaseDocumentSelector";
 import { UrlExtractionInput } from "./UrlExtractionInput";
-import { ManualTextInput } from "./ManualTextInput";
 import { ExtractionProgress } from "./ExtractionProgress";
 import { ExtractionErrorDisplay } from "./ExtractionErrorDisplay";
 import { TroubleshootingPanel } from "./TroubleshootingPanel";
@@ -192,13 +191,6 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           isExtracting={isExtracting}
         />
 
-        {/* Manual Text Input Component - Only show if no extraction is in progress */}
-        <ManualTextInput
-          extractionText={extractionText}
-          setExtractionText={setExtractionText}
-          isDisabled={isExtracting} // Disable during extraction to prevent confusion
-        />
-
         {/* Extraction Progress Display */}
         {isExtracting && (
           <ExtractionProgress 
@@ -233,7 +225,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             } else {
               toast({
                 title: "No Text Available",
-                description: "Please extract text first or paste it manually",
+                description: "Please extract text first",
                 variant: "destructive"
               });
             }

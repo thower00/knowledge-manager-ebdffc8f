@@ -37,7 +37,7 @@ export async function extractPdfTextServerSide(
     if (progressCallback) progressCallback(20);
     
     // Add retry mechanism for more reliability
-    const maxRetries = 2;
+    const maxRetries = 3;
     let currentRetry = 0;
     let lastError: Error | null = null;
     
@@ -46,7 +46,7 @@ export async function extractPdfTextServerSide(
         // Call the server-side function directly with fetch for better control
         console.log(`Attempt ${currentRetry + 1}: Calling server-side PDF processing function with options:`, options);
         
-        // Shorten the timeout to avoid UI hanging too long
+        // Use a shorter timeout to avoid UI hanging too long
         const effectiveTimeout = Math.min(options?.timeout || 45, 45); // Cap at 45 seconds
         
         // Prepare request data
@@ -54,7 +54,8 @@ export async function extractPdfTextServerSide(
           pdfBase64: base64Data,
           options: {
             ...options,
-            timeout: effectiveTimeout
+            timeout: effectiveTimeout,
+            forceTextMode: true // Force text-only extraction to avoid binary data
           },
           timestamp: Date.now(),  // Add timestamp to avoid caching issues
           nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
@@ -85,92 +86,16 @@ export async function extractPdfTextServerSide(
         // Report success
         if (progressCallback) progressCallback(100);
         
-        // Ensure the text is a string, not binary data
+        // Ensure the text is clean, not binary data
         if (typeof data.text === 'string') {
           console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
           
-          // Enhanced binary data cleaning - apply more aggressive filtering
-          let cleanedText = data.text;
+          // Full text cleaning function to ensure we have readable text, not binary
+          const cleanedText = ensureReadableText(data.text);
           
-          // Check if the text appears to contain binary data (common indicators)
-          const hasBinaryIndicators = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\xAD\u0600-\u0605\u061C\u06DD\u070F\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB]/.test(cleanedText) ||
-                                    /[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³]/.test(cleanedText) ||
-                                    cleanedText.includes('�');
-                                    
-          if (hasBinaryIndicators || true) { // Always clean the text as a safety measure
-            console.log("Detected possible binary content, applying aggressive cleaning...");
-            
-            // Multi-step cleaning approach
-            // Step 1: First attempt - keep only ASCII printable and common whitespace
-            cleanedText = cleanedText
-              .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Replace non-ASCII with spaces
-              .replace(/\s+/g, ' ')                 // Collapse multiple whitespace
-              .trim();
-              
-            console.log(`After initial cleaning: ${cleanedText.length} chars remain`);
-            
-            // Step 2: If most of the text was lost, try extracting only words with letters
-            if (cleanedText.length < data.text.length * 0.1 || cleanedText.length < 500) {
-              console.log("First cleaning removed too much content, trying word extraction approach");
-              
-              // Extract words that contain at least one letter (more permissive)
-              const words = data.text.split(/\s+/)
-                .filter(word => /[a-zA-Z]/.test(word) && word.length >= 2)
-                .join(' ');
-                
-              if (words.length > cleanedText.length) {
-                cleanedText = words;
-                console.log(`Word extraction approach recovered more text: ${cleanedText.length} chars`);
-              }
-            }
-            
-            // Step 3: Check if we still have viable text, otherwise use even more permissive approach
-            if (cleanedText.length < 500) {
-              console.log("Still insufficient text, using character frequency analysis");
-              
-              // Count characters to find the most common ones (likely to be valid text)
-              const charCount = new Map();
-              for (const char of data.text) {
-                charCount.set(char, (charCount.get(char) || 0) + 1);
-              }
-              
-              // Keep only the most common characters that appear to be text
-              const commonChars = [...charCount.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .filter(([char]) => {
-                  const code = char.charCodeAt(0);
-                  return (code >= 32 && code <= 126) || // ASCII printable
-                         code === 10 || code === 13 || code === 9; // Line breaks and tab
-                })
-                .slice(0, 50) // Take top 50 most common characters
-                .map(([char]) => char);
-                
-              // Create a set for faster lookups
-              const validChars = new Set(commonChars);
-              
-              // Filter the text to keep only these common characters
-              cleanedText = data.text
-                .split('')
-                .map(char => validChars.has(char) ? char : ' ')
-                .join('')
-                .replace(/\s+/g, ' ')
-                .trim();
-                
-              console.log(`Character frequency approach produced: ${cleanedText.length} chars`);
-            }
-            
-            // Final verification - if we don't have enough meaningful content, provide a fallback message
-            if (cleanedText.length < 200 || !/[a-zA-Z]{2,}/.test(cleanedText)) {
-              console.warn("Failed to extract readable text content after multiple cleaning attempts");
-              
-              // Return a helpful fallback message
-              return `The document appears to contain mainly binary or encoded data that could not be converted to readable text.\n\nThis may indicate one of the following issues:\n- The document may be a scan-based PDF without embedded text\n- The PDF may have unusual encoding or compression\n- The document might be password-protected or have security restrictions\n\nPlease try with a different document or use OCR software to extract the text first.`;
-            }
-            
-            console.log(`Text cleaned: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);
-          }
+          // Log the cleaning results
+          console.log(`Text cleaning complete: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);
           
-          // Return cleaned text
           return cleanedText;
         } else {
           throw new Error("Invalid text format in response");
@@ -198,6 +123,103 @@ export async function extractPdfTextServerSide(
   } catch (error) {
     console.error("Error in server-side PDF extraction:", error);
     throw error;
+  }
+}
+
+/**
+ * Comprehensive text cleaning function to ensure we get readable text, not binary
+ * This uses multiple strategies to clean text and prevent binary data showing up
+ */
+function ensureReadableText(text: string): string {
+  if (!text || text.length === 0) return "";
+  
+  console.log("Running comprehensive text cleaning...");
+  
+  // Keep original text for comparison
+  const originalText = text;
+  
+  try {
+    // STRATEGY 1: Basic binary data removal
+    let cleanedText = text
+      .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
+      .replace(/[^\x20-\x7E\r\n\t]/g, ' ')                    // Keep ASCII printable
+      .replace(/\uFFFD/g, ' ')                                // Replace replacement char
+      .replace(/\s+/g, ' ')                                  // Collapse multiple spaces
+      .trim();
+      
+    console.log(`Strategy 1 result: ${cleanedText.length} chars`);
+      
+    // If we still have sufficient text, use this version
+    if (cleanedText.length > originalText.length * 0.5 && cleanedText.length > 500) {
+      return cleanedText;
+    }
+    
+    // STRATEGY 2: Extract words that contain letters
+    console.log("Strategy 1 removed too much text, trying word extraction...");
+    const words = originalText.split(/\s+/)
+      .filter(word => /[a-zA-Z]/.test(word) && word.length >= 2)
+      .join(' ');
+      
+    console.log(`Strategy 2 result: ${words.length} chars`);
+      
+    if (words.length > 500) {
+      return words;
+    }
+    
+    // STRATEGY 3: Character frequency analysis for extreme cases
+    console.log("Strategy 2 insufficient, using character frequency analysis...");
+    
+    // Count character frequencies
+    const charCount = new Map();
+    for (const char of originalText) {
+      charCount.set(char, (charCount.get(char) || 0) + 1);
+    }
+    
+    // Get the most common printable characters
+    const commonChars = [...charCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .filter(([char]) => {
+        const code = char.charCodeAt(0);
+        return (code >= 32 && code <= 126) || code === 10 || code === 13; // ASCII + line breaks
+      })
+      .slice(0, 75) // Take top 75 most common characters
+      .map(([char]) => char);
+      
+    // Make a set for faster lookups
+    const validChars = new Set(commonChars);
+    
+    // Keep only the common characters
+    cleanedText = originalText
+      .split('')
+      .map(char => validChars.has(char) ? char : ' ')
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim();
+      
+    console.log(`Strategy 3 result: ${cleanedText.length} chars`);
+      
+    if (cleanedText.length > 200) {
+      return cleanedText;
+    }
+    
+    // STRATEGY 4: Last resort - extract anything that looks like text
+    console.log("Strategy 3 insufficient, using regex pattern matching as last resort...");
+    
+    // Extract all sequences that look like words
+    const textMatches = originalText.match(/[a-zA-Z0-9][a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]{2,}/g) || [];
+    const extractedText = textMatches.join(' ');
+    
+    console.log(`Strategy 4 result: ${extractedText.length} chars`);
+    
+    if (extractedText.length > 100) {
+      return extractedText;
+    }
+    
+    // If all strategies failed, return a helpful error message
+    return "The document appears to contain mainly binary or encoded data that could not be converted to readable text. The PDF might be scan-based without embedded text or have security restrictions.";
+  } catch (error) {
+    console.error("Error during text cleaning:", error);
+    return "Error cleaning text from document. The extracted content may be in a format that cannot be properly displayed.";
   }
 }
 

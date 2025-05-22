@@ -153,34 +153,7 @@ export function extractTextFromParentheses(pdfBytes: string): string {
 // Attempt to extract text with different encodings
 export function extractTextWithEncodings(pdfBytes: string): string {
   try {
-    // Approach 1: UTF-16BE (often used in PDFs)
-    let utf16Text = "";
-    try {
-      // Extract potential UTF-16BE text
-      const utf16Regex = /0(\w)0(\w)/g;
-      const utf16Matches = [...pdfBytes.matchAll(utf16Regex)];
-      if (utf16Matches && utf16Matches.length > 100) {
-        let chars = [];
-        for (const [_, byte1, byte2] of utf16Matches) {
-          const charCode = parseInt(byte1 + byte2, 16);
-          if (charCode >= 32 && charCode <= 126) {
-            chars.push(String.fromCharCode(charCode));
-          }
-        }
-        utf16Text = chars.join('');
-        
-        // Clean up and filter
-        const words = utf16Text.split(/\s+/).filter(word => word.length >= 3);
-        if (words.length > 50) {
-          console.log("Successfully extracted text using UTF-16BE pattern matching");
-          return words.join(' ');
-        }
-      }
-    } catch (e) {
-      console.error("UTF-16BE extraction failed", e);
-    }
-    
-    // Approach 2: Latin-1 (ISO-8859-1) decoding with strict filtering
+    // Approach 1: Latin-1 (ISO-8859-1) decoding with strict filtering
     try {
       console.log("Trying Latin-1 decoding with improved filtering");
       
@@ -229,7 +202,7 @@ export function extractTextWithEncodings(pdfBytes: string): string {
       console.error("Error in Latin-1 decoding:", error);
     }
     
-    // Approach 3: Character frequency analysis
+    // Approach 2: Character frequency analysis
     try {
       console.log("Trying character frequency analysis as last resort");
       
@@ -285,44 +258,6 @@ export function extractTextWithEncodings(pdfBytes: string): string {
       console.error("Error in frequency analysis:", error);
     }
     
-    // Approach 4: Unicode code point extraction (more aggressive)
-    try {
-      console.log("Trying Unicode code point extraction");
-      
-      // Collect all characters that look like they might be text
-      let textChars = [];
-      for (let i = 0; i < pdfBytes.length; i++) {
-        const code = pdfBytes.charCodeAt(i);
-        
-        // Only collect characters that are likely to be readable text
-        if ((code >= 32 && code <= 126) ||  // Basic Latin
-            (code >= 160 && code <= 255) ||  // Latin-1 Supplement
-            (code >= 192 && code <= 687) ||  // European scripts
-            (code >= 913 && code <= 1154) || // Greek and Coptic
-            (code === 10 || code === 13 || code === 9)) { // Line breaks and tab
-          textChars.push(String.fromCharCode(code));
-        } else {
-          // Use space for non-text characters
-          textChars.push(' ');
-        }
-      }
-      
-      // Join and clean up
-      let unicodeText = textChars.join('').replace(/\s+/g, ' ').trim();
-      
-      // Filter out words that don't contain at least one letter (to remove random punctuation)
-      const words = unicodeText.split(/\s+/)
-        .filter(word => word.length >= 3 && /[a-zA-Z]/.test(word))
-        .join(' ');
-        
-      if (words.length > 100) {
-        console.log("Successfully extracted text using Unicode code point analysis");
-        return words;
-      }
-    } catch (error) {
-      console.error("Error in Unicode extraction:", error);
-    }
-    
     return "";
   } catch (error) {
     console.error("Error in encoding extraction:", error);
@@ -376,33 +311,25 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
 }
 
 // Clean and normalize text to remove binary data indicators
-function cleanAndNormalizeText(text: string): string {
+export function cleanAndNormalizeText(text: string): string {
   if (!text || text.length === 0) return text;
   
   // First pass - remove clearly binary sequences
   let cleaned = text
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
     .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF]/g, ' ')       // Keep ASCII and extended Latin
-    .replace(/\uFFFD/g, ' ');                               // Replace replacement character
+    .replace(/\uFFFD/g, ' ')                               // Replace replacement character
+    .replace(/Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³/g, ' '); // Replace common binary indicators
     
-  // Second pass - look for remaining problematic patterns
-  const hasBinaryIndicators = /[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³]/g.test(cleaned);
-  
-  if (hasBinaryIndicators) {
-    // More aggressive cleaning - only keep letters, numbers, common punctuation
-    const words = cleaned.split(/\s+/)
-      .filter(word => {
-        // Keep only words that contain at least one letter or number and are not gibberish
-        return word.length >= 2 && 
-               /[a-zA-Z0-9]/.test(word) && 
-               !/[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|§|¥|®|©]/.test(word);
-      })
-      .join(' ');
-      
-    return words;
-  }
-  
-  return cleaned;
+  // Second pass - look for remaining words
+  const words = cleaned.split(/\s+/)
+    .filter(word => {
+      // Keep only words that contain at least one letter or number
+      return word.length >= 2 && /[a-zA-Z0-9]/.test(word);
+    })
+    .join(' ');
+    
+  return words;
 }
 
 // Wrapper that tries all extraction methods
@@ -410,18 +337,18 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Try each method in order of reliability and take the best result
   const results = [];
   
-  // Method 1: Text Objects
-  const textObjectsResult = extractTextFromTextObjects(pdfBytes);
-  if (textObjectsResult && textObjectsResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(textObjectsResult);
-    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length });
-  }
-  
-  // Method 2: Streams
+  // Method 1: Streams (usually most reliable)
   const streamsResult = extractTextFromStreams(pdfBytes);
   if (streamsResult && streamsResult.length > 100) {
     const cleaned = cleanAndNormalizeText(streamsResult);
     results.push({ text: cleaned, method: 'streams', score: cleaned.length });
+  }
+  
+  // Method 2: Text Objects
+  const textObjectsResult = extractTextFromTextObjects(pdfBytes);
+  if (textObjectsResult && textObjectsResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(textObjectsResult);
+    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length });
   }
   
   // Method 3: Parentheses
