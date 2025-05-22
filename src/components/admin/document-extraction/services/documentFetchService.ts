@@ -24,12 +24,13 @@ export const fetchDocumentViaProxy = async (
   const isConnectionTest = !url || title === "connection_test";
   
   // Ensure Google Drive URLs are in the correct format
+  let processedUrl = url;
   if (!isConnectionTest && url.includes('drive.google.com')) {
     const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
     if (wasConverted) {
       console.log(`Google Drive URL converted from: ${url}`);
       console.log(`To direct download URL: ${convertedUrl}`);
-      url = convertedUrl;
+      processedUrl = convertedUrl;
     }
   }
   
@@ -39,14 +40,14 @@ export const fetchDocumentViaProxy = async (
       if (isConnectionTest) {
         console.log("This is a connection test");
       } else {
-        console.log("Fetching document from URL:", url);
+        console.log("Fetching document from URL:", processedUrl);
       }
       
       // Add a timestamp and nonce to prevent caching issues
       const nonce = Math.random().toString(36).substring(2, 15);
       const timestamp = Date.now();
       
-      // Access the anon key directly from a constant - this is a public key
+      // Access the anon key directly - this is a public key so it's fine to have in code
       const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
       
       // Get the auth token
@@ -65,10 +66,10 @@ export const fetchDocumentViaProxy = async (
           'Pragma': 'no-cache',
         },
         body: JSON.stringify({ 
-          url,
+          url: processedUrl,
           title,
           action: isConnectionTest ? "connection_test" : "fetch_document",
-          has_url: !!url,
+          has_url: !!processedUrl,
           timestamp,
           nonce, // Add random nonce for cache busting
           noCache: true // Explicit no-cache flag

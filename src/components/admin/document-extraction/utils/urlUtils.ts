@@ -25,8 +25,6 @@ export const validatePdfUrl = (url: string): {
 
   // Automatically attempt to convert Google Drive URLs to direct download format
   if (url.includes('drive.google.com')) {
-    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(url);
-    
     // Consider any Google Drive URL valid as we'll try to convert it during processing
     return { isValid: true, message: null };
   }
@@ -81,22 +79,11 @@ export const convertGoogleDriveUrl = (url: string): {
   if (fileMatch && fileMatch[1]) {
     fileId = fileMatch[1];
     
-    // If URL already ends with /view?alt=media, don't modify it
-    if (url.endsWith('/view?alt=media')) {
-      return { url, wasConverted: false };
-    }
+    console.log("Extracted Google Drive file ID:", fileId);
     
-    // If URL ends with /view, append ?alt=media
-    if (url.endsWith('/view')) {
-      return { 
-        url: `${url}?alt=media`,
-        wasConverted: true 
-      };
-    }
-    
-    // Otherwise create a proper direct download URL
+    // Create a proper direct download URL - this format works better than the others
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
       wasConverted: true 
     };
   }
@@ -108,7 +95,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (openMatch && openMatch[1]) {
     fileId = openMatch[1];
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
       wasConverted: true 
     };
   }
@@ -120,7 +107,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (docsMatch && docsMatch[1]) {
     fileId = docsMatch[1];
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
       wasConverted: true 
     };
   }
@@ -131,7 +118,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (anyMatch && anyMatch[1]) {
     fileId = anyMatch[1];
     return {
-      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
       wasConverted: true
     };
   }

@@ -51,7 +51,7 @@ export async function extractPdfTextServerSide(
         const session = await supabase.auth.getSession();
         const authToken = session.data.session?.access_token || '';
         
-        // Access the anon key from the environment
+        // Access the anon key directly - this is a public key so it's fine to have in code
         const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
 
         // Direct fetch to the edge function
@@ -131,9 +131,13 @@ export async function fetchAndExtractPdfServerSide(
     if (progressCallback) progressCallback(5);
     
     // Convert Google Drive URL if needed - critical for access
-    const { url: convertedUrl } = convertGoogleDriveUrl(documentUrl);
+    const { url: convertedUrl, wasConverted } = convertGoogleDriveUrl(documentUrl);
     console.log(`Original URL: ${documentUrl}`);
     console.log(`Converted URL: ${convertedUrl}`);
+    
+    if (wasConverted) {
+      console.log("URL was converted to direct download format");
+    }
     
     // Fetch the document via proxy
     let documentData: ArrayBuffer;

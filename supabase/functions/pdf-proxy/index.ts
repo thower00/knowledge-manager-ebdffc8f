@@ -16,7 +16,7 @@ function optimizeGoogleDriveUrl(url: string): string {
   }
 
   // Already in proper format
-  if (url.includes('alt=media')) {
+  if (url.includes('uc?export=download')) {
     return url;
   }
 
@@ -24,13 +24,16 @@ function optimizeGoogleDriveUrl(url: string): string {
   const fileIdMatch = url.match(/\/file\/d\/([^\/]+)/);
   if (fileIdMatch && fileIdMatch[1]) {
     const fileId = fileIdMatch[1];
-    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
+    console.log(`Converting Google Drive URL with file ID: ${fileId}`);
+    // Using basic export=download format which works more reliably
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
   
   // Try to extract any ID-looking string
   const anyIdMatch = url.match(/([a-zA-Z0-9_-]{25,})/);
   if (anyIdMatch && anyIdMatch[1]) {
-    return `https://drive.google.com/uc?export=download&id=${anyIdMatch[1]}&alt=media`;
+    console.log(`Extracted potential Google Drive ID by pattern match: ${anyIdMatch[1]}`);
+    return `https://drive.google.com/uc?export=download&id=${anyIdMatch[1]}`;
   }
 
   return url;
@@ -111,7 +114,9 @@ serve(async (req: Request) => {
     // Optimize Google Drive URLs for direct access
     const optimizedUrl = optimizeGoogleDriveUrl(url);
     
-    console.log(`Proxying request for ${title || "document"} at URL: ${optimizedUrl}`);
+    console.log(`Proxying request for ${title || "document"}`);
+    console.log(`Original URL: ${url}`);
+    console.log(`Optimized URL: ${optimizedUrl}`);
     
     // Fetch the document with proper headers for Google Drive
     const headers = new Headers({
