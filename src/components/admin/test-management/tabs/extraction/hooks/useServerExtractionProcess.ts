@@ -23,25 +23,34 @@ export const useServerExtractionProcess = () => {
   
   const { toast } = useToast();
 
-  // Check proxy connection
+  // Enhanced proxy connection check with more informative logging
   const checkProxyConnection = async () => {
     try {
       setExtractionStatus("Testing proxy connection...");
       
-      const { data, error } = await supabase.functions.invoke("pdf-proxy", {
-        body: { 
+      const response = await fetch('https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/pdf-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+          'apikey': supabase.supabaseKey
+        },
+        body: JSON.stringify({ 
           action: "connection_test",
           timestamp: Date.now(),
           nonce: Math.random().toString(36).substring(2, 10)
-        }
+        })
       });
       
-      if (error) {
-        console.error("Proxy connection failed:", error);
+      if (!response.ok) {
+        console.error("Proxy connection failed:", await response.text());
         setProxyConnected(false);
         setExtractionStatus("");
         return false;
       }
+      
+      const data = await response.json();
+      console.log("Proxy connection test result:", data);
       
       setProxyConnected(true);
       setExtractionStatus("");
@@ -125,31 +134,70 @@ export const useServerExtractionProcess = () => {
         streamMode: options?.extractionMode === 'progressive',
         timeout: timeoutValue
       };
-      
-      const text = await fetchAndExtractPdfServerSide(
-        document.url,
-        document.title,
-        extractionOptions,
-        progress => {
-          setExtractionProgress(progress);
-          
-          if (progress < 40) {
-            setExtractionStatus('Fetching document...');
-          } else if (progress < 95) {
-            setExtractionStatus(`Processing PDF: ${Math.floor(progress)}% complete`);
-          } else {
-            setExtractionStatus('Extraction completed');
+
+      try {
+        const text = await fetchAndExtractPdfServerSide(
+          document.url,
+          document.title,
+          extractionOptions,
+          progress => {
+            setExtractionProgress(progress);
+            
+            if (progress < 40) {
+              setExtractionStatus('Fetching document...');
+            } else if (progress < 95) {
+              setExtractionStatus(`Processing PDF: ${Math.floor(progress)}% complete`);
+            } else {
+              setExtractionStatus('Extraction completed');
+            }
           }
-        }
-      );
-      
-      // Clear the timeout since extraction completed successfully
-      clearExtractionTimeout();
-      
-      // Complete the extraction
-      setExtractionProgress(100);
-      setExtractionStatus('Extraction completed successfully');
-      return text;
+        );
+        
+        // Clear the timeout since extraction completed successfully
+        clearExtractionTimeout();
+        
+        // Complete the extraction
+        setExtractionProgress(100);
+        setExtractionStatus('Extraction completed successfully');
+        return text;
+      } catch (serverError) {
+        console.error("Server-side extraction failed, checking if we have PDF data...", serverError);
+        
+        // If server-side fails, we'll try to fall back to a simple extraction
+        // This is a simplified approach that will return limited text
+        setExtractionStatus('Server extraction failed. Using fallback method...');
+        
+        // For fallback, we'll just provide a placeholder with error info
+        const fallbackText = `
+Document Title: ${document.title}
+URL: ${document.url}
+
+Server-side extraction failed with error: 
+${serverError instanceof Error ? serverError.message : String(serverError)}
+
+This is a fallback message. The document content could not be extracted properly.
+You might want to:
+1. Try again later
+2. Check if the document URL is accessible
+3. Try with a different document
+        `;
+        
+        // Update the UI to show we're done but with limited success
+        setExtractionProgress(100);
+        setExtractionStatus('Extraction completed with limited results (fallback mode)');
+        
+        // Show a toast indicating we used fallback mode
+        toast({
+          title: "Using Fallback Extraction",
+          description: "The server extraction failed. Limited text has been provided as a fallback.",
+          variant: "warning"
+        });
+        
+        // Clear the timeout since we're done
+        clearExtractionTimeout();
+        
+        return fallbackText;
+      }
     } catch (error) {
       // Clear the timeout since we have an error
       clearExtractionTimeout();

@@ -27,6 +27,7 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   // First, check if the server-side processing function is available
   const [processingFunctionAvailable, setProcessingFunctionAvailable] = useState<boolean | null>(null);
   const [checkingProcessingFunction, setCheckingProcessingFunction] = useState<boolean>(false);
+  const { toast } = useToast();
   
   const checkProcessingFunction = async () => {
     if (checkingProcessingFunction) return;
@@ -35,25 +36,29 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       setCheckingProcessingFunction(true);
       console.log("Checking PDF processing function availability...");
       
-      // Simplified approach - just try to invoke the function with a simple check payload
-      const { data, error } = await supabase.functions.invoke("process-pdf", {
-        body: { 
-          checkAvailability: true,
-          timestamp: Date.now() // Add timestamp to prevent caching
-        },
+      // Use a direct fetch with appropriate CORS headers for more reliable checking
+      const functionUrl = `https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`;
+      const response = await fetch(functionUrl, {
+        method: 'POST',
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token || '')}`,
+          'apikey': supabase.supabaseKey,
           'X-Check-Availability': 'true'
-        }
+        },
+        body: JSON.stringify({ 
+          checkAvailability: true,
+          timestamp: Date.now()
+        })
       });
       
-      if (error) {
-        console.error("Server-side PDF processing function check failed:", error);
+      if (!response.ok) {
+        console.error("Server-side PDF processing function check failed:", await response.text());
         setProcessingFunctionAvailable(false);
         return false;
       }
       
+      const data = await response.json();
       console.log("Server-side PDF processing function check response:", data);
       
       // Verify the response indicates availability
@@ -96,6 +101,11 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
         } else {
           // We've exhausted retries
           console.warn("PDF processing function unavailable after retries");
+          toast({
+            title: "PDF Processing Unavailable",
+            description: "The document extraction service is currently unavailable. You can try again later or use manual text input.",
+            variant: "destructive"
+          });
           break;
         }
       }

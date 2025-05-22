@@ -43,25 +43,37 @@ export async function extractPdfTextServerSide(
     
     while (currentRetry <= maxRetries) {
       try {
-        // Call the server-side function
+        // Call the server-side function directly with fetch for better control
         console.log(`Attempt ${currentRetry + 1}: Calling server-side PDF processing function with options:`, options);
         
-        const { data, error } = await supabase.functions.invoke("process-pdf", {
-          body: { 
+        // Prepare authentication headers
+        const session = await supabase.auth.getSession();
+        const authToken = session.data.session?.access_token || '';
+        
+        // Direct fetch to the edge function
+        const functionUrl = 'https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf';
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'apikey': supabase.supabaseKey,
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache',
+          },
+          body: JSON.stringify({ 
             pdfBase64: base64Data,
             options: options || {}
-          },
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          }
+          })
         });
         
-        if (error) {
-          console.error("Server-side PDF processing failed:", error);
-          throw new Error(`Server-side PDF processing failed: ${error.message}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Server-side PDF processing failed with status ${response.status}:`, errorText);
+          throw new Error(`Server-side PDF processing failed: HTTP ${response.status} - ${errorText}`);
         }
+        
+        const data = await response.json();
         
         if (!data || (!data.text && !data.success)) {
           throw new Error("No text extracted from PDF");
@@ -115,7 +127,13 @@ export async function fetchAndExtractPdfServerSide(
     if (progressCallback) progressCallback(5);
     
     // Fetch the document via proxy
-    const documentData = await fetchDocumentViaProxy(documentUrl, documentTitle);
+    let documentData: ArrayBuffer;
+    try {
+      documentData = await fetchDocumentViaProxy(documentUrl, documentTitle);
+    } catch (proxyError) {
+      console.error("Error fetching document via proxy:", proxyError);
+      throw new Error(`Failed to fetch document: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`);
+    }
     
     // Update progress
     if (progressCallback) progressCallback(40);
