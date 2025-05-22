@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
 import { useToast } from "@/hooks/use-toast";
@@ -63,10 +63,10 @@ export const useDocumentSelection = () => {
     }
   };
 
-  const refreshDocuments = () => {
-    fetchDocuments();
-    setSelectedDocumentIds([]);
-  };
+  // Modified to return a Promise explicitly
+  const refreshDocuments = useCallback(async () => {
+    return fetchDocuments();
+  }, []);
 
   // Fetch documents on mount
   useEffect(() => {
