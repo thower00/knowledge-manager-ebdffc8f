@@ -45,6 +45,10 @@ export const DatabaseDocumentSelector = ({
     extractAllDocuments
   });
 
+  // Calculate whether the extract button should be enabled
+  const canExtract = (selectedDocumentIds.length > 0 || extractAllDocuments) && 
+                      dbDocuments.length > 0 && !isExtracting;
+
   return (
     <div className="space-y-2 p-4 border rounded-md bg-gray-50">
       <div className="flex items-center justify-between mb-2">
@@ -144,11 +148,11 @@ export const DatabaseDocumentSelector = ({
             console.log("Extract button clicked", {
               selectedCount: selectedDocumentIds.length,
               extractAll: extractAllDocuments,
-              disabled: (selectedDocumentIds.length === 0 && !extractAllDocuments) || isExtracting || dbDocuments.length === 0
+              disabled: !canExtract
             });
             handleExtractFromDatabase();
           }} 
-          disabled={(selectedDocumentIds.length === 0 && !extractAllDocuments) || isExtracting || dbDocuments.length === 0}
+          disabled={!canExtract}
         >
           {isExtracting ? (
             <>

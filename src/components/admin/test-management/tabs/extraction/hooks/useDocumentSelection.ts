@@ -12,6 +12,7 @@ export const useDocumentSelection = () => {
   const { toast } = useToast();
 
   // Define documentsToProcess - documents that will be processed based on selection
+  // Fix: properly handle extractAllDocuments vs selectedDocumentIds
   const documentsToProcess = extractAllDocuments 
     ? dbDocuments 
     : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
@@ -50,7 +51,8 @@ export const useDocumentSelection = () => {
     console.log("Current selection:", selectedDocumentIds);
     console.log("All documents:", dbDocuments.map(d => d.id));
     
-    if (selectedDocumentIds.length === dbDocuments.length) {
+    // Fix: Check actual array lengths for equality check instead of direct comparison
+    if (selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0) {
       // Deselect all
       console.log("Deselecting all");
       setSelectedDocumentIds([]);

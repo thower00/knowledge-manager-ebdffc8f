@@ -5,8 +5,10 @@ import { useDocumentSelection } from "./useDocumentSelection";
 import { useUrlValidation } from "./useUrlValidation";
 import { useServerExtractionProcess } from "./useServerExtractionProcess";
 import { ExtractionOptionsType } from "../ExtractionOptions";
-import { sleep } from "@/lib/utils";
 import { ProcessedDocument } from "@/types/document";
+
+// Add the sleep function that was missing
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const useExtractionHandlers = (
   onComplete?: (extractedText: string, testUrl?: string) => void
@@ -49,7 +51,7 @@ export const useExtractionHandlers = (
     totalPages,
     isProgressiveMode,
     extractionStatus,
-    currentDocumentIndex
+    currentDocumentIndex // Added from server extraction process
   } = useServerExtractionProcess();
 
   // Extract text from URL
@@ -150,8 +152,8 @@ export const useExtractionHandlers = (
     console.log("Available documents:", dbDocuments?.length || 0);
     console.log("Documents to process:", documentsToProcess?.length || 0);
     
-    // Validate selected documents - FIX: Check length or extract all flag
-    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
+    // Validate selected documents - FIXED: Check documentsToProcess length instead of selectedDocumentIds
+    if (documentsToProcess.length === 0) {
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
@@ -272,7 +274,7 @@ export const useExtractionHandlers = (
     setProcessExtractionText
   ]);
   
-  // Helper function for sleeping
+  // Helper function for refreshing documents and connection
   const handleRefresh = useCallback(async () => {
     await refreshDocuments();
     await checkProxyConnection();
