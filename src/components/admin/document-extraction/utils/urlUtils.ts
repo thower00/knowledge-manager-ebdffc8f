@@ -64,8 +64,12 @@ export const convertGoogleDriveUrl = (url: string): {
     return { url, wasConverted: false }; // Not a Google Drive URL
   }
   
-  // Already in direct download format with alt=media
-  if (url.includes('alt=media')) {
+  // Already in export=download format - just ensure alt=media parameter is added
+  if (url.includes('export=download')) {
+    if (!url.includes('alt=media')) {
+      const separator = url.includes('?') ? '&' : '?';
+      return { url: `${url}${separator}alt=media`, wasConverted: true };
+    }
     return { url, wasConverted: false };
   }
   
@@ -83,7 +87,7 @@ export const convertGoogleDriveUrl = (url: string): {
     
     // Create a proper direct download URL - this format works better than the others
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 
     };
   }
@@ -95,7 +99,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (openMatch && openMatch[1]) {
     fileId = openMatch[1];
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 
     };
   }
@@ -107,7 +111,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (docsMatch && docsMatch[1]) {
     fileId = docsMatch[1];
     return { 
-      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true 
     };
   }
@@ -118,7 +122,7 @@ export const convertGoogleDriveUrl = (url: string): {
   if (anyMatch && anyMatch[1]) {
     fileId = anyMatch[1];
     return {
-      url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      url: `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`,
       wasConverted: true
     };
   }

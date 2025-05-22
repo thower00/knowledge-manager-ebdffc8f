@@ -15,9 +15,15 @@ function optimizeGoogleDriveUrl(url: string): string {
     return url;
   }
 
+  // Already in proper format with alt=media
+  if (url.includes('alt=media')) {
+    return url;
+  }
+  
   // Already in proper format
   if (url.includes('uc?export=download')) {
-    return url;
+    // Add alt=media if needed
+    return url + (url.includes('?') ? '&' : '?') + 'alt=media';
   }
 
   // Convert from /file/d/ID/view to proper format
@@ -25,15 +31,15 @@ function optimizeGoogleDriveUrl(url: string): string {
   if (fileIdMatch && fileIdMatch[1]) {
     const fileId = fileIdMatch[1];
     console.log(`Converting Google Drive URL with file ID: ${fileId}`);
-    // Using basic export=download format which works more reliably
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    // Using export=download and alt=media for reliable direct access
+    return `https://drive.google.com/uc?export=download&id=${fileId}&alt=media`;
   }
   
   // Try to extract any ID-looking string
   const anyIdMatch = url.match(/([a-zA-Z0-9_-]{25,})/);
   if (anyIdMatch && anyIdMatch[1]) {
     console.log(`Extracted potential Google Drive ID by pattern match: ${anyIdMatch[1]}`);
-    return `https://drive.google.com/uc?export=download&id=${anyIdMatch[1]}`;
+    return `https://drive.google.com/uc?export=download&id=${anyIdMatch[1]}&alt=media`;
   }
 
   return url;

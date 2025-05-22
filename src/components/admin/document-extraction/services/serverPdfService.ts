@@ -53,31 +53,21 @@ export async function extractPdfTextServerSide(
         
         // Access the anon key directly - this is a public key so it's fine to have in code
         const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
-
-        // Direct fetch to the edge function
-        const functionUrl = 'https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf';
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'apikey': apiKey,
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache',
-          },
-          body: JSON.stringify({ 
+        
+        // Use Supabase client for invoking the function
+        const { data, error } = await supabase.functions.invoke('process-pdf', {
+          body: {
             pdfBase64: base64Data,
-            options: options || {}
-          })
+            options: options || {},
+            timestamp: Date.now(),  // Add timestamp to avoid caching issues
+            nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
+          }
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Server-side PDF processing failed with status ${response.status}:`, errorText);
-          throw new Error(`Server-side PDF processing failed: HTTP ${response.status} - ${errorText}`);
+        if (error) {
+          console.error(`Server-side PDF processing failed:`, error);
+          throw new Error(`Server-side PDF processing failed: ${error.message}`);
         }
-        
-        const data = await response.json();
         
         if (!data || (!data.text && !data.success)) {
           throw new Error("No text extracted from PDF");
