@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
@@ -65,7 +64,10 @@ export const useDocumentSelection = () => {
 
   // Modified to return a Promise explicitly
   const refreshDocuments = useCallback(async () => {
-    return fetchDocuments();
+    await fetchDocuments();
+    // Keep this to reset selection when refreshing
+    setSelectedDocumentIds([]);
+    return;
   }, []);
 
   // Fetch documents on mount

@@ -28,7 +28,7 @@ export const useDatabaseExtraction = (
     console.log("Documents to process:", documentsToProcess?.length || 0);
     
     // Validate selected documents
-    if (documentsToProcess.length === 0) {
+    if (!extractAllDocuments && selectedDocumentIds.length === 0) {
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
@@ -41,6 +41,16 @@ export const useDatabaseExtraction = (
       toast({
         title: "No Documents Available",
         description: "There are no documents in the database",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Explicitly check if documentsToProcess is empty
+    if (documentsToProcess.length === 0) {
+      toast({
+        title: "No Documents to Process",
+        description: "No valid documents were selected for processing",
         variant: "destructive"
       });
       return;
@@ -65,16 +75,6 @@ export const useDatabaseExtraction = (
       // Determine which documents to process
       const docsToProcess = documentsToProcess;
       console.log("Final documents to process:", docsToProcess);
-      
-      if (docsToProcess.length === 0) {
-        setIsExtracting(false);
-        toast({
-          title: "No Documents to Process",
-          description: "No valid documents were found for processing",
-          variant: "destructive"
-        });
-        return;
-      }
       
       let combinedText = "";
       let processedCount = 0;

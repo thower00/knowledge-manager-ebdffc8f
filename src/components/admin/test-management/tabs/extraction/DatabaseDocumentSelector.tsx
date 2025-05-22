@@ -80,7 +80,7 @@ export const DatabaseDocumentSelector = ({
                 <Checkbox 
                   id="select-all" 
                   checked={selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0}
-                  onCheckedChange={() => toggleSelectAll()}
+                  onCheckedChange={toggleSelectAll}
                 />
                 <Label htmlFor="select-all" className="cursor-pointer">Select All Documents</Label>
               </div>
