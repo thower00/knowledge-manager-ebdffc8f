@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Simple PDF text extraction function
+// Improved PDF text extraction function
 async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
@@ -24,47 +24,120 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Simple text extraction from binary data
-    // This is a simplified approach since we can't use PDF.js directly in Deno
-    const pdfBytes = atob(base64Data);
-    
-    // Find text markers in the PDF binary
-    // This is a very simplified approach - in production you would use a proper PDF library
-    // that's compatible with Deno/Edge Functions
-    let extractedText = "";
-    let pageCount = 0;
+    // Decode the base64 data
+    let pdfBytes;
+    try {
+      pdfBytes = atob(base64Data);
+      console.log(`Successfully decoded base64 data, length: ${pdfBytes.length} bytes`);
+    } catch (decodeError) {
+      console.error("Error decoding base64 data:", decodeError);
+      return {
+        text: "Error decoding PDF data: " + decodeError.message,
+        success: false,
+        error: "Base64 decoding failed"
+      };
+    }
     
     // Count PDF pages (very approximate)
     const pageMarkers = pdfBytes.match(/\/Page\s*<<.*?>>/g);
-    if (pageMarkers) {
-      pageCount = pageMarkers.length;
-    } else {
-      // Fallback estimate
-      pageCount = Math.max(1, Math.floor(pdfBytes.length / 5000));
-    }
-    
+    let pageCount = pageMarkers ? pageMarkers.length : Math.max(1, Math.floor(pdfBytes.length / 5000));
     console.log(`Estimated ${pageCount} pages in document`);
     
-    // Extract some text from the PDF (very simplified approach)
-    const textMatches = pdfBytes.match(/\(([^)]+)\)/g);
-    if (textMatches) {
-      const processedMatches = textMatches
-        .slice(0, 1000) // Limit processing to avoid timeouts
-        .map(match => match.substring(1, match.length - 1))
-        .filter(text => /[a-zA-Z0-9]/.test(text)); // Only keep text with alphanumeric chars
+    // IMPROVED TEXT EXTRACTION - Add multiple patterns for different PDF encoding types
+    let extractedText = "";
+    
+    // Pattern 1: Look for text streams
+    const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
+    const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
+    
+    if (textStreams && textStreams.length > 0) {
+      console.log(`Found ${textStreams.length} text streams`);
       
-      extractedText = processedMatches.join(" ");
+      // Take the longest streams as they likely contain the main text
+      const sortedStreams = textStreams
+        .map(match => match[1])
+        .filter(stream => stream.length > 50)
+        .sort((a, b) => b.length - a.length)
+        .slice(0, 10); // Take top 10 longest streams
+      
+      if (sortedStreams.length > 0) {
+        extractedText = sortedStreams.join("\n\n");
+      }
     }
     
-    // If we couldn't extract text using the above method, use a more aggressive pattern
-    if (!extractedText || extractedText.length < 50) {
-      // Try another pattern for text extraction
-      const anotherPattern = /(\w+[\s,.]){3,}/g;
-      const moreMatches = pdfBytes.match(anotherPattern);
-      
-      if (moreMatches && moreMatches.length > 0) {
-        extractedText = moreMatches.join(" ");
+    // Pattern 2: Look for text objects in parentheses
+    if (!extractedText || extractedText.length < 100) {
+      const textMatches = pdfBytes.match(/\(([^)]+)\)/g);
+      if (textMatches && textMatches.length > 0) {
+        console.log(`Found ${textMatches.length} text matches in parentheses`);
+        
+        // Filter and clean text
+        const processedMatches = textMatches
+          .map(match => {
+            try {
+              // Remove the surrounding parentheses
+              return match.substring(1, match.length - 1)
+                // Handle basic PDF text encoding
+                .replace(/\\n/g, '\n')
+                .replace(/\\r/g, '')
+                .replace(/\\\\/g, '\\')
+                .replace(/\\t/g, '\t');
+            } catch (e) {
+              return '';
+            }
+          })
+          .filter(text => /[a-zA-Z0-9]/.test(text) && text.length > 2);
+        
+        // Join text with spaces, but try to detect words that should be together
+        let joinedText = "";
+        let prevTextEndsWithWordBreak = true;
+        
+        for (const text of processedMatches) {
+          const startsWithWordBreak = /^[.,;:!? ]/.test(text);
+          
+          if (!prevTextEndsWithWordBreak && !startsWithWordBreak) {
+            joinedText += " " + text;
+          } else {
+            joinedText += text;
+          }
+          
+          prevTextEndsWithWordBreak = /[.,;:!? ]$/.test(text);
+        }
+        
+        extractedText = joinedText;
       }
+    }
+    
+    // Pattern 3: Try another approach with word boundaries if previous methods didn't yield good results
+    if (!extractedText || extractedText.length < 100) {
+      const wordPattern = /(\w{3,})/g;
+      const words = pdfBytes.match(wordPattern);
+      
+      if (words && words.length > 0) {
+        console.log(`Found ${words.length} potential words`);
+        
+        // Filter for likely actual words (not binary data)
+        const likelyWords = words.filter(word => 
+          /^[a-zA-Z0-9]{3,}$/.test(word) && 
+          !/^[0-9]+$/.test(word)
+        );
+        
+        if (likelyWords.length > 0) {
+          extractedText = likelyWords.join(" ");
+        }
+      }
+    }
+    
+    // If we still couldn't extract meaningful text, return a helpful error
+    if (!extractedText || extractedText.length < 50) {
+      console.log("Couldn't extract meaningful text using standard methods");
+      return {
+        text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
+        success: false,
+        error: "Text extraction failed",
+        totalPages: pageCount,
+        processedPages: 0
+      };
     }
     
     // Determine how many pages to process based on options
@@ -73,18 +146,22 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     // Create a structured response
     const processedPages = [];
     for (let i = 1; i <= maxPages; i++) {
-      // In a real implementation, we'd extract text per page
       processedPages.push({
         pageNumber: i,
         text: `Page ${i} content`
       });
     }
     
-    // Format the text with page numbers
+    // Split extracted text into pages (approximate)
+    const textPerPage = Math.max(Math.floor(extractedText.length / maxPages), 500);
     let formattedText = "";
+    
     for (let i = 1; i <= maxPages; i++) {
-      formattedText += `--- Page ${i} ---\n`;
-      formattedText += extractedText + `\n\n`;
+      const startPos = (i - 1) * textPerPage;
+      const endPos = i === maxPages ? extractedText.length : i * textPerPage;
+      const pageText = extractedText.substring(startPos, endPos);
+      
+      formattedText += `--- Page ${i} ---\n${pageText}\n\n`;
     }
     
     // Add footer if we limited the pages
@@ -93,7 +170,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     }
     
     return {
-      text: formattedText || "No text could be extracted",
+      text: formattedText || "No text could be extracted. The PDF may be image-based or secured.",
       pages: processedPages,
       totalPages: pageCount,
       processedPages: maxPages,
@@ -102,7 +179,12 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     };
   } catch (error) {
     console.error("Error extracting text:", error);
-    throw error;
+    return {
+      text: `Error extracting text: ${error.message || "Unknown error"}`,
+      success: false,
+      error: error.message,
+      available: true
+    };
   }
 }
 
