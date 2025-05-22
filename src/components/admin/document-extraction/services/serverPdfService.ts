@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
@@ -90,37 +89,82 @@ export async function extractPdfTextServerSide(
         if (typeof data.text === 'string') {
           console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
           
-          // Clean up binary/corrupted text - apply text cleaning to remove binary characters
+          // Enhanced binary data cleaning - apply more aggressive filtering
           let cleanedText = data.text;
           
           // Check if the text appears to contain binary data (common indicators)
           const hasBinaryIndicators = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\xAD\u0600-\u0605\u061C\u06DD\u070F\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB]/.test(cleanedText) ||
-                                    cleanedText.includes('Ý') || 
-                                    cleanedText.includes('î') || 
-                                    cleanedText.includes('ò') || 
-                                    cleanedText.includes('ô');
+                                    /[Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³]/.test(cleanedText) ||
+                                    cleanedText.includes('�');
                                     
-          if (hasBinaryIndicators) {
-            console.log("Detected possible binary content, cleaning text...");
+          if (hasBinaryIndicators || true) { // Always clean the text as a safety measure
+            console.log("Detected possible binary content, applying aggressive cleaning...");
             
-            // Replace non-printable and non-ASCII characters with spaces
+            // Multi-step cleaning approach
+            // Step 1: First attempt - keep only ASCII printable and common whitespace
             cleanedText = cleanedText
-              .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only printable ASCII chars and line breaks
+              .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Replace non-ASCII with spaces
               .replace(/\s+/g, ' ')                 // Collapse multiple whitespace
               .trim();
-
-            // If most of the text was binary, it's possible the cleanup left very little content
-            if (cleanedText.length < data.text.length * 0.1) {
-              console.warn("Cleaning removed most of the text content, original might be heavily binary");
               
-              // Try more aggressive filtering to extract readable content
+            console.log(`After initial cleaning: ${cleanedText.length} chars remain`);
+            
+            // Step 2: If most of the text was lost, try extracting only words with letters
+            if (cleanedText.length < data.text.length * 0.1 || cleanedText.length < 500) {
+              console.log("First cleaning removed too much content, trying word extraction approach");
+              
+              // Extract words that contain at least one letter (more permissive)
               const words = data.text.split(/\s+/)
-                .filter(word => /^[A-Za-z0-9.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]+$/.test(word) && word.length >= 2)
+                .filter(word => /[a-zA-Z]/.test(word) && word.length >= 2)
                 .join(' ');
                 
               if (words.length > cleanedText.length) {
                 cleanedText = words;
+                console.log(`Word extraction approach recovered more text: ${cleanedText.length} chars`);
               }
+            }
+            
+            // Step 3: Check if we still have viable text, otherwise use even more permissive approach
+            if (cleanedText.length < 500) {
+              console.log("Still insufficient text, using character frequency analysis");
+              
+              // Count characters to find the most common ones (likely to be valid text)
+              const charCount = new Map();
+              for (const char of data.text) {
+                charCount.set(char, (charCount.get(char) || 0) + 1);
+              }
+              
+              // Keep only the most common characters that appear to be text
+              const commonChars = [...charCount.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .filter(([char]) => {
+                  const code = char.charCodeAt(0);
+                  return (code >= 32 && code <= 126) || // ASCII printable
+                         code === 10 || code === 13 || code === 9; // Line breaks and tab
+                })
+                .slice(0, 50) // Take top 50 most common characters
+                .map(([char]) => char);
+                
+              // Create a set for faster lookups
+              const validChars = new Set(commonChars);
+              
+              // Filter the text to keep only these common characters
+              cleanedText = data.text
+                .split('')
+                .map(char => validChars.has(char) ? char : ' ')
+                .join('')
+                .replace(/\s+/g, ' ')
+                .trim();
+                
+              console.log(`Character frequency approach produced: ${cleanedText.length} chars`);
+            }
+            
+            // Final verification - if we don't have enough meaningful content, provide a fallback message
+            if (cleanedText.length < 200 || !/[a-zA-Z]{2,}/.test(cleanedText)) {
+              console.warn("Failed to extract readable text content after multiple cleaning attempts");
+              
+              // Return a helpful fallback message
+              return `The document appears to contain mainly binary or encoded data that could not be converted to readable text.\n\nThis may indicate one of the following issues:\n- The document may be a scan-based PDF without embedded text\n- The PDF may have unusual encoding or compression\n- The document might be password-protected or have security restrictions\n\nPlease try with a different document or use OCR software to extract the text first.`;
             }
             
             console.log(`Text cleaned: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);

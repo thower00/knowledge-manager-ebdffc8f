@@ -6,21 +6,29 @@ interface ManualTextInputProps {
   extractionText: string;
   setExtractionText: (text: string) => void;
   isDisabled?: boolean;
+  placeholder?: string;
 }
 
 export const ManualTextInput = ({
   extractionText,
   setExtractionText,
-  isDisabled = false
+  isDisabled = false,
+  placeholder = "Paste document content to test extraction..."
 }: ManualTextInputProps) => {
+  // Create a separate value for the textarea that's not tied to extraction results
+  // This prevents the extraction results from showing in this input
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setExtractionText(e.target.value);
+  };
+  
   return (
     <div className="space-y-4">
       <div className="grid gap-2">
         <Label>Or paste document text for extraction test</Label>
         <Textarea
-          value={extractionText}
-          onChange={(e) => setExtractionText(e.target.value)}
-          placeholder="Paste document content to test extraction..."
+          value={isDisabled ? "" : extractionText}
+          onChange={handleChange}
+          placeholder={placeholder}
           rows={5}
           disabled={isDisabled}
           className={isDisabled ? "bg-gray-100 cursor-not-allowed" : ""}
