@@ -58,7 +58,9 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     // Progressive extraction states
     pagesProcessed,
     totalPages,
-    isProgressiveMode
+    isProgressiveMode,
+    // Status message
+    extractionStatus
   } = useDocumentExtraction({ onRunTest });
 
   // Function to handle retry based on current context
@@ -134,6 +136,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             isProgressiveMode={isProgressiveMode}
             pagesProcessed={pagesProcessed}
             totalPages={totalPages}
+            status={extractionStatus}
           />
         )}
         

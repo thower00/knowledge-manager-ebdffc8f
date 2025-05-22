@@ -4,6 +4,7 @@ interface ExtractionProgressProps {
   isProgressiveMode?: boolean;
   pagesProcessed?: number;
   totalPages?: number;
+  status?: string;
 }
 
 export const ExtractionProgress = ({
@@ -11,6 +12,7 @@ export const ExtractionProgress = ({
   isProgressiveMode,
   pagesProcessed,
   totalPages,
+  status,
 }: ExtractionProgressProps) => {
   return (
     <div className="mt-2 space-y-2">
@@ -24,9 +26,13 @@ export const ExtractionProgress = ({
         {isProgressiveMode && pagesProcessed !== undefined && totalPages ? (
           <>
             Processing page {pagesProcessed} of {totalPages} ({extractionProgress}% complete)
+            {status && <span className="block mt-1 italic">{status}</span>}
           </>
         ) : (
-          <>{extractionProgress}% complete</>
+          <>
+            {extractionProgress}% complete
+            {status && <span className="block mt-1 italic">{status}</span>}
+          </>
         )}
       </p>
     </div>

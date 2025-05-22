@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
@@ -15,7 +16,7 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   const [extractionOptions, setExtractionOptions] = useState<ExtractionOptionsType>({
     extractFirstPagesOnly: false,
     pageLimit: 10,
-    timeout: 90,
+    timeout: 30, // Decreased from 90 to 30 seconds
     extractionMode: "progressive" // Default to progressive mode
   });
 
@@ -84,6 +85,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     pagesProcessed: extractionProcess.pagesProcessed,
     totalPages: extractionProcess.totalPages,
     isProgressiveMode: extractionProcess.isProgressiveMode,
+    
+    // Status message
+    extractionStatus: extractionProcess.extractionStatus,
     
     // Extraction handlers
     handleExtractFromUrl,
