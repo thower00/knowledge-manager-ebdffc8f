@@ -29,6 +29,7 @@ export async function extractPdfTextServerSide(
       base64Data = btoa(
         new Uint8Array(documentData).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
+      console.log(`Successfully converted base64 to ArrayBuffer, size: ${documentData.byteLength}`);
     } else {
       // If it's already a base64 string
       base64Data = documentData;
@@ -47,7 +48,7 @@ export async function extractPdfTextServerSide(
         console.log(`Attempt ${currentRetry + 1}: Calling server-side PDF processing function with options:`, options);
         
         // Use a shorter timeout to avoid UI hanging too long
-        const effectiveTimeout = Math.min(options?.timeout || 45, 45); // Cap at 45 seconds
+        const effectiveTimeout = Math.min(options?.timeout || 30, 30); // Cap at 30 seconds
         
         // Prepare request data
         const requestData = {
@@ -55,7 +56,8 @@ export async function extractPdfTextServerSide(
           options: {
             ...options,
             timeout: effectiveTimeout,
-            forceTextMode: true // Force text-only extraction to avoid binary data
+            forceTextMode: true, // Force text-only extraction to avoid binary data
+            disableBinaryOutput: true // New option to prevent binary data in output
           },
           timestamp: Date.now(),  // Add timestamp to avoid caching issues
           nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
@@ -90,7 +92,7 @@ export async function extractPdfTextServerSide(
         if (typeof data.text === 'string') {
           console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
           
-          // Full text cleaning function to ensure we have readable text, not binary
+          // Apply improved text cleaning to prevent binary display issues
           const cleanedText = ensureReadableText(data.text);
           
           // Log the cleaning results
@@ -139,7 +141,7 @@ function ensureReadableText(text: string): string {
   const originalText = text;
   
   try {
-    // STRATEGY 1: Basic binary data removal
+    // STRATEGY 1: Basic binary data removal - more aggressive than before
     let cleanedText = text
       .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
       .replace(/[^\x20-\x7E\r\n\t]/g, ' ')                    // Keep ASCII printable
@@ -150,24 +152,27 @@ function ensureReadableText(text: string): string {
     console.log(`Strategy 1 result: ${cleanedText.length} chars`);
       
     // If we still have sufficient text, use this version
-    if (cleanedText.length > originalText.length * 0.5 && cleanedText.length > 500) {
+    if (cleanedText.length > originalText.length * 0.4 && cleanedText.length > 300) {
       return cleanedText;
     }
     
-    // STRATEGY 2: Extract words that contain letters
+    // STRATEGY 2: Extract words that contain letters - focus on meaningful words
     console.log("Strategy 1 removed too much text, trying word extraction...");
     const words = originalText.split(/\s+/)
-      .filter(word => /[a-zA-Z]/.test(word) && word.length >= 2)
+      .filter(word => {
+        // Only keep words with letters and minimum length
+        return /[a-zA-Z]{2,}/.test(word) && word.length >= 2;
+      })
       .join(' ');
       
     console.log(`Strategy 2 result: ${words.length} chars`);
       
-    if (words.length > 500) {
+    if (words.length > 300) {
       return words;
     }
     
-    // STRATEGY 3: Character frequency analysis for extreme cases
-    console.log("Strategy 2 insufficient, using character frequency analysis...");
+    // STRATEGY 3: Character frequency analysis - even more aggressive
+    console.log("Strategy 2 insufficient, using enhanced character frequency analysis...");
     
     // Count character frequencies
     const charCount = new Map();
@@ -175,20 +180,18 @@ function ensureReadableText(text: string): string {
       charCount.set(char, (charCount.get(char) || 0) + 1);
     }
     
-    // Get the most common printable characters
+    // Get all printable ASCII characters
     const commonChars = [...charCount.entries()]
-      .sort((a, b) => b[1] - a[1])
       .filter(([char]) => {
         const code = char.charCodeAt(0);
         return (code >= 32 && code <= 126) || code === 10 || code === 13; // ASCII + line breaks
       })
-      .slice(0, 75) // Take top 75 most common characters
-      .map(([char]) => char);
+      .sort((a, b) => b[1] - a[1]); // Sort by frequency
       
-    // Make a set for faster lookups
-    const validChars = new Set(commonChars);
+    // Make a set for faster lookups - use more characters
+    const validChars = new Set(commonChars.map(([char]) => char));
     
-    // Keep only the common characters
+    // Keep only the valid characters
     cleanedText = originalText
       .split('')
       .map(char => validChars.has(char) ? char : ' ')
@@ -198,25 +201,36 @@ function ensureReadableText(text: string): string {
       
     console.log(`Strategy 3 result: ${cleanedText.length} chars`);
       
-    if (cleanedText.length > 200) {
+    if (cleanedText.length > 100) {
       return cleanedText;
     }
     
-    // STRATEGY 4: Last resort - extract anything that looks like text
-    console.log("Strategy 3 insufficient, using regex pattern matching as last resort...");
+    // STRATEGY 4: Last resort - extract anything that looks like words with regex
+    console.log("Using regex pattern matching as last resort...");
     
-    // Extract all sequences that look like words
-    const textMatches = originalText.match(/[a-zA-Z0-9][a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]{2,}/g) || [];
+    // Extract sequences that look like words with more aggressive pattern
+    const textMatches = originalText.match(/[a-zA-Z][a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]{2,}/g) || [];
     const extractedText = textMatches.join(' ');
     
     console.log(`Strategy 4 result: ${extractedText.length} chars`);
     
-    if (extractedText.length > 100) {
+    if (extractedText.length > 50) {
       return extractedText;
     }
     
-    // If all strategies failed, return a helpful error message
-    return "The document appears to contain mainly binary or encoded data that could not be converted to readable text. The PDF might be scan-based without embedded text or have security restrictions.";
+    // If all else fails, attempt one more with pure ASCII filtering
+    const asciiOnly = originalText.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                             .replace(/\s+/g, ' ')
+                             .trim();
+                             
+    console.log(`ASCII-only filtering result: ${asciiOnly.length} chars`);
+    
+    if (asciiOnly.length > 50) {
+      return asciiOnly;
+    }
+    
+    // If all else fails, return a helpful error message
+    return "Could not extract readable text from this document. The PDF might contain only scanned images without embedded text or have security restrictions.";
   } catch (error) {
     console.error("Error during text cleaning:", error);
     return "Error cleaning text from document. The extracted content may be in a format that cannot be properly displayed.";
@@ -253,6 +267,7 @@ export async function fetchAndExtractPdfServerSide(
     let documentData: ArrayBuffer;
     try {
       documentData = await fetchDocumentViaProxy(convertedUrl, documentTitle);
+      console.log(`Successfully converted base64 to ArrayBuffer, size: ${documentData.byteLength}`);
     } catch (proxyError) {
       console.error("Error fetching document via proxy:", proxyError);
       throw new Error(`Failed to fetch document: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`);

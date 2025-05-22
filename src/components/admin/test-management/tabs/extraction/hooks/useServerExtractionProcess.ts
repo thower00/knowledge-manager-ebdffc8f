@@ -21,6 +21,9 @@ export const useServerExtractionProcess = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [isProgressiveMode, setIsProgressiveMode] = useState(true);
   
+  // Track if extraction has been completed
+  const extractionCompletedRef = useRef(false);
+  
   const { toast } = useToast();
 
   // Effect to clear timeout on unmount
@@ -87,36 +90,42 @@ export const useServerExtractionProcess = () => {
       window.clearTimeout(timeoutId);
     }
     
+    // Reset the extraction completed flag
+    extractionCompletedRef.current = false;
+    
     // Convert seconds to milliseconds
     const timeoutValue = timeoutSeconds * 1000;
     
     // Create a new timeout - add a small buffer to the server timeout
     const newTimeoutId = window.setTimeout(() => {
-      console.error(`Extraction timeout reached for document: ${documentTitle}`);
+      console.log(`Extraction timeout reached for document: ${documentTitle}`);
       
-      // Don't reset extraction state if we have text but may have timed out
-      // This allows seeing partial results
-      const hasPartialResults = extractionText && extractionText.length > 0;
-      
-      if (!hasPartialResults) {
-        // Reset extraction state only if we have no results
-        setIsExtracting(false);
-        setExtractionProgress(0);
-      } else {
-        // Mark as complete but with a warning if we have partial results
-        setIsExtracting(false);
-        setExtractionProgress(100);
+      // Only show timeout error if extraction hasn't been marked as completed
+      if (!extractionCompletedRef.current) {
+        // Don't reset extraction state if we have text but may have timed out
+        // This allows seeing partial results
+        const hasPartialResults = extractionText && extractionText.length > 0;
+        
+        if (!hasPartialResults) {
+          // Reset extraction state only if we have no results
+          setIsExtracting(false);
+          setExtractionProgress(0);
+        } else {
+          // Mark as complete but with a warning if we have partial results
+          setIsExtracting(false);
+          setExtractionProgress(100);
+        }
+        
+        // Set error message
+        setExtractionError(`Extraction timed out after ${timeoutSeconds} seconds. The server might be overloaded or the PDF might be too complex.${hasPartialResults ? " Partial results are shown." : ""}`);
+        
+        // Show toast to user
+        toast({
+          title: "Extraction Timeout",
+          description: `The extraction process for "${documentTitle}" took too long and was terminated.${hasPartialResults ? " Partial results are available." : ""}`,
+          variant: "destructive"
+        });
       }
-      
-      // Set error message
-      setExtractionError(`Extraction timed out after ${timeoutSeconds} seconds. The server might be overloaded or the PDF might be too complex.${hasPartialResults ? " Partial results are shown." : ""}`);
-      
-      // Show toast to user
-      toast({
-        title: "Extraction Timeout",
-        description: `The extraction process for "${documentTitle}" took too long and was terminated.${hasPartialResults ? " Partial results are available." : ""}`,
-        variant: "destructive"
-      });
     }, timeoutValue);
     
     setTimeoutId(newTimeoutId);
@@ -130,6 +139,8 @@ export const useServerExtractionProcess = () => {
       window.clearTimeout(timeoutId);
       setTimeoutId(null);
     }
+    // Mark extraction as completed
+    extractionCompletedRef.current = true;
   };
 
   // Extract text from a single document with options
@@ -153,7 +164,7 @@ export const useServerExtractionProcess = () => {
       const timeoutValue = options?.timeout || 60;
       
       // Create client-side timeout that's a little longer than server-side
-      createExtractionTimeout(document.title, timeoutValue + 5);
+      createExtractionTimeout(document.title, timeoutValue + 15); // Increased timeout buffer
       
       // Extract text using our server-side solution
       console.log(`Starting server-side extraction for document: ${document.title}`);
@@ -186,38 +197,17 @@ export const useServerExtractionProcess = () => {
           }
         );
         
-        // If we got text but it appears to be binary/corrupted
-        if (text && (text.includes('Ý') || text.includes('î') || text.includes('ò') || text.includes('ô'))) {
-          console.warn("Extracted text appears to be binary/encoded content");
-          
-          // Try to clean up the text - remove obvious binary segments
-          const cleanedText = text
-            .replace(/[^\x20-\x7E\n\r\t]/g, ' ')  // Replace non-ASCII with spaces
-            .replace(/\s+/g, ' ')                 // Collapse whitespace
-            .trim();
-          
-          if (cleanedText.length > 100) {
-            console.log("Returning cleaned text version");
-            
-            // Clear the timeout since extraction completed successfully
-            clearExtractionTimeout();
-            
-            // Complete the extraction
-            setExtractionProgress(100);
-            setExtractionStatus('Extraction completed with text cleanup');
-            
-            return cleanedText;
-          } else {
-            throw new Error("Extracted text appears to be binary data and could not be properly decoded to readable text");
-          }
-        }
-        
-        // Clear the timeout since extraction completed successfully
+        // Always clear the timeout since extraction completed successfully
         clearExtractionTimeout();
         
-        // Complete the extraction
+        // Mark as complete even if text is empty
         setExtractionProgress(100);
         setExtractionStatus('Extraction completed successfully');
+        
+        if (!text || text.length < 100) {
+          throw new Error("No meaningful text could be extracted from the document.");
+        }
+        
         return text;
       } catch (serverError) {
         console.error("Server-side extraction failed, checking if we have PDF data...", serverError);

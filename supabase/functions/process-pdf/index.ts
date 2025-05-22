@@ -82,6 +82,26 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
           
         console.log(`After cleaning: ${extractedText.length} characters of text remain`);
       }
+      
+      // Apply final aggressive cleaning to guarantee no binary data
+      if (options?.disableBinaryOutput) {
+        extractedText = extractedText
+          .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only ASCII printable chars and line breaks
+          .replace(/\s+/g, ' ')                 // Collapse whitespace
+          .trim();
+        
+        // Extract any words we can find that contain letters
+        const words = extractedText.split(/\s+/)
+          .filter(word => /[a-zA-Z]{2,}/.test(word))
+          .join(' ');
+        
+        // Use word extraction if it gives us meaningful content
+        if (words.length > extractedText.length * 0.3 && words.length > 100) {
+          extractedText = words;
+        }
+        
+        console.log(`Final cleaning complete: ${extractedText.length} characters remain`);
+      }
     } catch (error) {
       console.error("Text extraction error:", error);
       return {
@@ -95,15 +115,6 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     
     // Determine how many pages to process based on options
     const maxPages = options?.maxPages ? Math.min(options.maxPages, pageCount) : pageCount;
-    
-    // Create a structured response
-    const processedPages = [];
-    for (let i = 1; i <= maxPages; i++) {
-      processedPages.push({
-        pageNumber: i,
-        text: `Page ${i} content`
-      });
-    }
     
     // Split extracted text into pages (approximate)
     const textPerPage = Math.max(Math.floor(extractedText.length / maxPages), 500);
@@ -124,7 +135,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     
     return {
       text: formattedText || "No text could be extracted. The PDF may be image-based or secured.",
-      pages: processedPages,
+      pages: [],
       totalPages: pageCount,
       processedPages: maxPages,
       success: true,
@@ -234,7 +245,8 @@ serve(async (req) => {
       maxPages: options.maxPages || "all",
       streamMode: options.streamMode || false,
       timeout: options.timeout || 60,
-      forceTextMode: options.forceTextMode || false
+      forceTextMode: options.forceTextMode || false,
+      disableBinaryOutput: options.disableBinaryOutput || false
     }));
 
     // Process the PDF with a timeout to prevent function timeouts

@@ -1,124 +1,126 @@
 
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ProcessedDocument } from "@/types/document";
+import { useDocumentSelection } from "./useDocumentSelection";
+import { useUrlValidation } from "./useUrlValidation";
+import { useServerExtractionProcess } from "./useServerExtractionProcess";
 import { ExtractionOptionsType } from "../ExtractionOptions";
+import { sleep } from "@/lib/utils";
 
-// Define the types for the extraction process interface
-interface ExtractionProcess {
-  isExtracting: boolean;
-  setIsExtracting: (value: boolean) => void;
-  extractionProgress: number;
-  setExtractionProgress: (value: number) => void;
-  extractionError: string | null;
-  setExtractionError: (value: string | null) => void;
-  extractionText: string;
-  setExtractionText: (value: string) => void;
-  extractFromDocument: (document: ProcessedDocument, options?: ExtractionOptionsType) => Promise<string>;
-  createExtractionTimeout: (documentTitle: string, timeoutSeconds?: number) => number;
-  clearExtractionTimeout: () => void;
-  currentDocumentIndex?: number;
-  setCurrentDocumentIndex: (index: number) => void;
-  abortController?: AbortController | null;
-}
-
-interface UseExtractionHandlersProps {
-  testUrl: string;
-  testUrlValid: boolean;
-  validateUrl: (url: string) => boolean;
-  selectedDocumentIds: string[];
-  extractAllDocuments: boolean;
-  documentsToProcess: ProcessedDocument[];
-  extractionProcess: ExtractionProcess;
-  extractionOptions: ExtractionOptionsType;
-  onRunTest: (data: { extractionText: string, testUrl?: string }) => void;
-}
-
-export const useExtractionHandlers = ({
-  testUrl,
-  testUrlValid,
-  validateUrl,
-  selectedDocumentIds,
-  extractAllDocuments,
-  documentsToProcess,
-  extractionProcess,
-  extractionOptions,
-  onRunTest
-}: UseExtractionHandlersProps) => {
+export const useExtractionHandlers = (
+  onComplete?: (extractedText: string, testUrl?: string) => void
+) => {
+  const [extractionText, setExtractionText] = useState("");
   const { toast } = useToast();
-
+  
+  // Import other hooks
   const {
+    testUrl,
+    setTestUrl,
+    validateUrl,
+    testUrlValid,
+    testUrlError
+  } = useUrlValidation();
+  
+  const {
+    selectedDocumentIds,
+    dbDocuments,
+    isLoadingDocuments,
+    extractAllDocuments,
+    setExtractAllDocuments,
+    toggleDocumentSelection,
+    toggleSelectAll,
+    refreshDocuments,
+    documentsToProcess,
+    currentDocumentIndex
+  } = useDocumentSelection();
+  
+  const {
+    isExtracting,
     setIsExtracting,
-    setExtractionProgress,
+    extractionProgress,
+    extractionError,
     setExtractionError,
-    setExtractionText,
+    proxyConnected,
     extractFromDocument,
-    createExtractionTimeout,
-    clearExtractionTimeout,
-    currentDocumentIndex,
-    setCurrentDocumentIndex
-  } = extractionProcess;
+    checkProxyConnection,
+    setExtractionText: setProcessExtractionText,
+    pagesProcessed,
+    totalPages,
+    isProgressiveMode,
+    extractionStatus
+  } = useServerExtractionProcess();
 
-  // Extract text from a URL
+  // Extract text from URL
   const handleExtractFromUrl = useCallback(async () => {
-    if (!testUrl || !validateUrl(testUrl)) {
+    // Validate URL
+    if (!testUrl) {
+      toast({
+        title: "No URL Provided",
+        description: "Please enter a valid URL",
+        variant: "destructive"
+      });
       return;
     }
     
+    if (!testUrlValid) {
+      toast({
+        title: "Invalid URL",
+        description: testUrlError || "The URL appears to be invalid",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check connection first
     setIsExtracting(true);
-    setExtractionProgress(0);
-    setExtractionError(null);
     
     try {
-      // Extract the document title from the URL for better user feedback
-      const urlObj = new URL(testUrl);
-      const fileName = urlObj.pathname.split('/').pop() || "document.pdf";
+      // Make sure we have a connection to the proxy
+      const isConnected = await checkProxyConnection();
+      if (!isConnected) {
+        setIsExtracting(false);
+        toast({
+          title: "Connection Failed",
+          description: "Could not connect to the document proxy service",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      setExtractionProgress(10);
-      
-      // Create a timeout for this extraction
-      createExtractionTimeout(fileName, extractionOptions.timeout);
-      
-      // Create a mock document object for the URL
-      const urlDocument: ProcessedDocument = {
-        id: 'url-document',
-        title: fileName,
+      // Create a temporary document object with URL
+      const tempDoc = {
+        id: "url-extract",
+        title: "URL Document",
         url: testUrl,
-        source_id: '',
-        source_type: 'url',
-        mime_type: 'application/pdf',
-        status: 'completed',
         created_at: new Date().toISOString(),
-        size: 0
+        author: "URL Extraction",
+        type: "url"
       };
       
-      // Use the extractFromDocument method from the extraction process
-      const text = await extractFromDocument(urlDocument, extractionOptions);
+      // Extract text
+      const extractedText = await extractFromDocument(tempDoc);
       
-      // Clear timeout as extraction completed successfully
-      clearExtractionTimeout();
+      // Update state with results
+      setExtractionText(extractedText);
+      setProcessExtractionText(extractedText);
       
-      // Update the extraction text
-      setExtractionText(text);
+      // Call complete callback if provided
+      if (onComplete) {
+        onComplete(extractedText, testUrl);
+      }
       
-      // Complete the process
-      setExtractionProgress(100);
       toast({
-        title: "Extraction Completed",
-        description: `Successfully extracted text from ${fileName}`,
+        title: "Extraction Complete",
+        description: "Successfully extracted text from URL"
       });
-      
-      // Call the onRunTest callback with the extracted text
-      onRunTest({ extractionText: text, testUrl });
     } catch (error) {
-      // Clear timeout as we have an error
-      clearExtractionTimeout();
+      console.error("Error in URL extraction:", error);
+      setExtractionError(error instanceof Error ? error.message : "Unknown error during extraction");
       
-      console.error("Extraction error:", error);
-      setExtractionError(error instanceof Error ? error.message : String(error));
       toast({
         title: "Extraction Failed",
-        description: error instanceof Error ? error.message : "Failed to extract text from document",
+        description: error instanceof Error ? error.message : "Unknown error during extraction",
         variant: "destructive"
       });
     } finally {
@@ -126,142 +128,184 @@ export const useExtractionHandlers = ({
     }
   }, [
     testUrl, 
-    validateUrl, 
+    testUrlValid, 
+    testUrlError, 
+    checkProxyConnection, 
     extractFromDocument, 
-    setIsExtracting, 
-    setExtractionProgress, 
-    setExtractionText, 
-    setExtractionError, 
-    createExtractionTimeout, 
-    clearExtractionTimeout,
-    extractionOptions, 
+    onComplete, 
     toast, 
-    onRunTest
+    setIsExtracting, 
+    setExtractionError,
+    setProcessExtractionText
   ]);
 
-  // Extract text from selected database documents
+  // Extract text from database documents
   const handleExtractFromDatabase = useCallback(async () => {
-    // If no documents selected or extract all not checked
-    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
+    // Validate selected documents
+    if ((!selectedDocumentIds || selectedDocumentIds.length === 0) && !extractAllDocuments) {
       toast({
-        title: "No Selection",
-        description: "Please select a document or check 'Extract from all documents'",
+        title: "No Documents Selected",
+        description: "Please select at least one document or enable 'Extract All'",
         variant: "destructive"
       });
       return;
     }
     
-    if (documentsToProcess.length === 0) {
+    if (!dbDocuments || dbDocuments.length === 0) {
       toast({
-        title: "No Documents",
-        description: "There are no documents to extract from",
+        title: "No Documents Available",
+        description: "There are no documents in the database",
         variant: "destructive"
       });
       return;
     }
     
+    // Check connection first
     setIsExtracting(true);
-    setExtractionProgress(0);
-    setExtractionError(null);
     
     try {
-      if (documentsToProcess.length === 1) {
-        // Single document extraction
-        const document = documentsToProcess[0];
-        
-        // Create a timeout for this document
-        createExtractionTimeout(document.title, extractionOptions.timeout);
-        
-        const text = await extractFromDocument(document, extractionOptions);
-        
-        // Clear timeout as extraction completed successfully
-        clearExtractionTimeout();
-        
-        setExtractionText(text);
-        
+      // Make sure we have a connection to the proxy
+      const isConnected = await checkProxyConnection();
+      if (!isConnected) {
+        setIsExtracting(false);
         toast({
-          title: "Extraction Completed",
-          description: `Successfully extracted text from ${document.title}`,
+          title: "Connection Failed",
+          description: "Could not connect to the document proxy service",
+          variant: "destructive"
         });
+        return;
+      }
+      
+      // Determine which documents to process
+      const docsToProcess = documentsToProcess;
+      
+      if (docsToProcess.length === 0) {
+        setIsExtracting(false);
+        toast({
+          title: "No Documents to Process",
+          description: "No valid documents were found for processing",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      let combinedText = "";
+      let processedCount = 0;
+      
+      // We'll only process the first document for simplicity
+      const doc = docsToProcess[0];
+      
+      try {
+        // Extract text from this document
+        const extractedText = await extractFromDocument(doc);
         
-        onRunTest({ extractionText: text });
-      } else {
-        // Multiple documents extraction
-        let allText = "";
-        let successCount = 0;
-        let failureCount = 0;
+        // Add header for this document
+        combinedText = `Document: ${doc.title}\n\n${extractedText}`;
+        processedCount++;
         
-        for (let i = 0; i < documentsToProcess.length; i++) {
-          const doc = documentsToProcess[i];
-          setCurrentDocumentIndex(i);
-          
-          try {
-            // Create a timeout for this document
-            createExtractionTimeout(doc.title, extractionOptions.timeout);
-            
-            const text = await extractFromDocument(doc, extractionOptions);
-            
-            // Clear timeout as extraction completed successfully
-            clearExtractionTimeout();
-            
-            allText += `\n\n--- Document: ${doc.title} ---\n\n${text}`;
-            successCount++;
-          } catch (error) {
-            // Clear timeout as we have an error
-            clearExtractionTimeout();
-            
-            failureCount++;
-            allText += `\n\n--- Document: ${doc.title} (FAILED) ---\n\nFailed to extract: ${error instanceof Error ? error.message : String(error)}`;
-          }
-          
-          // Update overall progress
-          setExtractionProgress(Math.floor(((i + 1) / documentsToProcess.length) * 100));
+        // Update state with results
+        setExtractionText(combinedText);
+        setProcessExtractionText(combinedText);
+        
+        // Wait a moment before marking as complete to ensure UI updates
+        await sleep(100);
+        
+        // Call complete callback if provided
+        if (onComplete) {
+          onComplete(combinedText);
         }
+      } catch (docError) {
+        console.error(`Error extracting from document ${doc.title}:`, docError);
         
-        setExtractionText(allText);
+        // Continue with next document, add error note to combined text
+        combinedText += `\n\nError extracting from ${doc.title}: ${docError instanceof Error ? docError.message : "Unknown error"}`;
         
+        // Set extraction error
+        setExtractionError(docError instanceof Error ? docError.message : "Error extracting from document");
+      }
+      
+      if (processedCount === 0) {
         toast({
-          title: "Batch Extraction Completed",
-          description: `Successfully extracted ${successCount} documents, failed ${failureCount}`,
-          variant: successCount > 0 ? "default" : "destructive"
+          title: "Extraction Failed",
+          description: "Could not extract text from any of the selected documents",
+          variant: "destructive"
         });
-        
-        onRunTest({ extractionText: allText });
+      } else {
+        toast({
+          title: "Extraction Complete",
+          description: `Successfully extracted text from ${processedCount} document(s)`
+        });
       }
     } catch (error) {
-      // Clear timeout as we have an error
-      clearExtractionTimeout();
-      
-      console.error("Extraction error:", error);
-      setExtractionError(error instanceof Error ? error.message : String(error));
+      console.error("Error in database extraction:", error);
+      setExtractionError(error instanceof Error ? error.message : "Unknown error during extraction");
       
       toast({
         title: "Extraction Failed",
-        description: error instanceof Error ? error.message : "Failed to extract text from document",
+        description: error instanceof Error ? error.message : "Unknown error during extraction",
         variant: "destructive"
       });
     } finally {
       setIsExtracting(false);
     }
   }, [
-    selectedDocumentIds, 
-    extractAllDocuments, 
-    documentsToProcess, 
+    selectedDocumentIds,
+    extractAllDocuments,
+    dbDocuments,
+    checkProxyConnection,
+    documentsToProcess,
     extractFromDocument,
-    setIsExtracting, 
-    setExtractionProgress, 
-    setExtractionText, 
+    onComplete,
+    toast,
+    setIsExtracting,
     setExtractionError,
-    createExtractionTimeout, 
-    clearExtractionTimeout, 
-    extractionOptions,
-    setCurrentDocumentIndex, 
-    toast, 
-    onRunTest
+    setProcessExtractionText
   ]);
+  
+  // Helper function for sleeping
+  const handleRefresh = useCallback(async () => {
+    await refreshDocuments();
+    await checkProxyConnection();
+  }, [refreshDocuments, checkProxyConnection]);
 
   return {
+    // URL-related state and functions
+    testUrl,
+    setTestUrl,
+    testUrlValid,
+    testUrlError,
+    
+    // Document selection state and functions
+    selectedDocumentIds,
+    dbDocuments,
+    isLoadingDocuments,
+    extractAllDocuments,
+    setExtractAllDocuments,
+    toggleDocumentSelection,
+    toggleSelectAll,
+    refreshDocuments,
+    documentsToProcess,
+    currentDocumentIndex,
+    
+    // Extraction state and functions
+    extractionText,
+    setExtractionText,
+    isExtracting,
+    extractionProgress,
+    extractionError,
+    proxyConnected,
+    
+    // Main extraction functions
     handleExtractFromUrl,
-    handleExtractFromDatabase
+    handleExtractFromDatabase,
+    handleRefresh,
+    
+    // Progressive extraction states
+    pagesProcessed,
+    totalPages,
+    isProgressiveMode,
+    
+    // Status message
+    extractionStatus
   };
 };
