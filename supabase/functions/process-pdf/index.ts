@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 // Define proper CORS headers
@@ -8,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Improved PDF text extraction function
+// Improved PDF text extraction function with better encoding support
 async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
@@ -218,34 +217,160 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       }
     }
     
-    // Method 5: Last resort - try UTF-8 & Latin-1 decoding attempts on binary data
+    // Method 5: Try different encodings on binary data - NEW ENHANCED APPROACH
     if (!extractedText || extractedText.length < 100) {
       try {
-        // Try Latin-1 (ISO-8859-1) decoding which preserves byte values
-        let latinText = "";
-        for (let i = 0; i < pdfBytes.length; i++) {
-          const charCode = pdfBytes.charCodeAt(i) & 0xFF;
-          if (charCode >= 32 && charCode < 127) {
-            latinText += String.fromCharCode(charCode);
-          } else if (charCode === 10 || charCode === 13 || charCode === 9) {
-            latinText += String.fromCharCode(charCode);
-          } else {
-            latinText += ' ';
+        console.log("Using enhanced encoding approach for complex PDFs");
+        
+        // Try multiple encoding approaches
+        
+        // Approach 1: UTF-16BE (often used in PDFs)
+        let utf16Text = "";
+        try {
+          // Extract potential UTF-16BE text
+          const utf16Regex = /0(\w)0(\w)/g;
+          const utf16Matches = [...pdfBytes.matchAll(utf16Regex)];
+          if (utf16Matches && utf16Matches.length > 100) {
+            let chars = [];
+            for (const [_, byte1, byte2] of utf16Matches) {
+              const charCode = parseInt(byte1 + byte2, 16);
+              if (charCode >= 32 && charCode <= 126) {
+                chars.push(String.fromCharCode(charCode));
+              }
+            }
+            utf16Text = chars.join('');
+            
+            // Clean up and filter
+            const words = utf16Text.split(/\s+/).filter(word => word.length >= 3);
+            if (words.length > 50) {
+              extractedText = words.join(' ');
+              console.log("Successfully extracted text using UTF-16BE pattern matching");
+            }
+          }
+        } catch (e) {
+          console.error("UTF-16BE extraction failed", e);
+        }
+        
+        // Approach 2: Latin-1 (ISO-8859-1) decoding with improved character filtering
+        if (!extractedText || extractedText.length < 100) {
+          console.log("Trying Latin-1 decoding with improved filtering");
+          
+          // Process in chunks to handle large documents
+          const chunkSize = 10000;
+          let latinText = "";
+          
+          for (let startPos = 0; startPos < pdfBytes.length; startPos += chunkSize) {
+            const endPos = Math.min(startPos + chunkSize, pdfBytes.length);
+            const chunk = pdfBytes.substring(startPos, endPos);
+            
+            // Better character filtering - keep alphabets, numbers, punctuation
+            let chunkText = "";
+            for (let i = 0; i < chunk.length; i++) {
+              const charCode = chunk.charCodeAt(i) & 0xFF;
+              // Accept common Latin characters, numbers, and punctuation
+              if ((charCode >= 65 && charCode <= 90) ||   // A-Z
+                  (charCode >= 97 && charCode <= 122) ||  // a-z
+                  (charCode >= 48 && charCode <= 57) ||   // 0-9
+                  (charCode === 32) ||                    // space
+                  (charCode >= 33 && charCode <= 46) ||   // punctuation
+                  (charCode === 10) || (charCode === 13) || (charCode === 9)) { // newlines, tab
+                chunkText += String.fromCharCode(charCode);
+              } else {
+                chunkText += ' ';
+              }
+            }
+            
+            // Add to overall text
+            latinText += chunkText;
+          }
+          
+          // Process the latinText to merge words correctly
+          latinText = latinText.replace(/\s+/g, ' ').trim();
+          
+          // Check if we got meaningful text
+          const words = latinText.split(/\s+/).filter(word => 
+            word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
+          );
+          
+          if (words.length > 50) {
+            extractedText = words.join(' ');
+            console.log("Successfully extracted text using improved Latin-1 decoding");
           }
         }
         
-        // Clean up the text
-        latinText = latinText.replace(/\s+/g, ' ')
-                             .split(' ')
-                             .filter(word => word.length > 2 && /[a-zA-Z]{2,}/.test(word))
-                             .join(' ');
-        
-        if (latinText.length > 100) {
-          extractedText = latinText;
-          console.log("Successfully extracted text using Latin-1 decoding");
+        // Approach 3: Unicode code point extraction
+        if (!extractedText || extractedText.length < 100) {
+          console.log("Trying Unicode code point extraction");
+          
+          // Find sequences that might be unicode characters
+          const unicodeMatches = pdfBytes.match(/\\u[0-9a-fA-F]{4}/g);
+          if (unicodeMatches && unicodeMatches.length > 50) {
+            const unicodeText = unicodeMatches
+              .map(u => String.fromCharCode(parseInt(u.substring(2), 16)))
+              .join('');
+              
+            if (unicodeText.length > 100) {
+              extractedText = unicodeText;
+              console.log("Successfully extracted text using Unicode code points");
+            }
+          }
         }
       } catch (e) {
         console.error("Error during encoding conversion:", e);
+      }
+    }
+    
+    // Method 6: Last resort - character frequency analysis
+    if (!extractedText || extractedText.length < 100) {
+      console.log("Trying character frequency analysis as last resort");
+      
+      // Create a frequency map of characters in the document
+      const charFrequency = new Map();
+      for (let i = 0; i < pdfBytes.length; i++) {
+        const char = pdfBytes.charAt(i);
+        charFrequency.set(char, (charFrequency.get(char) || 0) + 1);
+      }
+      
+      // Sort characters by frequency (most common first)
+      const sortedChars = [...charFrequency.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([char, _]) => char);
+      
+      // Keep only the most common characters that look like text
+      const likelyTextChars = sortedChars
+        .filter(char => {
+          const code = char.charCodeAt(0);
+          return (code >= 32 && code <= 126) || // ASCII printable
+                 (code === 9 || code === 10 || code === 13); // Tab, LF, CR
+        })
+        .slice(0, 75); // Keep top 75 most common text characters
+      
+      // Build a set of acceptable characters
+      const validChars = new Set(likelyTextChars);
+      
+      // Extract text using only the most common characters
+      let freqText = "";
+      for (let i = 0; i < pdfBytes.length; i++) {
+        const char = pdfBytes.charAt(i);
+        if (validChars.has(char)) {
+          freqText += char;
+        } else {
+          // Replace with space if not in our accepted set
+          freqText += ' ';
+        }
+      }
+      
+      // Clean up the text
+      freqText = freqText.replace(/\s+/g, ' ').trim();
+      
+      // See if we have enough meaningful words
+      const words = freqText.split(/\s+/).filter(word => 
+        word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
+      );
+      
+      if (words.length > 50) {
+        extractedText = words.join(' ');
+        console.log("Successfully extracted text using character frequency analysis");
       }
     }
     
