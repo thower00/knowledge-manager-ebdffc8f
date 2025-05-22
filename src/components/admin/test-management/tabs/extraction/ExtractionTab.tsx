@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, CheckCircle } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
 import { DatabaseDocumentSelector } from "./DatabaseDocumentSelector";
 import { UrlExtractionInput } from "./UrlExtractionInput";
@@ -57,6 +57,9 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     currentDocumentIndex,
     documentsToProcess,
     processingFunctionAvailable,
+    checkProcessingFunction,
+    checkingProcessingFunction,
+    handleRefresh,
     // Progressive extraction states
     pagesProcessed,
     totalPages,
@@ -85,25 +88,67 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Test Document Extraction</CardTitle>
-        <CardDescription>
-          Verify document text extraction functionality
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Test Document Extraction</CardTitle>
+            <CardDescription>
+              Verify document text extraction functionality
+            </CardDescription>
+          </div>
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isExtracting || checkingProcessingFunction}
+          >
+            {(checkingProcessingFunction) ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-1" />
+            )}
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Server-side processing status */}
-        {!processingFunctionAvailable && (
+        {processingFunctionAvailable === false && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Server-side PDF processing unavailable</AlertTitle>
             <AlertDescription>
-              The server-side PDF processing function isn't responding. Extraction may not work correctly.
-              Try refreshing the page or contact support if this persists.
+              <div className="space-y-2">
+                <p>
+                  The server-side PDF processing function isn't responding. Extraction may not work correctly.
+                  Try refreshing the page or contact support if this persists.
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                    onClick={checkProcessingFunction}
+                    disabled={checkingProcessingFunction}
+                  >
+                    {checkingProcessingFunction ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                        Check Again
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </AlertDescription>
           </Alert>
         )}
         
-        {processingFunctionAvailable && (
+        {processingFunctionAvailable === true && (
           <Alert variant="default" className="bg-green-50 text-green-800 border-green-200">
             <CheckCircle className="h-4 w-4" />
             <AlertTitle>Server-side PDF processing enabled</AlertTitle>
@@ -216,4 +261,4 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       </CardContent>
     </Card>
   );
-};
+}

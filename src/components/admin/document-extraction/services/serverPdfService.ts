@@ -10,8 +10,7 @@ interface ServerPdfExtractionOptions {
 
 /**
  * Extract text from a PDF using the server-side processing function
- * @param documentUrl URL of the document to process
- * @param documentTitle Title of the document (for logging)
+ * @param documentData URL of the document to process
  * @param options Extraction options
  * @returns Extracted text
  */
@@ -37,28 +36,61 @@ export async function extractPdfTextServerSide(
     
     if (progressCallback) progressCallback(20);
     
-    // Call the server-side function
-    console.log("Calling server-side PDF processing function with options:", options);
-    const { data, error } = await supabase.functions.invoke("process-pdf", {
-      body: { 
-        pdfBase64: base64Data,
-        options: options || {}
+    // Add retry mechanism for more reliability
+    const maxRetries = 2;
+    let currentRetry = 0;
+    let lastError: Error | null = null;
+    
+    while (currentRetry <= maxRetries) {
+      try {
+        // Call the server-side function
+        console.log(`Attempt ${currentRetry + 1}: Calling server-side PDF processing function with options:`, options);
+        
+        const { data, error } = await supabase.functions.invoke("process-pdf", {
+          body: { 
+            pdfBase64: base64Data,
+            options: options || {}
+          },
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        });
+        
+        if (error) {
+          console.error("Server-side PDF processing failed:", error);
+          throw new Error(`Server-side PDF processing failed: ${error.message}`);
+        }
+        
+        if (!data || (!data.text && !data.success)) {
+          throw new Error("No text extracted from PDF");
+        }
+        
+        // Report success
+        if (progressCallback) progressCallback(100);
+        
+        return data.text;
+      } catch (error) {
+        console.error(`Attempt ${currentRetry + 1} failed:`, error);
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        if (currentRetry < maxRetries) {
+          // Wait before retrying (with exponential backoff)
+          const delay = Math.pow(2, currentRetry) * 1000;
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          currentRetry++;
+          if (progressCallback) progressCallback(Math.min(20 + currentRetry * 10, 60));
+        } else {
+          // We've exhausted retries
+          throw lastError;
+        }
       }
-    });
-    
-    if (error) {
-      console.error("Server-side PDF processing failed:", error);
-      throw new Error(`Server-side PDF processing failed: ${error.message}`);
     }
     
-    if (!data || !data.text) {
-      throw new Error("No text extracted from PDF");
-    }
-    
-    // Report success
-    if (progressCallback) progressCallback(100);
-    
-    return data.text;
+    // This should never happen due to the throw in the else block above
+    throw lastError || new Error("Unknown error processing PDF");
   } catch (error) {
     console.error("Error in server-side PDF extraction:", error);
     throw error;

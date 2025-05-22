@@ -25,29 +25,40 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   const extractionProcess = useServerExtractionProcess();
   
   // First, check if the server-side processing function is available
-  const [processingFunctionAvailable, setProcessingFunctionAvailable] = useState<boolean>(false);
+  const [processingFunctionAvailable, setProcessingFunctionAvailable] = useState<boolean | null>(null);
+  const [checkingProcessingFunction, setCheckingProcessingFunction] = useState<boolean>(false);
+  
+  const checkProcessingFunction = async () => {
+    if (checkingProcessingFunction) return;
+    
+    try {
+      setCheckingProcessingFunction(true);
+      
+      // Try to invoke the function with a minimal request to check if it exists
+      const { data, error } = await supabase.functions.invoke("process-pdf", {
+        body: { checkAvailability: true },
+        headers: {
+          'Cache-Control': 'no-cache',
+          'X-Check-Availability': 'true'
+        }
+      });
+      
+      if (error) {
+        console.warn("Server-side PDF processing function check failed:", error);
+        setProcessingFunctionAvailable(false);
+      } else {
+        console.log("Server-side PDF processing function is available:", data);
+        setProcessingFunctionAvailable(true);
+      }
+    } catch (error) {
+      console.warn("Error checking PDF processing function:", error);
+      setProcessingFunctionAvailable(false);
+    } finally {
+      setCheckingProcessingFunction(false);
+    }
+  };
   
   useEffect(() => {
-    const checkProcessingFunction = async () => {
-      try {
-        // Try to invoke the function with a minimal request to check if it exists
-        const { data, error } = await supabase.functions.invoke("process-pdf", {
-          body: { checkAvailability: true }
-        });
-        
-        if (error) {
-          console.warn("Server-side PDF processing function check failed:", error);
-          setProcessingFunctionAvailable(false);
-        } else {
-          console.log("Server-side PDF processing function is available");
-          setProcessingFunctionAvailable(true);
-        }
-      } catch (error) {
-        console.warn("Error checking PDF processing function:", error);
-        setProcessingFunctionAvailable(false);
-      }
-    };
-    
     checkProcessingFunction();
   }, []);
 
@@ -78,6 +89,13 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       extractionProcess.clearExtractionTimeout();
     };
   }, []);
+  
+  // Handle refresh
+  const handleRefresh = async () => {
+    await checkProcessingFunction();
+    await extractionProcess.checkProxyConnection();
+    await documentSelection.fetchDocuments();
+  };
 
   // Return all the properties and methods needed by the component
   return {
@@ -104,6 +122,8 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     
     // Server-side processing availability
     processingFunctionAvailable,
+    checkProcessingFunction,
+    checkingProcessingFunction,
     
     // Extraction process
     isExtracting: extractionProcess.isExtracting,
@@ -121,6 +141,9 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     
     // Status message
     extractionStatus: extractionProcess.extractionStatus,
+    
+    // Refresh handler
+    handleRefresh,
     
     // Extraction handlers
     handleExtractFromUrl,
