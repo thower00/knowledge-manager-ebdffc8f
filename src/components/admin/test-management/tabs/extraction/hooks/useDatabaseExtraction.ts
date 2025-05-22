@@ -22,10 +22,22 @@ export const useDatabaseExtraction = (
   // Extract text from database documents
   const handleExtractFromDatabase = useCallback(async () => {
     // Log selection state to help debugging
-    console.log("Selected document IDs:", selectedDocumentIds);
-    console.log("Extract All Documents flag:", extractAllDocuments);
-    console.log("Available documents:", dbDocuments?.length || 0);
-    console.log("Documents to process:", documentsToProcess?.length || 0);
+    console.log("handleExtractFromDatabase called with state:", {
+      selectedDocumentIds,
+      extractAllDocuments,
+      dbDocumentsCount: dbDocuments?.length || 0,
+      documentsToProcessCount: documentsToProcess?.length || 0
+    });
+    
+    // Safety checks
+    if (!dbDocuments || dbDocuments.length === 0) {
+      toast({
+        title: "No Documents Available",
+        description: "There are no documents in the database",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Validate selected documents
     if (!extractAllDocuments && selectedDocumentIds.length === 0) {
@@ -37,17 +49,17 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    if (!dbDocuments || dbDocuments.length === 0) {
-      toast({
-        title: "No Documents Available",
-        description: "There are no documents in the database",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Verify documentsToProcess directly
+    const docsToProcess = extractAllDocuments ? dbDocuments : 
+                         dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
     
-    // Explicitly check if documentsToProcess is empty
-    if (documentsToProcess.length === 0) {
+    console.log("Final documents computation:", {
+      extractAll: extractAllDocuments,
+      selectedIds: selectedDocumentIds,
+      computed: docsToProcess.length
+    });
+    
+    if (docsToProcess.length === 0) {
       toast({
         title: "No Documents to Process",
         description: "No valid documents were selected for processing",
@@ -72,25 +84,11 @@ export const useDatabaseExtraction = (
         return;
       }
       
-      // Verify documents to process (double-check to prevent errors)
-      if (documentsToProcess.length === 0) {
-        setIsExtracting(false);
-        toast({
-          title: "No Documents to Process",
-          description: "No valid documents were found for processing",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Log what we're about to process
-      console.log("Final documents to process:", documentsToProcess);
-      
       let combinedText = "";
       let processedCount = 0;
       
-      // We'll only process the first document for simplicity
-      const doc = documentsToProcess[0];
+      // Get the first document for extraction
+      const doc = docsToProcess[0];
       
       if (!doc) {
         setIsExtracting(false);

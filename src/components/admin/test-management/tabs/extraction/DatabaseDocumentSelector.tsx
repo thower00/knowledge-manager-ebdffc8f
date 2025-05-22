@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText, AlertTriangle } from "lucide-react";
+import { Loader2, FileText, AlertTriangle, Info } from "lucide-react";
 import { ProcessedDocument } from "@/types/document";
 
 interface DatabaseDocumentSelectorProps {
@@ -43,7 +43,7 @@ export const DatabaseDocumentSelector = ({
     dbDocumentsCount: dbDocuments?.length || 0,
     selectedDocumentIds,
     extractAllDocuments,
-    documentsToProcess: documentsToProcess?.length || 0
+    documentsToProcessCount: Array.isArray(documentsToProcess) ? documentsToProcess.length : 0
   });
 
   // Calculate whether the extract button should be enabled
@@ -90,7 +90,7 @@ export const DatabaseDocumentSelector = ({
                 <Checkbox 
                   id="select-all" 
                   checked={selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0}
-                  onCheckedChange={toggleSelectAll}
+                  onCheckedChange={() => toggleSelectAll()}
                 />
                 <Label htmlFor="select-all" className="cursor-pointer">Select All Documents</Label>
               </div>
@@ -114,6 +114,7 @@ export const DatabaseDocumentSelector = ({
                         id={`doc-${doc.id}`} 
                         checked={selectedDocumentIds.includes(doc.id)}
                         onCheckedChange={() => toggleDocumentSelection(doc.id)}
+                        className="cursor-pointer"
                       />
                       <div className="flex-grow cursor-pointer">
                         <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">{doc.title}</Label>
@@ -149,9 +150,17 @@ export const DatabaseDocumentSelector = ({
               console.log("Extract all changed to:", checked);
               setExtractAllDocuments(checked === true);
             }}
+            className="cursor-pointer"
           />
-          <Label htmlFor="extract-all">Extract from all documents (ignores selection)</Label>
+          <Label htmlFor="extract-all" className="cursor-pointer">Extract from all documents (ignores selection)</Label>
         </div>
+        
+        {selectedDocumentIds.length === 0 && !extractAllDocuments && dbDocuments.length > 0 && (
+          <div className="flex items-center space-x-2 text-amber-600 text-sm mt-2">
+            <Info className="h-4 w-4" />
+            <span>Please select at least one document or enable "Extract All"</span>
+          </div>
+        )}
         
         <Button 
           className="w-full" 
@@ -168,7 +177,7 @@ export const DatabaseDocumentSelector = ({
           {isExtracting ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {documentsToProcess.length > 1 
+              {Array.isArray(documentsToProcess) && documentsToProcess.length > 1 
                 ? `Extracting Document ${currentDocumentIndex + 1}/${documentsToProcess.length}...` 
                 : "Extracting..."}
             </>

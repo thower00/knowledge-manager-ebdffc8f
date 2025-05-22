@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
 import { useToast } from "@/hooks/use-toast";
@@ -11,9 +10,8 @@ export const useDocumentSelection = () => {
   const [extractAllDocuments, setExtractAllDocuments] = useState(false);
   const { toast } = useToast();
 
-  // Define documentsToProcess - documents that will be processed based on selection
-  // Important: Use memoization to ensure this array is stable
-  const documentsToProcess = useCallback(() => {
+  // Define documentsToProcess as a memoized value - NOT a function
+  const documentsToProcess = useMemo(() => {
     console.log("Computing documentsToProcess with:", {
       extractAll: extractAllDocuments,
       selectedIds: selectedDocumentIds,
@@ -79,7 +77,7 @@ export const useDocumentSelection = () => {
     await fetchDocuments();
     // Keep this to reset selection when refreshing
     setSelectedDocumentIds([]);
-    return;
+    return Promise.resolve();
   }, []);
 
   // Fetch documents on mount
@@ -97,6 +95,6 @@ export const useDocumentSelection = () => {
     toggleSelectAll,
     refreshDocuments,
     fetchDocuments,
-    documentsToProcess: documentsToProcess() // Call the function to compute current value
+    documentsToProcess // Return the memoized value, not a function
   };
 };
