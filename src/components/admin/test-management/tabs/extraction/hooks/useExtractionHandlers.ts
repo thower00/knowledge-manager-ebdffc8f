@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
@@ -6,6 +5,7 @@ import { useUrlValidation } from "./useUrlValidation";
 import { useServerExtractionProcess } from "./useServerExtractionProcess";
 import { ExtractionOptionsType } from "../ExtractionOptions";
 import { sleep } from "@/lib/utils";
+import { ProcessedDocument } from "@/types/document";
 
 export const useExtractionHandlers = (
   onComplete?: (extractedText: string, testUrl?: string) => void
@@ -31,8 +31,7 @@ export const useExtractionHandlers = (
     toggleDocumentSelection,
     toggleSelectAll,
     refreshDocuments,
-    documentsToProcess,
-    currentDocumentIndex
+    documentsToProcess
   } = useDocumentSelection();
   
   const {
@@ -48,7 +47,8 @@ export const useExtractionHandlers = (
     pagesProcessed,
     totalPages,
     isProgressiveMode,
-    extractionStatus
+    extractionStatus,
+    currentDocumentIndex
   } = useServerExtractionProcess();
 
   // Extract text from URL
@@ -89,13 +89,15 @@ export const useExtractionHandlers = (
       }
       
       // Create a temporary document object with URL
-      const tempDoc = {
+      const tempDoc: ProcessedDocument = {
         id: "url-extract",
         title: "URL Document",
         url: testUrl,
         created_at: new Date().toISOString(),
-        author: "URL Extraction",
-        type: "url"
+        source_id: "url",
+        source_type: "url",
+        mime_type: "text/html",
+        status: "pending"
       };
       
       // Extract text

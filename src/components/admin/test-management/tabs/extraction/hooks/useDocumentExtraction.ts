@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
@@ -124,18 +123,13 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   const documentSelection = useDocumentSelection();
   const urlValidation = useUrlValidation();
   
-  // Create extraction handlers with the dependencies they need
-  const { handleExtractFromUrl, handleExtractFromDatabase } = useExtractionHandlers({
-    testUrl: urlValidation.testUrl,
-    testUrlValid: urlValidation.testUrlValid,
-    validateUrl: urlValidation.validateUrl,
-    selectedDocumentIds: documentSelection.selectedDocumentIds,
-    extractAllDocuments: documentSelection.extractAllDocuments,
-    documentsToProcess: documentSelection.documentsToProcess,
-    extractionProcess,
-    extractionOptions,
-    onRunTest
-  });
+  // Create the callback for handling extraction completion
+  const handleExtractionComplete = (extractedText: string, testUrl?: string) => {
+    onRunTest({ extractionText: extractedText, testUrl });
+  };
+  
+  // Use extraction handlers hook
+  const extractionHandlers = useExtractionHandlers(handleExtractionComplete);
 
   // Check proxy connection on mount
   useEffect(() => {
@@ -204,7 +198,7 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     handleRefresh,
     
     // Extraction handlers
-    handleExtractFromUrl,
-    handleExtractFromDatabase
+    handleExtractFromUrl: extractionHandlers.handleExtractFromUrl,
+    handleExtractFromDatabase: extractionHandlers.handleExtractFromDatabase
   };
 };
