@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, AlertTriangle } from "lucide-react";
 import { ProcessedDocument } from "@/types/document";
 
 interface DatabaseDocumentSelectorProps {
@@ -42,12 +42,22 @@ export const DatabaseDocumentSelector = ({
   console.log("DatabaseDocumentSelector rendering with:", {
     dbDocumentsCount: dbDocuments?.length || 0,
     selectedDocumentIds,
-    extractAllDocuments
+    extractAllDocuments,
+    documentsToProcess: documentsToProcess?.length || 0
   });
 
   // Calculate whether the extract button should be enabled
-  const canExtract = (selectedDocumentIds.length > 0 || extractAllDocuments) && 
-                      dbDocuments.length > 0 && !isExtracting;
+  const canExtract = ((selectedDocumentIds.length > 0 || extractAllDocuments) && 
+                      dbDocuments.length > 0 && !isExtracting);
+  
+  // Debug the extraction conditions
+  console.log("Extract button state:", {
+    selectedCount: selectedDocumentIds.length,
+    extractAll: extractAllDocuments,
+    dbDocumentsLength: dbDocuments.length,
+    isExtracting,
+    canExtract
+  });
 
   return (
     <div className="space-y-2 p-4 border rounded-md bg-gray-50">
@@ -98,13 +108,14 @@ export const DatabaseDocumentSelector = ({
                       className={`flex items-center space-x-2 p-2 rounded-md ${
                         selectedDocumentIds.includes(doc.id) ? 'bg-blue-50' : 'hover:bg-gray-100'
                       }`}
+                      onClick={() => toggleDocumentSelection(doc.id)}
                     >
                       <Checkbox 
                         id={`doc-${doc.id}`} 
                         checked={selectedDocumentIds.includes(doc.id)}
                         onCheckedChange={() => toggleDocumentSelection(doc.id)}
                       />
-                      <div className="flex-grow">
+                      <div className="flex-grow cursor-pointer">
                         <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">{doc.title}</Label>
                         <div className="flex gap-2 items-center mt-1">
                           <Badge variant="outline" className="text-xs font-normal">
@@ -157,7 +168,7 @@ export const DatabaseDocumentSelector = ({
           {isExtracting ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {documentsToProcess?.length > 1 
+              {documentsToProcess.length > 1 
                 ? `Extracting Document ${currentDocumentIndex + 1}/${documentsToProcess.length}...` 
                 : "Extracting..."}
             </>

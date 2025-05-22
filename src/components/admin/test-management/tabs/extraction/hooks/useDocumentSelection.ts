@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
@@ -11,10 +12,21 @@ export const useDocumentSelection = () => {
   const { toast } = useToast();
 
   // Define documentsToProcess - documents that will be processed based on selection
-  // Fix: properly handle extractAllDocuments vs selectedDocumentIds
-  const documentsToProcess = extractAllDocuments 
-    ? dbDocuments 
-    : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+  // Important: Use memoization to ensure this array is stable
+  const documentsToProcess = useCallback(() => {
+    console.log("Computing documentsToProcess with:", {
+      extractAll: extractAllDocuments,
+      selectedIds: selectedDocumentIds,
+      docsCount: dbDocuments.length
+    });
+    
+    if (extractAllDocuments) {
+      return dbDocuments;
+    } else {
+      // Filter the documents based on selected IDs
+      return dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    }
+  }, [dbDocuments, selectedDocumentIds, extractAllDocuments]);
 
   // Fetch documents from the database
   const fetchDocuments = async () => {
@@ -62,7 +74,7 @@ export const useDocumentSelection = () => {
     }
   };
 
-  // Modified to return a Promise explicitly
+  // Modified to return a Promise explicitly and preserve the correct functionality
   const refreshDocuments = useCallback(async () => {
     await fetchDocuments();
     // Keep this to reset selection when refreshing
@@ -85,6 +97,6 @@ export const useDocumentSelection = () => {
     toggleSelectAll,
     refreshDocuments,
     fetchDocuments,
-    documentsToProcess
+    documentsToProcess: documentsToProcess() // Call the function to compute current value
   };
 };

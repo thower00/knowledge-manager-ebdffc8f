@@ -22,6 +22,7 @@ export const useExtractionHandlers = (
     testUrlError
   } = useUrlValidation();
   
+  // Get document selection and handling
   const {
     selectedDocumentIds,
     dbDocuments,
@@ -34,6 +35,7 @@ export const useExtractionHandlers = (
     documentsToProcess
   } = useDocumentSelection();
   
+  // Server extraction process
   const {
     isExtracting,
     setIsExtracting,

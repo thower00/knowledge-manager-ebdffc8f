@@ -72,18 +72,39 @@ export const useDatabaseExtraction = (
         return;
       }
       
-      // Determine which documents to process
-      const docsToProcess = documentsToProcess;
-      console.log("Final documents to process:", docsToProcess);
+      // Verify documents to process (double-check to prevent errors)
+      if (documentsToProcess.length === 0) {
+        setIsExtracting(false);
+        toast({
+          title: "No Documents to Process",
+          description: "No valid documents were found for processing",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Log what we're about to process
+      console.log("Final documents to process:", documentsToProcess);
       
       let combinedText = "";
       let processedCount = 0;
       
       // We'll only process the first document for simplicity
-      const doc = docsToProcess[0];
+      const doc = documentsToProcess[0];
+      
+      if (!doc) {
+        setIsExtracting(false);
+        toast({
+          title: "Document Not Found",
+          description: "Selected document could not be found",
+          variant: "destructive"
+        });
+        return;
+      }
       
       try {
         // Extract text from this document
+        console.log("Processing document:", doc.title);
         const extractedText = await extractFromDocument(doc);
         
         // Add header for this document
