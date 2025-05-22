@@ -43,31 +43,106 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     let pageCount = pageMarkers ? pageMarkers.length : Math.max(1, Math.floor(pdfBytes.length / 5000));
     console.log(`Estimated ${pageCount} pages in document`);
     
-    // IMPROVED TEXT EXTRACTION - Add multiple patterns for different PDF encoding types
+    // IMPROVED TEXT EXTRACTION WITH BETTER ENCODING HANDLING
     let extractedText = "";
     
-    // Pattern 1: Look for text streams
-    const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
-    const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
+    // Try to detect PDF version for better handling
+    const pdfVersion = pdfBytes.substring(0, 10).match(/PDF-(\d+\.\d+)/);
+    console.log(`PDF version detected: ${pdfVersion ? pdfVersion[1] : 'unknown'}`);
     
-    if (textStreams && textStreams.length > 0) {
-      console.log(`Found ${textStreams.length} text streams`);
+    // Step 1: Find text encoding declaration
+    let encodingMatch = pdfBytes.match(/\/Encoding\s*\/([A-Za-z0-9-]+)/);
+    let encoding = encodingMatch ? encodingMatch[1] : "StandardEncoding";
+    console.log(`PDF encoding detected: ${encoding}`);
+    
+    // Step 2: Extract text using multiple methods for redundancy
+    
+    // Method 1: Look for text objects with proper encoding
+    const textObjectPattern = /BT\s*(.*?)\s*ET/gs;
+    const textObjects = [...pdfBytes.matchAll(textObjectPattern)];
+    
+    if (textObjects && textObjects.length > 0) {
+      console.log(`Found ${textObjects.length} text objects`);
       
-      // Take the longest streams as they likely contain the main text
-      const sortedStreams = textStreams
-        .map(match => match[1])
-        .filter(stream => stream.length > 50)
-        .sort((a, b) => b.length - a.length)
-        .slice(0, 10); // Take top 10 longest streams
+      // Process and combine text objects
+      let objectText = "";
+      for (const [_, content] of textObjects) {
+        // Extract text strings
+        const textMatches = content.match(/\((.*?)\)/g);
+        if (textMatches) {
+          for (const match of textMatches) {
+            // Remove parentheses and decode PDF escape sequences
+            let text = match.substring(1, match.length - 1)
+              .replace(/\\n/g, '\n')
+              .replace(/\\r/g, '')
+              .replace(/\\\\/g, '\\')
+              .replace(/\\t/g, '\t')
+              .replace(/\\(\d{3})/g, (_, octal) => 
+                String.fromCharCode(parseInt(octal, 8))
+              );
+            
+            // Add space between text fragments that likely need it
+            if (objectText.length > 0 && 
+                !objectText.endsWith(' ') && 
+                !objectText.endsWith('\n') && 
+                !text.startsWith(' ') && 
+                !text.startsWith('\n')) {
+              objectText += ' ';
+            }
+            
+            objectText += text;
+          }
+        }
+      }
       
-      if (sortedStreams.length > 0) {
-        extractedText = sortedStreams.join("\n\n");
+      if (objectText.length > 100) {
+        extractedText = objectText;
+        console.log("Successfully extracted text using text objects method");
       }
     }
     
-    // Pattern 2: Look for text objects in parentheses
+    // Method 2: Look for text streams if Method 1 didn't give good results
     if (!extractedText || extractedText.length < 100) {
-      const textMatches = pdfBytes.match(/\(([^)]+)\)/g);
+      const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
+      const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
+      
+      if (textStreams && textStreams.length > 0) {
+        console.log(`Found ${textStreams.length} text streams`);
+        
+        // Take the longest streams as they likely contain the main text
+        const sortedStreams = textStreams
+          .map(match => match[1])
+          .filter(stream => stream.length > 50)
+          .sort((a, b) => b.length - a.length)
+          .slice(0, 10); // Take top 10 longest streams
+        
+        if (sortedStreams.length > 0) {
+          // Try to extract readable text from the streams
+          let streamText = "";
+          
+          for (const stream of sortedStreams) {
+            // Look for text patterns in the stream
+            const potentialText = stream.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                                       .replace(/\s+/g, ' ')
+                                       .trim();
+            
+            if (potentialText.length > 100 && 
+                (potentialText.split(' ').length > 20)) {
+              streamText += potentialText + "\n\n";
+            }
+          }
+          
+          if (streamText.length > extractedText.length) {
+            extractedText = streamText;
+            console.log("Successfully extracted text using stream method");
+          }
+        }
+      }
+    }
+    
+    // Method 3: Extract text from parenthetical strings
+    if (!extractedText || extractedText.length < 100) {
+      const textMatches = pdfBytes.match(/\(([^)]{3,})\)/g);
       if (textMatches && textMatches.length > 0) {
         console.log(`Found ${textMatches.length} text matches in parentheses`);
         
@@ -75,20 +150,22 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
         const processedMatches = textMatches
           .map(match => {
             try {
-              // Remove the surrounding parentheses
+              // Remove the surrounding parentheses and decode PDF escapes
               return match.substring(1, match.length - 1)
-                // Handle basic PDF text encoding
                 .replace(/\\n/g, '\n')
                 .replace(/\\r/g, '')
                 .replace(/\\\\/g, '\\')
-                .replace(/\\t/g, '\t');
+                .replace(/\\t/g, '\t')
+                .replace(/\\(\d{3})/g, (_, octal) => 
+                  String.fromCharCode(parseInt(octal, 8))
+                );
             } catch (e) {
               return '';
             }
           })
           .filter(text => /[a-zA-Z0-9]/.test(text) && text.length > 2);
         
-        // Join text with spaces, but try to detect words that should be together
+        // Join text with intelligent spacing
         let joinedText = "";
         let prevTextEndsWithWordBreak = true;
         
@@ -104,27 +181,71 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
           prevTextEndsWithWordBreak = /[.,;:!? ]$/.test(text);
         }
         
-        extractedText = joinedText;
+        if (joinedText.length > extractedText.length) {
+          extractedText = joinedText;
+          console.log("Successfully extracted text using parenthetical strings method");
+        }
       }
     }
     
-    // Pattern 3: Try another approach with word boundaries if previous methods didn't yield good results
+    // Method 4: Try using content decoding for binary streams
     if (!extractedText || extractedText.length < 100) {
-      const wordPattern = /(\w{3,})/g;
-      const words = pdfBytes.match(wordPattern);
+      // Look for content streams with specific filters
+      const contentStreamPattern = /\/Filter\s*\/([A-Za-z0-9]+).*?stream\s([\s\S]*?)\sendstream/g;
+      const contentStreams = [...pdfBytes.matchAll(contentStreamPattern)];
       
-      if (words && words.length > 0) {
-        console.log(`Found ${words.length} potential words`);
+      if (contentStreams && contentStreams.length > 0) {
+        console.log(`Found ${contentStreams.length} content streams with filters`);
         
-        // Filter for likely actual words (not binary data)
-        const likelyWords = words.filter(word => 
-          /^[a-zA-Z0-9]{3,}$/.test(word) && 
-          !/^[0-9]+$/.test(word)
-        );
-        
-        if (likelyWords.length > 0) {
-          extractedText = likelyWords.join(" ");
+        // Process each filtered stream
+        let decodedContent = "";
+        for (const [_, filterType, content] of contentStreams) {
+          // Simple extraction of ASCII text from binary streams
+          const textParts = content.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                                 .replace(/\s+/g, ' ')
+                                 .split(' ')
+                                 .filter(word => word.length > 2 && /[a-zA-Z]{2,}/.test(word));
+          
+          if (textParts.length > 20) {
+            decodedContent += textParts.join(' ') + "\n\n";
+          }
         }
+        
+        if (decodedContent.length > extractedText.length) {
+          extractedText = decodedContent;
+          console.log("Successfully extracted text using content stream decoding");
+        }
+      }
+    }
+    
+    // Method 5: Last resort - try UTF-8 & Latin-1 decoding attempts on binary data
+    if (!extractedText || extractedText.length < 100) {
+      try {
+        // Try Latin-1 (ISO-8859-1) decoding which preserves byte values
+        let latinText = "";
+        for (let i = 0; i < pdfBytes.length; i++) {
+          const charCode = pdfBytes.charCodeAt(i) & 0xFF;
+          if (charCode >= 32 && charCode < 127) {
+            latinText += String.fromCharCode(charCode);
+          } else if (charCode === 10 || charCode === 13 || charCode === 9) {
+            latinText += String.fromCharCode(charCode);
+          } else {
+            latinText += ' ';
+          }
+        }
+        
+        // Clean up the text
+        latinText = latinText.replace(/\s+/g, ' ')
+                             .split(' ')
+                             .filter(word => word.length > 2 && /[a-zA-Z]{2,}/.test(word))
+                             .join(' ');
+        
+        if (latinText.length > 100) {
+          extractedText = latinText;
+          console.log("Successfully extracted text using Latin-1 decoding");
+        }
+      } catch (e) {
+        console.error("Error during encoding conversion:", e);
       }
     }
     
