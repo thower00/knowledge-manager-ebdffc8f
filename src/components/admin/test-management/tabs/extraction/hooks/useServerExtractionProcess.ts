@@ -28,12 +28,19 @@ export const useServerExtractionProcess = () => {
     try {
       setExtractionStatus("Testing proxy connection...");
       
+      // Get the auth token
+      const authSession = await supabase.auth.getSession();
+      const authToken = authSession.data.session?.access_token || '';
+      
+      // Use the public anon key
+      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
+      
       const response = await fetch('https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/pdf-proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-          'apikey': supabase.supabaseKey
+          'Authorization': `Bearer ${authToken}`,
+          'apikey': apiKey
         },
         body: JSON.stringify({ 
           action: "connection_test",

@@ -38,12 +38,18 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
       
       // Use a direct fetch with appropriate CORS headers for more reliable checking
       const functionUrl = `https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`;
+      const authSession = await supabase.auth.getSession();
+      const authToken = authSession.data.session?.access_token || '';
+      
+      // Access the anon key directly from a constant - this is a public key
+      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
+      
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token || '')}`,
-          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer ${authToken}`,
+          'apikey': apiKey,
           'X-Check-Availability': 'true'
         },
         body: JSON.stringify({ 

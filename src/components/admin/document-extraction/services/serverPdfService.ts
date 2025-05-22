@@ -50,6 +50,9 @@ export async function extractPdfTextServerSide(
         const session = await supabase.auth.getSession();
         const authToken = session.data.session?.access_token || '';
         
+        // Access the anon key from the environment
+        const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
+
         // Direct fetch to the edge function
         const functionUrl = 'https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf';
         const response = await fetch(functionUrl, {
@@ -57,7 +60,7 @@ export async function extractPdfTextServerSide(
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`,
-            'apikey': supabase.supabaseKey,
+            'apikey': apiKey,
             'Cache-Control': 'no-cache, no-store',
             'Pragma': 'no-cache',
           },
