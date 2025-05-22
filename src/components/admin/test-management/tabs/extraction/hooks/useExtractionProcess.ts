@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
@@ -6,11 +7,11 @@ import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/se
 import { ExtractionOptionsType } from "../ExtractionOptions";
 import { PageProcessingEvent } from "@/components/admin/document-extraction/utils/pdfTypes";
 
-// Default extraction configuration
+// Default extraction configuration with increased timeouts
 const EXTRACTION_CONFIG = {
-  loadingTimeout: 60000,      // 60 seconds for the whole document loading
-  pageTimeout: 20000,         // 20 seconds per page
-  maxConcurrentPages: 2       // Process max 2 pages concurrently to reduce memory usage
+  loadingTimeout: 90000,      // 90 seconds for the whole document loading (increased from 60s)
+  pageTimeout: 30000,         // 30 seconds per page (increased from 20s)
+  maxConcurrentPages: 1       // Process just 1 page at a time to reduce memory usage
 };
 
 export const useExtractionProcess = () => {
@@ -47,7 +48,7 @@ export const useExtractionProcess = () => {
   };
 
   // Create a timeout that will trigger if the extraction takes too long
-  const createExtractionTimeout = (documentTitle: string, timeoutSeconds: number = 60) => {
+  const createExtractionTimeout = (documentTitle: string, timeoutSeconds: number = 90) => {
     // Clear any existing timeout
     if (timeoutId) {
       window.clearTimeout(timeoutId);
@@ -101,11 +102,13 @@ export const useExtractionProcess = () => {
         setTotalPages(event.pagesToProcess);
         setPagesProcessed(0);
         textBufferRef.current = [];
+        // Update progress to show we've started processing
+        setExtractionProgress(20);
         break;
         
       case 'page':
         console.log(`Progressive extraction: Processed page ${event.pageNumber} of ${event.totalPages}`);
-        setPagesProcessed(event.pagesProcessed);
+        setPagesProcessed(event.pageNumber);
         
         // Add this page's text to our buffer
         if (textBufferRef.current.length <= event.pageNumber) {
@@ -121,12 +124,20 @@ export const useExtractionProcess = () => {
         // Update the progress percentage
         const progressPercentage = Math.floor((event.pagesProcessed / event.totalPages) * 100);
         setExtractionProgress(progressPercentage);
+        
+        // Reset the extraction timeout to avoid timeouts between pages
+        if (timeoutId) {
+          clearExtractionTimeout();
+          createExtractionTimeout(`${event.pageNumber}/${event.totalPages}`, 90);
+        }
         break;
         
       case 'complete':
         console.log(`Progressive extraction: Completed with ${event.pagesProcessed} pages processed`);
         // Final progress update
         setExtractionProgress(100);
+        // Clear any timeouts as we're done
+        clearExtractionTimeout();
         break;
         
       case 'error':
@@ -154,14 +165,14 @@ export const useExtractionProcess = () => {
     const controller = new AbortController();
     setAbortController(controller);
     
-    // Determine if we should use progressive mode
+    // Determine if we should use progressive mode - use it by default for now
     const useProgressiveMode = options?.extractionMode === 'progressive';
     setIsProgressiveMode(useProgressiveMode);
 
     try {
       // Set initial progress and create timeout
       setExtractionProgress(10);
-      const timeoutValue = options?.timeout || 60;
+      const timeoutValue = options?.timeout || 90; // Default to 90s now
       createExtractionTimeout(document.title, timeoutValue);
       
       // Fetch the document via proxy
@@ -174,8 +185,9 @@ export const useExtractionProcess = () => {
       // Configure extraction options
       const extractionConfig = {
         ...EXTRACTION_CONFIG,
-        loadingTimeout: (timeoutValue * 1000) * 0.7, // 70% of the total timeout
-        abortSignal: controller.signal
+        loadingTimeout: (timeoutValue * 1000), // Use the full timeout for loading
+        abortSignal: controller.signal,
+        maxPages: options?.extractFirstPagesOnly ? options.pageLimit : 0
       };
       
       // Extract text based on options and mode
@@ -198,10 +210,7 @@ export const useExtractionProcess = () => {
               setExtractionProgress(progress);
             }
           },
-          {
-            ...extractionConfig,
-            maxPages: options?.extractFirstPagesOnly ? options.pageLimit : 0
-          }
+          extractionConfig
         );
       } else if (options?.extractFirstPagesOnly) {
         text = await extractPdfFirstPages(
@@ -211,7 +220,8 @@ export const useExtractionProcess = () => {
             // Map the progress to our overall progress (40-95)
             const overallProgress = 40 + Math.floor((progress / 100) * 55);
             setExtractionProgress(overallProgress);
-          }
+          },
+          extractionConfig // Pass the config with increased timeouts
         );
       } else {
         // Extract text from the document with configured timeouts

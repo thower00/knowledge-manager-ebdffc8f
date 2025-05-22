@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentSelection } from "./useDocumentSelection";
@@ -12,12 +11,12 @@ interface UseDocumentExtractionProps {
 }
 
 export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps) => {
-  // Initialize extraction options with defaults
+  // Initialize extraction options with better defaults
   const [extractionOptions, setExtractionOptions] = useState<ExtractionOptionsType>({
     extractFirstPagesOnly: false,
     pageLimit: 10,
-    timeout: 60,
-    extractionMode: "standard"
+    timeout: 90,
+    extractionMode: "progressive" // Default to progressive mode
   });
 
   // Use individual hooks for different aspects of functionality
@@ -91,4 +90,3 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     handleExtractFromDatabase
   };
 };
-

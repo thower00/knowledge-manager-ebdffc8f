@@ -322,7 +322,8 @@ export const extractPdfText = async (
 export const extractPdfFirstPages = async (
   pdfData: ArrayBuffer,
   pageCount: number = 10,
-  progressCallback?: (progress: number) => void
+  progressCallback?: (progress: number) => void,
+  options?: PdfExtractionOptions
 ): Promise<string> => {
   console.log(`Extracting first ${pageCount} pages of PDF`);
   return extractPdfText(
@@ -330,8 +331,9 @@ export const extractPdfFirstPages = async (
     progressCallback,
     {
       ...DEFAULT_EXTRACTION_OPTIONS,
+      ...options,
       maxPages: pageCount,
-      loadingTimeout: 90000, // Extended timeout for loading phase
+      loadingTimeout: (options?.loadingTimeout || 90000), // Use provided timeout or default to 90s
     }
   );
 };

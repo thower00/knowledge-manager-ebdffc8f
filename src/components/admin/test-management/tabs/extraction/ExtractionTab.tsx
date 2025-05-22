@@ -190,4 +190,3 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     </Card>
   );
 }
-

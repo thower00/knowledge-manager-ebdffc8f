@@ -31,7 +31,7 @@ export function ExtractionOptions({
   isExtracting
 }: ExtractionOptionsProps) {
   return (
-    <Accordion type="single" collapsible className="border rounded-md">
+    <Accordion type="single" collapsible className="border rounded-md" defaultValue="options">
       <AccordionItem value="options">
         <AccordionTrigger className="px-4 py-2 hover:no-underline">
           <span className="text-sm font-medium">Extraction Options</span>
@@ -158,13 +158,13 @@ export function ExtractionOptions({
             <Input
               id="timeout"
               type="number"
-              min={10}
+              min={30}
               max={180}
               value={options.timeout}
               onChange={(e) =>
                 setOptions({
                   ...options,
-                  timeout: parseInt(e.target.value) || 60
+                  timeout: parseInt(e.target.value) || 90
                 })
               }
               className="w-24"
@@ -176,4 +176,3 @@ export function ExtractionOptions({
     </Accordion>
   );
 }
-

@@ -21,7 +21,7 @@ export const ExtractionProgress = ({
         ></div>
       </div>
       <p className="text-xs text-center text-muted-foreground">
-        {isProgressiveMode && totalPages ? (
+        {isProgressiveMode && pagesProcessed !== undefined && totalPages ? (
           <>
             Processing page {pagesProcessed} of {totalPages} ({extractionProgress}% complete)
           </>
@@ -32,4 +32,3 @@ export const ExtractionProgress = ({
     </div>
   );
 };
-
