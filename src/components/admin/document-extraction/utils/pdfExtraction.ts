@@ -6,7 +6,8 @@ import {
   PdfExtractionOptions, 
   DEFAULT_EXTRACTION_OPTIONS, 
   PageExtractionResult,
-  PdfMetadata 
+  PdfMetadata,
+  PageProcessingCallback
 } from './pdfTypes';
 
 /**
@@ -334,3 +335,175 @@ export const extractPdfFirstPages = async (
     }
   );
 };
+
+/**
+ * Progressive extraction that processes pages one by one and provides immediate feedback
+ * @param pdfData PDF data as ArrayBuffer
+ * @param pageCallback Callback that receives each page as it's processed
+ * @param progressCallback Optional callback to report overall progress
+ * @param options Configuration options
+ */
+export const extractPdfTextProgressively = async (
+  pdfData: ArrayBuffer,
+  pageCallback: PageProcessingCallback,
+  progressCallback?: (progress: number) => void,
+  options?: PdfExtractionOptions
+): Promise<string> => {
+  // Merge provided options with defaults
+  const extractionOptions = { ...DEFAULT_EXTRACTION_OPTIONS, ...options };
+  
+  // Initialize progress reporting
+  if (progressCallback) progressCallback(5);
+  
+  // Validate that the input is actually a PDF
+  if (!isPdfBuffer(pdfData)) {
+    console.error("The provided data does not appear to be a PDF (missing PDF header)");
+    throw new Error("The file does not appear to be a valid PDF document. It may be corrupted or in an unsupported format.");
+  }
+  
+  try {
+    // Initialize the worker before processing
+    await initPdfWorker();
+    if (progressCallback) progressCallback(10);
+    
+    // Create object for PDF loading with shorter initial timeout
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      disableFontFace: true, // Improve performance
+    });
+    
+    // Set a timeout for the loading task
+    console.log(`Progressive PDF loading with timeout: ${extractionOptions.loadingTimeout}ms`);
+    const loadingPromise = Promise.race([
+      loadingTask.promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`PDF loading timed out after ${Math.round(extractionOptions.loadingTimeout! / 1000)} seconds. The document might be too large or corrupted.`));
+        }, extractionOptions.loadingTimeout);
+      })
+    ]);
+    
+    const pdf = await loadingPromise as pdfjsLib.PDFDocumentProxy;
+    
+    // Get metadata and log information about the document
+    const metadata = await getPdfMetadata(pdf);
+    console.log(`Progressive PDF extraction started: ${metadata.pageCount} total pages`);
+    
+    // Set progress after loading document
+    if (progressCallback) progressCallback(20);
+    
+    // Determine how many pages to process
+    const totalPages = metadata.pageCount;
+    const pagesToProcess = extractionOptions.maxPages && extractionOptions.maxPages > 0 
+      ? Math.min(extractionOptions.maxPages, totalPages) 
+      : totalPages;
+    
+    // Report document metadata to callback
+    pageCallback({
+      type: 'metadata',
+      pageCount: totalPages,
+      pagesToProcess: pagesToProcess,
+      metadata: metadata
+    });
+    
+    // Process pages one by one
+    let processedPages = 0;
+    let fullText = '';
+    let aborted = false;
+    
+    // Set up abort handling if signal provided
+    if (extractionOptions.abortSignal) {
+      extractionOptions.abortSignal.addEventListener('abort', () => {
+        console.log("Progressive PDF extraction aborted by signal");
+        aborted = true;
+      });
+    }
+    
+    // Process each page sequentially
+    for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
+      // Check if processing was aborted
+      if (aborted) {
+        console.log("Progressive extraction was aborted");
+        break;
+      }
+      
+      try {
+        // Get the page
+        const page = await pdf.getPage(pageNum);
+        
+        // Extract text for this page
+        const result = await extractPageText(
+          page, 
+          pageNum, 
+          extractionOptions.pageTimeout
+        );
+        
+        // Increment processed page counter
+        processedPages++;
+        
+        // Add page text to full document text
+        fullText += result.text + '\n\n';
+        
+        // Report the page result via callback
+        pageCallback({
+          type: 'page',
+          ...result,
+          pagesProcessed: processedPages,
+          totalPages: pagesToProcess
+        });
+        
+        // Clean up page resources
+        page.cleanup();
+        
+        // Update progress
+        if (progressCallback) {
+          const progress = 20 + Math.floor((processedPages / pagesToProcess) * 75);
+          progressCallback(Math.min(progress, 95));
+        }
+      } catch (error) {
+        console.error(`Error in progressive extraction for page ${pageNum}:`, error);
+        
+        // Report the error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        pageCallback({
+          type: 'page',
+          pageNumber: pageNum,
+          text: `--- Page ${pageNum} - Error ---\n`,
+          error: errorMessage,
+          pagesProcessed: processedPages,
+          totalPages: pagesToProcess
+        });
+        
+        fullText += `--- Page ${pageNum} - Error: ${errorMessage} ---\n\n`;
+      }
+    }
+    
+    // Clean up
+    pdf.destroy().catch(e => console.error("Error destroying PDF:", e));
+    
+    // Report completion
+    pageCallback({
+      type: 'complete',
+      pagesProcessed: processedPages,
+      totalPages: pagesToProcess
+    });
+    
+    // Set completion progress
+    if (progressCallback) progressCallback(100);
+    
+    // Return the full document text
+    return fullText.trim();
+  } catch (error) {
+    console.error("Error in progressive PDF extraction:", error);
+    
+    // Report failure
+    pageCallback({
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    throw error;
+  }
+};
+

@@ -16,7 +16,8 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
   const [extractionOptions, setExtractionOptions] = useState<ExtractionOptionsType>({
     extractFirstPagesOnly: false,
     pageLimit: 10,
-    timeout: 60
+    timeout: 60,
+    extractionMode: "standard"
   });
 
   // Use individual hooks for different aspects of functionality
@@ -80,8 +81,14 @@ export const useDocumentExtraction = ({ onRunTest }: UseDocumentExtractionProps)
     proxyConnected: extractionProcess.proxyConnected,
     currentDocumentIndex: extractionProcess.currentDocumentIndex,
     
+    // Progressive extraction status
+    pagesProcessed: extractionProcess.pagesProcessed,
+    totalPages: extractionProcess.totalPages,
+    isProgressiveMode: extractionProcess.isProgressiveMode,
+    
     // Extraction handlers
     handleExtractFromUrl,
     handleExtractFromDatabase
   };
 };
+

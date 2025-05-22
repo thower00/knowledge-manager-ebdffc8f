@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/accordion";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export interface ExtractionOptionsType {
   extractFirstPagesOnly: boolean;
   pageLimit: number;
   timeout: number;
+  extractionMode: "standard" | "progressive";
 }
 
 interface ExtractionOptionsProps {
@@ -35,6 +37,44 @@ export function ExtractionOptions({
           <span className="text-sm font-medium">Extraction Options</span>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4 space-y-3">
+          {/* Extraction Mode Selection */}
+          <div className="grid gap-2">
+            <Label className="text-sm font-medium">Extraction Mode</Label>
+            <RadioGroup 
+              value={options.extractionMode} 
+              onValueChange={(value) => 
+                setOptions({
+                  ...options,
+                  extractionMode: value as "standard" | "progressive"
+                })
+              }
+              disabled={isExtracting}
+              className="grid grid-cols-2 gap-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="standard" id="standard-mode" />
+                <Label htmlFor="standard-mode" className="text-sm">Standard</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="progressive" id="progressive-mode" />
+                <Label htmlFor="progressive-mode" className="text-sm">Progressive</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-xs">
+                        Progressive mode processes pages one at a time and shows results immediately.
+                        Recommended for large documents.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </RadioGroup>
+          </div>
+
           <div className="flex items-center space-x-2">
             <Checkbox
               id="extract-first-pages"
@@ -136,3 +176,4 @@ export function ExtractionOptions({
     </Accordion>
   );
 }
+

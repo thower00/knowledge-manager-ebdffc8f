@@ -37,3 +37,14 @@ export interface PdfMetadata {
   modificationDate?: Date;
   pageCount: number;
 }
+
+// Progressive extraction callback events
+export type PageProcessingEvent = 
+  | { type: 'metadata'; pageCount: number; pagesToProcess: number; metadata: PdfMetadata }
+  | { type: 'page'; pageNumber: number; text: string; error?: string; pagesProcessed: number; totalPages: number }
+  | { type: 'complete'; pagesProcessed: number; totalPages: number }
+  | { type: 'error'; error: string };
+
+// Progressive extraction callback function type
+export type PageProcessingCallback = (event: PageProcessingEvent) => void;
+

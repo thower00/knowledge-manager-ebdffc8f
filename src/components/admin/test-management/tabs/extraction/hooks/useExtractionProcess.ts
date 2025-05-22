@@ -1,10 +1,10 @@
-
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
-import { extractPdfText, extractPdfFirstPages } from "@/components/admin/document-extraction/utils/pdfUtils";
+import { extractPdfText, extractPdfFirstPages, extractPdfTextProgressively } from "@/components/admin/document-extraction/utils/pdfUtils";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 import { ExtractionOptionsType } from "../ExtractionOptions";
+import { PageProcessingEvent } from "@/components/admin/document-extraction/utils/pdfTypes";
 
 // Default extraction configuration
 const EXTRACTION_CONFIG = {
@@ -22,6 +22,15 @@ export const useExtractionProcess = () => {
   const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
   const [timeoutId, setTimeoutId] = useState<number | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  
+  // Progressive extraction state
+  const [pagesProcessed, setPagesProcessed] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isProgressiveMode, setIsProgressiveMode] = useState(false);
+  
+  // Keep a buffer of received page texts for progressive mode
+  const textBufferRef = useRef<string[]>([]);
+  
   const { toast } = useToast();
 
   // Check proxy connection
@@ -84,6 +93,49 @@ export const useExtractionProcess = () => {
     }
   };
 
+  // Handle progressive extraction page events
+  const handleProgressiveExtraction = (event: PageProcessingEvent) => {
+    switch (event.type) {
+      case 'metadata':
+        console.log(`Progressive extraction: Document has ${event.pageCount} pages, processing ${event.pagesToProcess}`);
+        setTotalPages(event.pagesToProcess);
+        setPagesProcessed(0);
+        textBufferRef.current = [];
+        break;
+        
+      case 'page':
+        console.log(`Progressive extraction: Processed page ${event.pageNumber} of ${event.totalPages}`);
+        setPagesProcessed(event.pagesProcessed);
+        
+        // Add this page's text to our buffer
+        if (textBufferRef.current.length <= event.pageNumber) {
+          // Extend the array if needed
+          textBufferRef.current = [...textBufferRef.current, ...Array(event.pageNumber - textBufferRef.current.length + 1).fill('')];
+        }
+        textBufferRef.current[event.pageNumber - 1] = event.text;
+        
+        // Join all pages processed so far and update the extraction text
+        const currentText = textBufferRef.current.filter(text => text).join('\n\n');
+        setExtractionText(currentText);
+        
+        // Update the progress percentage
+        const progressPercentage = Math.floor((event.pagesProcessed / event.totalPages) * 100);
+        setExtractionProgress(progressPercentage);
+        break;
+        
+      case 'complete':
+        console.log(`Progressive extraction: Completed with ${event.pagesProcessed} pages processed`);
+        // Final progress update
+        setExtractionProgress(100);
+        break;
+        
+      case 'error':
+        console.error(`Progressive extraction error: ${event.error}`);
+        setExtractionError(event.error);
+        break;
+    }
+  };
+
   // Extract text from a single document with options
   const extractFromDocument = async (
     document: ProcessedDocument, 
@@ -101,6 +153,10 @@ export const useExtractionProcess = () => {
     // Create a new abort controller for this extraction
     const controller = new AbortController();
     setAbortController(controller);
+    
+    // Determine if we should use progressive mode
+    const useProgressiveMode = options?.extractionMode === 'progressive';
+    setIsProgressiveMode(useProgressiveMode);
 
     try {
       // Set initial progress and create timeout
@@ -122,9 +178,32 @@ export const useExtractionProcess = () => {
         abortSignal: controller.signal
       };
       
-      // Extract text based on options
+      // Extract text based on options and mode
       let text;
-      if (options?.extractFirstPagesOnly) {
+      if (useProgressiveMode) {
+        console.log("Using progressive extraction mode");
+        // Reset progressive extraction state
+        setPagesProcessed(0);
+        setTotalPages(0);
+        textBufferRef.current = [];
+        
+        // Use progressive extraction that processes and shows pages as they complete
+        text = await extractPdfTextProgressively(
+          documentData,
+          handleProgressiveExtraction,
+          (progress) => {
+            // In progressive mode, progress is handled by the page callback
+            // This is just a backup progress tracker for loading phase
+            if (progress < 40) {
+              setExtractionProgress(progress);
+            }
+          },
+          {
+            ...extractionConfig,
+            maxPages: options?.extractFirstPagesOnly ? options.pageLimit : 0
+          }
+        );
+      } else if (options?.extractFirstPagesOnly) {
         text = await extractPdfFirstPages(
           documentData,
           options.pageLimit,
@@ -188,6 +267,10 @@ export const useExtractionProcess = () => {
     extractFromDocument,
     createExtractionTimeout,
     clearExtractionTimeout,
-    abortController
+    abortController,
+    // Progressive extraction states
+    pagesProcessed,
+    totalPages,
+    isProgressiveMode
   };
 };
