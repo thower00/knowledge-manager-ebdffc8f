@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle } from "lucide-react";
 
 import { DatabaseDocumentSelector } from "./DatabaseDocumentSelector";
 import { UrlExtractionInput } from "./UrlExtractionInput";
@@ -104,7 +104,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         )}
         
         {processingFunctionAvailable && (
-          <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
+          <Alert variant="default" className="bg-green-50 text-green-800 border-green-200">
+            <CheckCircle className="h-4 w-4" />
             <AlertTitle>Server-side PDF processing enabled</AlertTitle>
             <AlertDescription>
               Using high-performance server-side PDF processing for better reliability.

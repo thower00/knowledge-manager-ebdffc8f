@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ProcessedDocument } from "@/types/document";
 import { fetchAndExtractPdfServerSide } from "@/components/admin/document-extraction/services/serverPdfService";
 import { ExtractionOptionsType } from "../ExtractionOptions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const useServerExtractionProcess = () => {
   const [isExtracting, setIsExtracting] = useState(false);
