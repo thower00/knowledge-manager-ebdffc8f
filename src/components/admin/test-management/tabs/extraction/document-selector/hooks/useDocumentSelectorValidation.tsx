@@ -21,7 +21,7 @@ export function useDocumentSelectorValidation({
   // Log selection state on render for debugging with more details
   useEffect(() => {
     console.log("DocumentSelection validation state:", {
-      documentsCount: documents.length,
+      documentsCount: documents?.length || 0,
       selectedIds: selectedDocumentIds,
       selectedCount: selectedDocumentIds?.length || 0,
       extractAll: extractAllDocuments,
@@ -53,7 +53,7 @@ export function useDocumentSelectorValidation({
     }
     
     // Additional validation: check if documents array is empty
-    if (documents.length === 0) {
+    if (!documents || documents.length === 0) {
       console.error("Extraction attempted with empty documents list");
       setSelectionError("No documents available in the database. Please upload documents first.");
       return;

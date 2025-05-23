@@ -33,8 +33,8 @@ export function DocumentTable({
   }, [documents, selectedDocumentIds]);
 
   // Check if we should show the empty state
-  if (isLoading || documents.length === 0) {
-    return <EmptyTableState isLoading={isLoading} documentsCount={documents.length} />;
+  if (isLoading || !documents || documents.length === 0) {
+    return <EmptyTableState isLoading={isLoading} documentsCount={documents?.length || 0} />;
   }
 
   // Safety check for selectedDocumentIds
@@ -52,7 +52,7 @@ export function DocumentTable({
           />
           <DocumentTableBody 
             documents={documents}
-            selectedDocumentIds={selectedDocumentIds}
+            selectedDocumentIds={safeSelectedIds}
             toggleDocumentSelection={toggleDocumentSelection}
             isLoading={isLoading}
           />

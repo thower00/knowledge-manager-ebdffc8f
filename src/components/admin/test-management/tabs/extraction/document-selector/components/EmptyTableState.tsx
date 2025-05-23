@@ -22,7 +22,7 @@ export function EmptyTableState({ isLoading, documentsCount = 0 }: EmptyTableSta
     );
   }
 
-  if (documentsCount === 0) {
+  if (!documentsCount || documentsCount === 0) {
     return (
       <CardContent className="p-0">
         <div className="py-8 text-center">
