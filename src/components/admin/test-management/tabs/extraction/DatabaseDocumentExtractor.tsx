@@ -30,7 +30,8 @@ export const DatabaseDocumentExtractor = ({
     toggleDocumentSelection,
     toggleSelectAll,
     setExtractAllDocuments,
-    refreshDocuments
+    refreshDocuments,
+    documentsToProcess
   } = useDocumentSelection();
   
   // Get handlers
@@ -72,8 +73,8 @@ export const DatabaseDocumentExtractor = ({
       <h3 className="text-base font-medium">Extract from Database Documents</h3>
       
       <DatabaseDocumentSelector
-        documents={dbDocuments || []}
-        isLoading={isLoadingDocuments}
+        dbDocuments={dbDocuments || []}
+        isLoadingDocuments={isLoadingDocuments}
         selectedDocumentIds={selectedDocumentIds}
         extractAllDocuments={extractAllDocuments}
         toggleDocumentSelection={toggleDocumentSelection}
@@ -83,6 +84,8 @@ export const DatabaseDocumentExtractor = ({
         proxyConnected={proxyConnected}
         refreshDocuments={refreshDocuments}
         disabled={isExtracting}
+        currentDocumentIndex={0}
+        documentsToProcess={documentsToProcess || []}
       />
     </div>
   );
