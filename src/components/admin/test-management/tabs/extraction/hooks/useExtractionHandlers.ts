@@ -90,44 +90,17 @@ export const useExtractionHandlers = (
     onComplete ? (text) => onComplete(text) : undefined
   );
   
-  // Create a wrapped handler that verifies document selection before extraction
+  // Create a wrapper that passes the current state directly to the extraction function
   const handleExtractFromDatabase = () => {
     console.log("handleExtractFromDatabase called - current selection state:", {
       selectedIds: selectedDocumentIds,
       extractAll: extractAllDocuments,
-      documentsCount: dbDocuments.length,
-      documentsToProcessCount: documentsToProcess.length
+      documentsCount: dbDocuments?.length || 0,
+      documentsToProcessCount: documentsToProcess?.length || 0
     });
-
-    // Get direct reference to documents that should be processed
-    let docsToProcess: ProcessedDocument[] = [];
     
-    if (extractAllDocuments && dbDocuments.length > 0) {
-      docsToProcess = dbDocuments;
-      console.log("Processing all documents:", docsToProcess.length);
-    } else if (selectedDocumentIds.length > 0) {
-      docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-      console.log("Processing selected documents:", docsToProcess.length);
-    }
-    
-    // Verify we have valid selection before proceeding
-    if (docsToProcess.length === 0) {
-      console.error("No documents to process in extraction handler");
-      setExtractionError("No documents selected or documents are unavailable. Please select at least one document or enable 'Extract All'.");
-      
-      toast({
-        title: "No Documents Selected",
-        description: "Please select at least one document or enable 'Extract All'",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // For debugging, log the document we'll process
-    console.log("Starting extraction with document:", docsToProcess[0].title);
-    
-    // Process directly with the document object instead of through IDs
-    return handleDirectExtraction(docsToProcess[0]);
+    // Call the base handler which has the dependency array with current state values
+    return handleExtractFromDbBase();
   };
   
   // Direct extraction function for immediate processing
@@ -218,6 +191,7 @@ export const useExtractionHandlers = (
     // Main extraction functions
     handleExtractFromUrl,
     handleExtractFromDatabase,
+    handleDirectExtraction,
     handleRefresh,
     
     // Progressive extraction states

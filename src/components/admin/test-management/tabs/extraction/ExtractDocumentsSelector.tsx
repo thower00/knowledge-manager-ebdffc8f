@@ -99,11 +99,14 @@ export function ExtractDocumentsSelector({
     setHasTriedExtraction(true);
     setTimeout(() => setIsButtonClicked(false), 300);
     
-    // Call the extraction handler
-    onExtract();
-    
-    // Additional logging to confirm handler was called
-    console.log("Extract handler called! Extraction should now be starting...");
+    // Call the extraction handler after a slight delay to ensure state updates have propagated
+    setTimeout(() => {
+      // Call the extraction handler
+      onExtract();
+      
+      // Additional logging to confirm handler was called
+      console.log("Extract handler called! Extraction should now be starting...");
+    }, 50);
   };
 
   return (
@@ -215,7 +218,7 @@ export function ExtractDocumentsSelector({
                   id="extract-all" 
                   checked={extractAllDocuments}
                   onCheckedChange={(checked) => {
-                    console.log("Extract all checkbox clicked, new value:", checked);
+                    console.log("Extract all changed to:", checked);
                     setExtractAllDocuments(checked === true);
                   }}
                 />

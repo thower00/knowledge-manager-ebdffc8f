@@ -47,16 +47,26 @@ export const useDatabaseExtraction = (
       console.log("Extract all is enabled, using all documents");
       docsToProcess = dbDocuments;
     } else if (selectedDocumentIds.length > 0) {
-      console.log("Using selected documents");
+      console.log("Using selected documents:", selectedDocumentIds);
       docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-    }
-    
-    if (docsToProcess.length === 0) {
+      console.log("Filtered documents for processing:", docsToProcess.map(d => d.title));
+    } else {
       console.error("No documents selected for processing");
       setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (docsToProcess.length === 0) {
+      console.error("No documents match the selection criteria");
+      setExtractionError("No documents match the selection criteria.");
+      toast({
+        title: "No Documents Available",
+        description: "No documents match the selection criteria",
         variant: "destructive"
       });
       return;
