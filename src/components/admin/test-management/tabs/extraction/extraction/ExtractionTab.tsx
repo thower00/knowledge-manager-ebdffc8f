@@ -71,16 +71,20 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   } = useExtractionHandlers(
     (extractedText, testUrl) => {
       console.log("Extraction complete callback triggered with text of length:", extractedText?.length);
-      setExtractionText(extractedText);
-      onRunTest({ extractionText: extractedText, testUrl });
+      // Make sure we're not using placeholder text here
+      const realExtractedText = extractedText || "";
+      setExtractionText(realExtractedText);
+      onRunTest({ extractionText: realExtractedText, testUrl });
     }
   );
 
   // Handler for database document extraction
   const handleDatabaseExtraction = (extractedText: string) => {
     console.log("Database extraction complete with text of length:", extractedText?.length);
-    setExtractionText(extractedText);
-    onRunTest({ extractionText: extractedText });
+    // Ensure we're passing the actual extracted text, not placeholder
+    const realExtractedText = extractedText || "";
+    setExtractionText(realExtractedText);
+    onRunTest({ extractionText: realExtractedText });
   };
   
   // Debug log for tracking extraction text

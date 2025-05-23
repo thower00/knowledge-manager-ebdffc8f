@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
@@ -91,12 +92,19 @@ export async function extractPdfTextServerSide(
         // Ensure the text is clean, not binary data
         if (typeof data.text === 'string') {
           console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
+          console.log(`First 200 characters of extracted text: "${data.text.substring(0, 200)}"`);
+          
+          // Do not use placeholder text - use actual extracted text
+          if (data.text.includes("Sample extracted text from") && data.text.length < 150) {
+            console.warn("Detected placeholder text in extraction result, actual extraction may have failed");
+          }
           
           // Apply improved text cleaning to prevent binary display issues
           const cleanedText = ensureReadableText(data.text);
           
           // Log the cleaning results
           console.log(`Text cleaning complete: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);
+          console.log(`First 200 characters of cleaned text: "${cleanedText.substring(0, 200)}"`);
           
           return cleanedText;
         } else {

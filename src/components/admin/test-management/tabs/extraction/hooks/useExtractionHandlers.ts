@@ -72,7 +72,17 @@ export const useExtractionHandlers = (
     setIsExtracting, 
     setExtractionError, 
     setProcessExtractionText, 
-    onComplete
+    (text, url) => {
+      console.log("URL extraction completed with text:", {
+        length: text?.length || 0,
+        sample: text?.substring(0, 100) || "no text"
+      });
+      
+      if (onComplete) {
+        // Ensure we pass the actual extracted text, not placeholder
+        onComplete(text, url);
+      }
+    }
   );
 
   // Use the refactored database extraction hook
@@ -89,7 +99,17 @@ export const useExtractionHandlers = (
     setIsExtracting,
     setExtractionError,
     setProcessExtractionText,
-    onComplete
+    (text) => {
+      console.log("Database extraction completed with text:", {
+        length: text?.length || 0,
+        sample: text?.substring(0, 100) || "no text"
+      });
+      
+      if (onComplete) {
+        // Make sure we pass the actual text
+        onComplete(text);
+      }
+    }
   );
   
   // Create a wrapper that passes the current state directly to the extraction function
@@ -148,7 +168,9 @@ export const useExtractionHandlers = (
     // Extract directly using the document
     extractFromDocument(doc)
       .then(text => {
-        console.log("Extraction completed successfully, text length:", text.length);
+        console.log("Direct extraction completed successfully, text length:", text.length);
+        console.log("First 100 characters:", text.substring(0, 100));
+        
         setExtractionText(text);
         setDbExtractionText(text);
         setProcessExtractionText(text);

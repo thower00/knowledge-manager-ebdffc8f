@@ -17,6 +17,13 @@ export const ExtractedTextPreview = ({
   // Ensure there's actual content to display
   const hasContent = extractionText && extractionText.trim().length > 0;
   
+  // Debug the content we're receiving
+  console.log("ExtractedTextPreview received text:", {
+    length: extractionText?.length || 0,
+    sample: extractionText?.substring(0, 100),
+    hasContent
+  });
+  
   if (!hasContent) return null;
   
   return (
