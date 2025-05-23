@@ -7,11 +7,11 @@ import { UrlExtractionInput } from "../UrlExtractionInput";
 import { ExtractionProgress } from "../ExtractionProgress";
 import { ExtractedTextPreview } from "../ExtractedTextPreview";
 import { ExtractionErrorDisplay } from "../ExtractionErrorDisplay";
-import { useExtractionInitialization } from "./hooks/useExtractionInitialization";
-import { useDocumentSelection } from "./hooks/useDocumentSelection";
-import { useExtractionHandlers } from "./hooks/useExtractionHandlers";
-import { useUrlValidation } from "./hooks/useUrlValidation";
-import { useExtractionOptions } from "./hooks/useExtractionOptions";
+import { useExtractionInitialization } from "../hooks/useExtractionInitialization";
+import { useDocumentSelection } from "../hooks/useDocumentSelection";
+import { useExtractionHandlers } from "../hooks/useExtractionHandlers";
+import { useUrlValidation } from "../hooks/useUrlValidation";
+import { useExtractionOptions } from "../hooks/useExtractionOptions";
 import { useState } from "react";
 
 interface ExtractionTabProps {
@@ -130,8 +130,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             <ExtractionProgress
               extractionProgress={extractionProgress}
               isProgressiveMode={useProgressiveMode}
-              currentDocumentIndex={currentDocumentIndex}
-              documentsToProcessCount={documentsToProcessCount}
+              pagesProcessed={currentDocumentIndex}
+              totalPages={documentsToProcessCount}
             />
           )}
 
