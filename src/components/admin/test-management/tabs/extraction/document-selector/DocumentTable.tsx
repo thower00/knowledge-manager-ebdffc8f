@@ -98,11 +98,8 @@ export function DocumentTable({
                 data-testid={`document-row-${doc.id}`}
               >
                 <TableCell onClick={(e) => {
-                  // Stop propagation to prevent row click from being triggered
+                  // Important: Stop propagation so the row click handler doesn't fire
                   e.stopPropagation();
-                  // Toggle document selection directly
-                  toggleDocumentSelection(doc.id);
-                  console.log("Checkbox toggled for document:", doc.id);
                 }}>
                   <Checkbox
                     checked={selectedDocumentIds.includes(doc.id)}
@@ -111,6 +108,10 @@ export function DocumentTable({
                       toggleDocumentSelection(doc.id);
                     }}
                     data-testid={`document-checkbox-${doc.id}`}
+                    onClick={(e) => {
+                      // Make sure the event doesn't bubble up to the row
+                      e.stopPropagation();
+                    }}
                   />
                 </TableCell>
                 <TableCell className="font-medium">{doc.title}</TableCell>

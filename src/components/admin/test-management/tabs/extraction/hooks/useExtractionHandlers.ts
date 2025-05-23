@@ -101,8 +101,8 @@ export const useExtractionHandlers = (
       documentsToProcessCount: documentsToProcess?.length || 0
     });
     
-    // Check for documents to process before attempting extraction
-    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
+    // Double-check that we have documents to process before attempting extraction
+    if (!extractAllDocuments && (!selectedDocumentIds || selectedDocumentIds.length === 0)) {
       console.error("No documents selected and extract all not enabled");
       setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({
