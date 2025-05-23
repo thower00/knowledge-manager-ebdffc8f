@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { cleanAndNormalizeText, extractTextAlternatives } from "./textCleaningService";
+import { cleanAndNormalizeText } from "./textCleaningService";
 
 interface ProxyExtractionOptions {
   maxPages?: number;
@@ -10,6 +10,7 @@ interface ProxyExtractionOptions {
   disableBinaryOutput?: boolean;
   strictTextCleaning?: boolean;
   useAdvancedExtraction?: boolean;
+  useTextPatternExtraction?: boolean;
 }
 
 /**
@@ -21,7 +22,7 @@ export async function extractPdfWithProxy(
   progressCallback?: (progress: number) => void
 ): Promise<string> {
   // Add retry mechanism for more reliability
-  const maxRetries = 3;
+  const maxRetries = 2;
   let currentRetry = 0;
   let lastError: Error | null = null;
   
@@ -41,7 +42,8 @@ export async function extractPdfWithProxy(
           forceTextMode: true,
           disableBinaryOutput: true,
           strictTextCleaning: true,
-          useTextPatternExtraction: true // New flag for pattern-based extraction
+          useAdvancedExtraction: true, // Enhanced extraction
+          useTextPatternExtraction: true // Pattern-based extraction
         },
         timestamp: Date.now(),
         nonce: Math.random().toString(36).substring(2, 15)
@@ -68,32 +70,19 @@ export async function extractPdfWithProxy(
       // Report success
       if (progressCallback) progressCallback(95);
       
-      // Enhanced text cleaning to ensure we don't get binary data
+      // Additional text validation and transformation
       if (typeof data.text === 'string') {
-        console.log(`PDF text extracted successfully, length: ${data.text.length} chars`);
-        console.log(`First 200 characters of extracted text: "${data.text.substring(0, 200)}"`);
+        const extractedText = data.text;
+        console.log(`PDF text extracted successfully, length: ${extractedText.length} chars`);
+        console.log(`First 200 characters of extracted text: "${extractedText.substring(0, 200)}"`);
         
-        // Special handling for binary-looking text
-        if (containsBinaryIndicators(data.text)) {
-          console.log("Detected potential binary content, applying extra cleaning");
-          
-          // Apply ultra-aggressive cleaning
-          const cleanedText = cleanAndNormalizeText(data.text);
-          console.log(`Text cleaning complete: original ${data.text.length} chars → cleaned ${cleanedText.length} chars`);
-          
-          // Try alternative extraction if cleaned text still seems problematic
-          if (containsBinaryIndicators(cleanedText) && cleanedText.length < 200) {
-            const alternatives = extractTextAlternatives(data.text);
-            if (alternatives.length > 0 && alternatives[0].length > cleanedText.length) {
-              console.log("Using alternative extraction method with better results");
-              return alternatives[0];
-            }
-          }
-          
-          return cleanedText;
+        // Apply additional cleaning if it appears to be binary data
+        if (isBinaryLooking(extractedText)) {
+          console.log("Detected potential binary content, applying extra client-side cleaning");
+          return cleanBinaryLookingText(extractedText);
         }
         
-        return data.text;
+        return extractedText;
       } else {
         throw new Error("Invalid text format in response");
       }
@@ -120,26 +109,73 @@ export async function extractPdfWithProxy(
 }
 
 /**
- * Check if text likely contains binary data indicators
+ * Check if text looks like it contains binary data or encoding issues
  */
-function containsBinaryIndicators(text: string): boolean {
-  if (!text || text.length < 20) return false;
+function isBinaryLooking(text: string): boolean {
+  if (!text || text.length < 100) return false;
   
-  // Check for various indicators of binary/corrupted content
+  // Check for indicators of binary content
   const binaryIndicators = [
-    // High concentration of special characters
-    text.replace(/[a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, '').length > text.length * 0.25,
+    // High percentage of non-alphanumeric characters
+    text.replace(/[a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, '').length > text.length * 0.3,
     
-    // Low word-to-character ratio (binary data often has few proper words)
-    text.split(/\s+/).filter(word => /^[a-zA-Z]{2,}$/.test(word)).length < text.length / 30,
+    // Low word-to-character ratio
+    text.split(/\s+/).filter(word => /^[a-zA-Z]{2,}$/.test(word)).length < text.length / 40,
     
-    // High concentration of control characters
-    /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/.test(text),
+    // Random-looking sequences of special chars and letters
+    /([\\\/\^~\*#@!\(\)\[\]{}]+[A-Za-z0-9]+){5,}/.test(text),
     
-    // Random-looking sequences of letters, numbers and symbols
-    /([\\\/\^~\*#@!\(\)\[\]{}]+[A-Za-z0-9]+){5,}/.test(text)
+    // Low percentage of common English words
+    countCommonWords(text) < text.length / 200
   ];
   
   // Return true if at least two indicators are found
   return binaryIndicators.filter(Boolean).length >= 2;
+}
+
+/**
+ * Count occurrences of common English words as a heuristic for meaningful text
+ */
+function countCommonWords(text: string): number {
+  const commonWords = ['the', 'and', 'that', 'have', 'for', 'not', 'this', 'with', 'you', 'which'];
+  let count = 0;
+  
+  for (const word of commonWords) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    const matches = text.match(regex);
+    count += matches ? matches.length : 0;
+  }
+  
+  return count;
+}
+
+/**
+ * Clean text that appears to contain binary data using more aggressive methods
+ */
+function cleanBinaryLookingText(text: string): string {
+  // First apply standard cleaning
+  let cleaned = cleanAndNormalizeText(text);
+  
+  // Extract complete sentences for better readability
+  const sentencesMatch = cleaned.match(/[A-Z][^.!?]+[.!?]/g);
+  if (sentencesMatch && sentencesMatch.join(' ').length > 200) {
+    return sentencesMatch.join(' ');
+  }
+  
+  // Extract meaningful word sequences as fallback
+  const wordSequences = cleaned.match(/[a-zA-Z]{3,}(\s+[a-zA-Z]{2,}){3,}/g);
+  if (wordSequences && wordSequences.length > 5) {
+    return wordSequences.join(' ');
+  }
+  
+  // If still problematic, use only the most likely real text parts
+  const letterOnlyWords = cleaned.split(/\s+/)
+    .filter(word => /^[a-zA-Z]{3,}$/.test(word))
+    .join(' ');
+    
+  if (letterOnlyWords.length > 100) {
+    return letterOnlyWords;
+  }
+  
+  return cleaned;
 }

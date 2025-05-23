@@ -1,40 +1,41 @@
 
+import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
+
 interface ExtractionProgressProps {
   extractionProgress: number;
   isProgressiveMode?: boolean;
   pagesProcessed?: number;
   totalPages?: number;
-  status?: string;
 }
 
-export const ExtractionProgress = ({
+export function ExtractionProgress({
   extractionProgress,
-  isProgressiveMode,
-  pagesProcessed,
-  totalPages,
-  status,
-}: ExtractionProgressProps) => {
+  isProgressiveMode = false,
+  pagesProcessed = 0,
+  totalPages = 0
+}: ExtractionProgressProps) {
+  // Format the progress value
+  const progressValue = Math.min(Math.max(0, extractionProgress), 100);
+  const progressText = `${Math.round(progressValue)}%`;
+  
   return (
-    <div className="mt-2 space-y-2">
-      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-green-500 transition-all duration-300 ease-in-out" 
-          style={{ width: `${extractionProgress}%` }}
-        ></div>
+    <div className="space-y-2 my-4">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Extracting text...</span>
+        </div>
+        <span className="font-medium">{progressText}</span>
       </div>
-      <p className="text-xs text-center text-muted-foreground">
-        {isProgressiveMode && pagesProcessed !== undefined && totalPages ? (
-          <>
-            Processing page {pagesProcessed} of {totalPages} ({extractionProgress}% complete)
-            {status && <span className="block mt-1 italic">{status}</span>}
-          </>
-        ) : (
-          <>
-            {extractionProgress}% complete
-            {status && <span className="block mt-1 italic">{status}</span>}
-          </>
-        )}
-      </p>
+      
+      <Progress value={progressValue} className="h-2" />
+      
+      {isProgressiveMode && totalPages > 0 && (
+        <div className="text-xs text-muted-foreground text-center">
+          Processing page {pagesProcessed} of {totalPages}
+        </div>
+      )}
     </div>
   );
-};
+}

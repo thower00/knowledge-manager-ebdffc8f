@@ -1,5 +1,4 @@
 
-import { supabase } from "@/integrations/supabase/client";
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
 import { cleanAndNormalizeText } from "./textCleaningService";
@@ -29,7 +28,7 @@ export async function extractPdfTextServerSide(
       base64Data = btoa(
         new Uint8Array(documentData).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
-      console.log(`Successfully converted base64 to ArrayBuffer, size: ${documentData.byteLength}`);
+      console.log(`Successfully converted ArrayBuffer to base64, size: ${documentData.byteLength}`);
     } else {
       // If it's already a base64 string
       base64Data = documentData;
@@ -40,14 +39,16 @@ export async function extractPdfTextServerSide(
     // Call the proxy extraction service with enhanced options
     const extractionOptions = {
       ...options,
-      timeout: Math.min(options?.timeout || 30, 30), // Cap at 30 seconds
+      timeout: Math.min(options?.timeout || 30, 60), // Cap at 60 seconds
       forceTextMode: true, // Force text-only extraction
       disableBinaryOutput: true, // Prevent binary data in output
       strictTextCleaning: true, // Request aggressive cleaning
-      useAdvancedExtraction: true // New flag to use our most advanced extraction
+      useAdvancedExtraction: true, // New flag to use our most advanced extraction
+      useTextPatternExtraction: true // Enable pattern extraction for difficult PDFs
     };
     
-    return extractPdfWithProxy(base64Data, extractionOptions, progressCallback);
+    const result = await extractPdfWithProxy(base64Data, extractionOptions, progressCallback);
+    return result;
   } catch (error) {
     console.error("Error in server-side PDF extraction:", error);
     throw error;

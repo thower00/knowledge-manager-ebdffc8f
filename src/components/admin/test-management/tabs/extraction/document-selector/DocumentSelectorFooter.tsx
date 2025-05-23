@@ -1,10 +1,8 @@
 
+import { ProcessedDocument } from "@/types/document";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CardContent } from "@/components/ui/card";
-import { FileText, Loader2, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
-import { ProcessedDocument } from "@/types/document";
+import { Loader2 } from "lucide-react";
 
 interface DocumentSelectorFooterProps {
   documents: ProcessedDocument[];
@@ -31,97 +29,62 @@ export function DocumentSelectorFooter({
   documentsToProcessCount,
   selectionError
 }: DocumentSelectorFooterProps) {
-  const [isButtonClicked, setIsButtonClicked] = useState(false);
+  // Count selected documents or all if extractAllDocuments is true
+  const selectedCount = extractAllDocuments 
+    ? documents.length 
+    : selectedDocumentIds.length;
   
-  // Calculate if extract button should be enabled
-  // Ensure selectedDocumentIds is an array before checking length
-  const hasSelection = Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0;
-  const canExtract = !isLoading && !isExtracting && (hasSelection || (extractAllDocuments && documents.length > 0));
-
-  // Log state for debugging
-  useEffect(() => {
-    console.log("DocumentSelectorFooter state:", {
-      hasSelection,
-      selectedCount: Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0,
-      extractAll: extractAllDocuments,
-      canExtract,
-      documentsCount: documents.length,
-      isExtracting,
-      selectionError,
-      selectedIds: JSON.stringify(selectedDocumentIds)
-    });
-  }, [selectedDocumentIds, extractAllDocuments, documents.length, isExtracting, canExtract, selectionError]);
-
-  // Handle extract button click with visual feedback
-  const handleExtractClick = () => {
-    console.log("Extract button clicked with state:", {
-      selectedIds: JSON.stringify(selectedDocumentIds),
-      selectedCount: Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0,
-      extractAll: extractAllDocuments,
-      canExtract,
-      hasSelection
-    });
-    
-    // Add visual feedback for button click
-    setIsButtonClicked(true);
-    setTimeout(() => setIsButtonClicked(false), 300);
-    
-    // Call the extraction handler
-    onExtract();
-  };
-
+  // Generate extraction button text
+  const extractButtonText = isExtracting
+    ? `Extracting ${currentDocumentIndex + 1}/${documentsToProcessCount}`
+    : `Extract ${selectedCount} Document${selectedCount !== 1 ? 's' : ''}`;
+  
   return (
-    <CardContent className="p-4 border-t">
+    <div className="p-4 border-t">
       <div className="flex items-center space-x-2 mb-4">
-        <Checkbox 
-          id="extract-all" 
+        <Checkbox
+          id="extract-all"
           checked={extractAllDocuments}
-          onCheckedChange={(checked) => {
-            console.log("Extract all changed to:", checked);
-            setExtractAllDocuments(checked === true);
-          }}
+          onCheckedChange={(checked) => setExtractAllDocuments(!!checked)}
+          disabled={isLoading || isExtracting}
         />
-        <label htmlFor="extract-all" className="text-sm cursor-pointer">
-          Extract from all documents (ignores selection)
+        <label
+          htmlFor="extract-all"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
+          Use all documents ({documents.length})
         </label>
       </div>
       
-      <div className="flex justify-between items-center">
-        <div className="text-sm text-muted-foreground">
-          {extractAllDocuments 
-            ? `All ${documents.length} documents will be processed` 
-            : `${Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0} document(s) selected`}
-        </div>
-        
-        <Button 
-          onClick={handleExtractClick}
-          disabled={!canExtract}
-          data-testid="extract-selected-button"
-          className={isButtonClicked ? "bg-primary/80" : ""}
-        >
-          {isExtracting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {documentsToProcessCount > 1 
-                ? `Extracting Document ${currentDocumentIndex + 1}/${documentsToProcessCount}...` 
-                : "Extracting..."}
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4 mr-2" />
-              {extractAllDocuments ? "Extract All" : "Extract Selected"}
-            </>
-          )}
-        </Button>
-      </div>
-      
-      {/* Error feedback - shown when selection validation fails */}
       {selectionError && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 flex items-center text-sm">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>{selectionError}</span>
+        <div className="text-sm text-red-500 mb-4">
+          {selectionError}
         </div>
       )}
-    </CardContent>
+      
+      <Button
+        onClick={onExtract}
+        disabled={
+          isLoading || 
+          isExtracting || 
+          (selectedDocumentIds.length === 0 && !extractAllDocuments) ||
+          documents.length === 0
+        }
+        className="w-full"
+      >
+        {isExtracting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {extractButtonText}
+      </Button>
+      
+      <div className="mt-2 text-xs text-muted-foreground text-center">
+        {!extractAllDocuments && selectedDocumentIds.length === 0 ? (
+          "Please select at least one document"
+        ) : (
+          `${extractAllDocuments ? 'All' : selectedDocumentIds.length} document${
+            (extractAllDocuments && documents.length !== 1) || (!extractAllDocuments && selectedDocumentIds.length !== 1) ? 's' : ''
+          } selected`
+        )}
+      </div>
+    </div>
   );
 }

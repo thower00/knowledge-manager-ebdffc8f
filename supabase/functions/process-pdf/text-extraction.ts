@@ -5,6 +5,138 @@ export function isPdfData(bytes: string): boolean {
   return bytes.substring(0, 8).includes("%PDF");
 }
 
+// Extract text by looking for patterns of likely words
+export function extractTextPatterns(pdfBytes: string): string {
+  try {
+    // Look for text that follows patterns of English words and sentences
+    const textPatterns = [
+      // Words with 3+ letters followed by spaces or punctuation
+      /([A-Za-z]{3,}[\s.,;:!?]+){3,}/g,
+      
+      // Capitalized words (likely proper nouns or sentence starts)
+      /([A-Z][a-z]{2,}[\s.,;:!?]+){2,}/g,
+      
+      // Common sentence structures
+      /([A-Z][a-z]{1,}[\s][a-z]+[\s][a-z]+[\s.,;:!?])/g
+    ];
+    
+    let extractedText = "";
+    
+    for (const pattern of textPatterns) {
+      const matches = pdfBytes.match(pattern);
+      if (matches && matches.length > 0) {
+        // Join matches with spacing
+        const matchText = matches.join(" ").replace(/\s+/g, " ");
+        
+        // If we found significant text, use it
+        if (matchText.length > extractedText.length) {
+          extractedText = matchText;
+        }
+      }
+    }
+    
+    return extractedText;
+  } catch (error) {
+    console.error("Error extracting text patterns:", error);
+    return "";
+  }
+}
+
+// Extract text from PDF streams
+export function extractTextFromStreams(pdfBytes: string): string {
+  try {
+    const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
+    const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
+    
+    if (!textStreams || textStreams.length === 0) {
+      return "";
+    }
+    
+    console.log(`Found ${textStreams.length} text streams`);
+    
+    // Take the longest streams as they likely contain the main text
+    const sortedStreams = textStreams
+      .map(match => match[1])
+      .filter(stream => stream.length > 50)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 10); // Take top 10 longest streams
+    
+    if (sortedStreams.length === 0) {
+      return "";
+    }
+    
+    let streamText = "";
+    
+    for (const stream of sortedStreams) {
+      // Look for text patterns in the stream
+      const potentialText = stream.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                                  .replace(/\s+/g, ' ')
+                                  .trim();
+      
+      if (potentialText.length > 100 && 
+          (potentialText.split(' ').length > 20)) {
+        streamText += potentialText + "\n\n";
+      }
+    }
+    
+    return streamText;
+  } catch (error) {
+    console.error("Error extracting text from streams:", error);
+    return "";
+  }
+}
+
+// Extract text by examining line breaks and spacing patterns
+export function extractTextByLines(pdfBytes: string): string {
+  try {
+    // Extract strings that might be text lines based on common PDF text encodings
+    const linePatterns = [
+      // Common PDF text encoding patterns
+      /\(([^\)]{5,})\)/g,  // Text in parentheses (common in PDF)
+      /BT\s*(.*?)\s*ET/gs, // Text between Begin Text and End Text markers
+      /TJ\s*\[(.*?)\]/gs,  // Text array in TJ operators
+    ];
+    
+    let lines: string[] = [];
+    
+    // Try each pattern
+    for (const pattern of linePatterns) {
+      const matches = [...pdfBytes.matchAll(pattern)];
+      if (matches && matches.length > 10) {
+        console.log(`Found ${matches.length} potential text lines using pattern`);
+        
+        // Extract the matched groups and process them
+        const extractedLines = matches.map(match => match[1] || match[0])
+          .filter(line => line.length >= 5)  // Filter out very short lines
+          .map(line => {
+            // Clean up line text
+            return line
+              .replace(/\\n/g, ' ')
+              .replace(/\\r/g, '')
+              .replace(/\\\\/g, '')
+              .replace(/\\t/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          })
+          .filter(line => {
+            // Keep lines that contain alphabetic characters
+            return /[A-Za-z]{3,}/.test(line);
+          });
+        
+        if (extractedLines.length > lines.length) {
+          lines = extractedLines;
+        }
+      }
+    }
+    
+    // Join the lines with proper spacing
+    return lines.join('\n');
+  } catch (error) {
+    console.error("Error extracting text by lines:", error);
+    return "";
+  }
+}
+
 // Extract text using parenthesized text objects
 export function extractTextFromTextObjects(pdfBytes: string): string {
   try {
@@ -50,50 +182,6 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
     return objectText;
   } catch (error) {
     console.error("Error extracting text from text objects:", error);
-    return "";
-  }
-}
-
-// Extract text from PDF streams
-export function extractTextFromStreams(pdfBytes: string): string {
-  try {
-    const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
-    const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
-    
-    if (!textStreams || textStreams.length === 0) {
-      return "";
-    }
-    
-    console.log(`Found ${textStreams.length} text streams`);
-    
-    // Take the longest streams as they likely contain the main text
-    const sortedStreams = textStreams
-      .map(match => match[1])
-      .filter(stream => stream.length > 50)
-      .sort((a, b) => b.length - a.length)
-      .slice(0, 10); // Take top 10 longest streams
-    
-    if (sortedStreams.length === 0) {
-      return "";
-    }
-    
-    let streamText = "";
-    
-    for (const stream of sortedStreams) {
-      // Look for text patterns in the stream
-      const potentialText = stream.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-                                  .replace(/\s+/g, ' ')
-                                  .trim();
-      
-      if (potentialText.length > 100 && 
-          (potentialText.split(' ').length > 20)) {
-        streamText += potentialText + "\n\n";
-      }
-    }
-    
-    return streamText;
-  } catch (error) {
-    console.error("Error extracting text from streams:", error);
     return "";
   }
 }
@@ -150,121 +238,6 @@ export function extractTextFromParentheses(pdfBytes: string): string {
   }
 }
 
-// Attempt to extract text with different encodings
-export function extractTextWithEncodings(pdfBytes: string): string {
-  try {
-    // Approach 1: Latin-1 (ISO-8859-1) decoding with strict filtering
-    try {
-      console.log("Trying Latin-1 decoding with improved filtering");
-      
-      // Process in chunks to handle large documents
-      const chunkSize = 10000;
-      let latinText = "";
-      
-      for (let startPos = 0; startPos < pdfBytes.length; startPos += chunkSize) {
-        const endPos = Math.min(startPos + chunkSize, pdfBytes.length);
-        const chunk = pdfBytes.substring(startPos, endPos);
-        
-        // Better character filtering - keep alphabets, numbers, punctuation
-        let chunkText = "";
-        for (let i = 0; i < chunk.length; i++) {
-          const charCode = chunk.charCodeAt(i) & 0xFF;
-          // Accept common Latin characters, numbers, and punctuation
-          if ((charCode >= 65 && charCode <= 90) ||   // A-Z
-              (charCode >= 97 && charCode <= 122) ||  // a-z
-              (charCode >= 48 && charCode <= 57) ||   // 0-9
-              (charCode === 32) ||                    // space
-              (charCode >= 33 && charCode <= 46) ||   // punctuation
-              (charCode === 10) || (charCode === 13) || (charCode === 9)) { // newlines, tab
-            chunkText += String.fromCharCode(charCode);
-          } else {
-            chunkText += ' ';
-          }
-        }
-        
-        // Add to overall text
-        latinText += chunkText;
-      }
-      
-      // Process the latinText to merge words correctly
-      latinText = latinText.replace(/\s+/g, ' ').trim();
-      
-      // Check if we got meaningful text
-      const words = latinText.split(/\s+/).filter(word => 
-        word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
-      );
-      
-      if (words.length > 50) {
-        console.log("Successfully extracted text using improved Latin-1 decoding");
-        return words.join(' ');
-      }
-    } catch (error) {
-      console.error("Error in Latin-1 decoding:", error);
-    }
-    
-    // Approach 2: Character frequency analysis
-    try {
-      console.log("Trying character frequency analysis as last resort");
-      
-      // Create a frequency map of characters in the document
-      const charFrequency = new Map();
-      for (let i = 0; i < pdfBytes.length; i++) {
-        const char = pdfBytes.charAt(i);
-        charFrequency.set(char, (charFrequency.get(char) || 0) + 1);
-      }
-      
-      // Sort characters by frequency (most common first)
-      const sortedChars = [...charFrequency.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([char, _]) => char);
-      
-      // Keep only the most common characters that look like text
-      const likelyTextChars = sortedChars
-        .filter(char => {
-          const code = char.charCodeAt(0);
-          return (code >= 32 && code <= 126) || // ASCII printable
-                 (code === 9 || code === 10 || code === 13); // Tab, LF, CR
-        })
-        .slice(0, 75); // Keep top 75 most common text characters
-      
-      // Build a set of acceptable characters
-      const validChars = new Set(likelyTextChars);
-      
-      // Extract text using only the most common characters
-      let freqText = "";
-      for (let i = 0; i < pdfBytes.length; i++) {
-        const char = pdfBytes.charAt(i);
-        if (validChars.has(char)) {
-          freqText += char;
-        } else {
-          // Replace with space if not in our accepted set
-          freqText += ' ';
-        }
-      }
-      
-      // Clean up the text
-      freqText = freqText.replace(/\s+/g, ' ').trim();
-      
-      // See if we have enough meaningful words
-      const words = freqText.split(/\s+/).filter(word => 
-        word.length >= 3 && /[a-zA-Z]{2,}/.test(word)
-      );
-      
-      if (words.length > 50) {
-        console.log("Successfully extracted text using character frequency analysis");
-        return words.join(' ');
-      }
-    } catch (error) {
-      console.error("Error in frequency analysis:", error);
-    }
-    
-    return "";
-  } catch (error) {
-    console.error("Error in encoding extraction:", error);
-    return "";
-  }
-}
-
 // Get PDF metadata from the document
 export function extractPdfMetadata(pdfBytes: string) {
   try {
@@ -314,22 +287,36 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
 export function cleanAndNormalizeText(text: string): string {
   if (!text || text.length === 0) return text;
   
-  // First pass - remove clearly binary sequences
-  let cleaned = text
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
-    .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF]/g, ' ')       // Keep ASCII and extended Latin
-    .replace(/\uFFFD/g, ' ')                               // Replace replacement character
-    .replace(/Ý|î|ò|ô|Ð|ð|Þ|þ|±|×|÷|¶|§|¦|¬|¢|¥|®|©|µ|¼|½|¾|¿|¡|«|»|°|·|´|`|¨|¯|¸|¹|²|³/g, ' '); // Replace common binary indicators
-    
-  // Second pass - look for remaining words
-  const words = cleaned.split(/\s+/)
-    .filter(word => {
-      // Keep only words that contain at least one letter or number
-      return word.length >= 2 && /[a-zA-Z0-9]/.test(word);
-    })
+  // Multi-stage cleaning approach
+  
+  // Stage 1: Remove binary and control characters
+  const stage1 = text.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
+                    .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF]/g, ' ')
+                    .replace(/\uFFFD/g, ' ');
+  
+  // Stage 2: Focus on extracting meaningful words (with 3+ alphabetic chars)
+  const words = stage1.split(/\s+/)
+    .filter(word => word.length >= 3 && /[a-zA-Z]{2,}/.test(word))
     .join(' ');
     
-  return words;
+  // If we found enough words, use that as our text
+  if (words.length > stage1.length / 3 || words.length > 200) {
+    return words;
+  }
+  
+  // Stage 3: Look for paragraph-like structures
+  const paragraphs = stage1.match(/[A-Za-z][^.!?]{10,}[.!?]/g);
+  if (paragraphs && paragraphs.length > 0) {
+    return paragraphs.join(' ');
+  }
+  
+  // Stage 4: As last resort, extract all letter sequences
+  const letterSequences = stage1.match(/[A-Za-z]{3,}/g);
+  if (letterSequences && letterSequences.length > 10) {
+    return letterSequences.join(' ');
+  }
+  
+  return stage1;
 }
 
 // Wrapper that tries all extraction methods
@@ -337,33 +324,39 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Try each method in order of reliability and take the best result
   const results = [];
   
-  // Method 1: Streams (usually most reliable)
+  // Method 1: Text Objects (usually most reliable)
+  const textObjectsResult = extractTextFromTextObjects(pdfBytes);
+  if (textObjectsResult && textObjectsResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(textObjectsResult);
+    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length * 1.2 });
+  }
+  
+  // Method 2: Streams
   const streamsResult = extractTextFromStreams(pdfBytes);
   if (streamsResult && streamsResult.length > 100) {
     const cleaned = cleanAndNormalizeText(streamsResult);
     results.push({ text: cleaned, method: 'streams', score: cleaned.length });
   }
   
-  // Method 2: Text Objects
-  const textObjectsResult = extractTextFromTextObjects(pdfBytes);
-  if (textObjectsResult && textObjectsResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(textObjectsResult);
-    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length });
+  // Method 3: Line-based extraction
+  const lineResult = extractTextByLines(pdfBytes);
+  if (lineResult && lineResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(lineResult);
+    results.push({ text: cleaned, method: 'lines', score: cleaned.length * 1.1 });
   }
   
-  // Method 3: Parentheses
+  // Method 4: Pattern-based as last resort
+  const patternResult = extractTextPatterns(pdfBytes);
+  if (patternResult && patternResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(patternResult);
+    results.push({ text: cleaned, method: 'patterns', score: cleaned.length });
+  }
+  
+  // Method 5: Parentheses
   const parenthesesResult = extractTextFromParentheses(pdfBytes);
   if (parenthesesResult && parenthesesResult.length > 100) {
     const cleaned = cleanAndNormalizeText(parenthesesResult);
     results.push({ text: cleaned, method: 'parentheses', score: cleaned.length });
-  }
-  
-  // Method 4: Various encodings
-  const encodingsResult = extractTextWithEncodings(pdfBytes);
-  if (encodingsResult && encodingsResult.length > 100) {
-    // Give encodings a slight boost as they're often better for international text
-    const cleaned = cleanAndNormalizeText(encodingsResult);
-    results.push({ text: cleaned, method: 'encodings', score: cleaned.length * 1.2 });
   }
   
   // If we have results, select the best one based on score
@@ -379,7 +372,7 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   }
   
   // If nothing worked, return empty string
-  return "";
+  return "No text could be extracted. The document may be image-based or protected.";
 }
 
 // Function to check if the extracted text looks like binary data

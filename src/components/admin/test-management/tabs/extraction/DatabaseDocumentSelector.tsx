@@ -2,7 +2,9 @@
 import { Button } from "@/components/ui/button";
 import { ProcessedDocument } from "@/types/document";
 import { DocumentList } from "./document-selector/DocumentList";
-import { ExtractControls } from "./document-selector/ExtractControls";
+import { DocumentSelectorHeader } from "./document-selector/DocumentSelectorHeader";
+import { DocumentSelectorFooter } from "./document-selector/DocumentSelectorFooter";
+import { ConnectionStatus } from "./document-selector/ConnectionStatus";
 import { ProxyStatus } from "./document-selector/ProxyStatus";
 
 interface DatabaseDocumentSelectorProps {
@@ -37,32 +39,19 @@ export const DatabaseDocumentSelector = ({
   currentDocumentIndex,
   documentsToProcess,
   proxyConnected,
-  disabled,
+  disabled = false,
   onExtract,
 }: DatabaseDocumentSelectorProps) => {
-  // Debug: Log selection state when component renders
-  console.log("DatabaseDocumentSelector rendering with:", {
-    dbDocumentsCount: dbDocuments?.length || 0,
-    selectedDocumentIds,
-    extractAllDocuments,
-    documentsToProcessCount: Array.isArray(documentsToProcess) ? documentsToProcess.length : 0
-  });
+  // Calculate the count of documents to process
+  const documentsToProcessCount = documentsToProcess?.length || 0;
 
   return (
     <div className="space-y-2 p-4 border rounded-md bg-gray-50">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-md font-medium">Extract from Database Documents</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={refreshDocuments}
-          disabled={isLoadingDocuments}
-        >
-          {isLoadingDocuments ? "Loading..." : "Refresh Documents"}
-        </Button>
-      </div>
+      <DocumentSelectorHeader 
+        refreshDocuments={refreshDocuments}
+        isLoading={isLoadingDocuments}
+      />
       
-      {/* Document List with checkboxes */}
       <DocumentList 
         documents={dbDocuments}
         isLoading={isLoadingDocuments}
@@ -72,19 +61,18 @@ export const DatabaseDocumentSelector = ({
         disabled={disabled || isExtracting}
       />
       
-      <ExtractControls 
-        dbDocuments={dbDocuments}
-        documentsToProcess={documentsToProcess}
+      <DocumentSelectorFooter 
+        documents={dbDocuments}
+        documentsToProcessCount={documentsToProcessCount}
         selectedDocumentIds={selectedDocumentIds}
         extractAllDocuments={extractAllDocuments}
         setExtractAllDocuments={setExtractAllDocuments}
         isExtracting={isExtracting}
+        isLoading={isLoadingDocuments}
         currentDocumentIndex={currentDocumentIndex}
-        handleExtractFromDatabase={handleExtractFromDatabase}
-        disabled={disabled}
+        onExtract={handleExtractFromDatabase}
       />
       
-      {/* Connection status indicator */}
       <ProxyStatus proxyConnected={proxyConnected} />
     </div>
   );

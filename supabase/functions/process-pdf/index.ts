@@ -4,8 +4,9 @@ import {
   isPdfData,
   extractPdfMetadata,
   extractTextWithTimeout,
-  textContainsBinaryIndicators,
-  cleanAndNormalizeText
+  cleanAndNormalizeText,
+  extractTextByLines,
+  extractTextPatterns
 } from "./text-extraction.ts";
 
 // Define proper CORS headers
@@ -61,57 +62,83 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       extractedText = await extractTextWithTimeout(pdfBytes, 25000);
       
       if (!extractedText || extractedText.length < 50) {
-        console.log("Couldn't extract meaningful text using standard methods");
-        return {
-          text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
-          success: false,
-          error: "Text extraction failed",
-          totalPages: pageCount,
-          processedPages: 0
-        };
-      }
-      
-      console.log(`Successfully extracted ${extractedText.length} characters of text`);
-      
-      // Always check for binary data and clean aggressively
-      console.log("Detected binary data in extracted text, applying additional cleaning");
-      
-      // Clean text more aggressively
-      extractedText = cleanAndNormalizeText(extractedText);
+        console.log("Couldn't extract meaningful text using standard methods, trying alternatives");
         
-      console.log(`After cleaning: ${extractedText.length} characters of text remain`);
-      
-      // Apply final aggressive cleaning to guarantee no binary data
-      if (options?.disableBinaryOutput || options?.strictTextCleaning || options?.useAdvancedExtraction) {
-        // Enhanced version with more aggressive cleaning for binary data
-        extractedText = extractedText
-          .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only ASCII printable chars and line breaks
-          .replace(/\s+/g, ' ')                 // Collapse whitespace
-          .trim();
-          
-        if (options?.useAdvancedExtraction) {
-          // Extract meaningful words with multiple consecutive letters
-          const meaningfulWords = extractedText.split(/\s+/)
-            .filter(word => /[a-zA-Z]{3,}/.test(word))
-            .join(' ');
-            
-          if (meaningfulWords.length > 200) {
-            extractedText = meaningfulWords;
+        // Try alternative extraction methods
+        const textByLines = extractTextByLines(pdfBytes);
+        if (textByLines && textByLines.length > 100) {
+          console.log(`Got better results using line-based extraction: ${textByLines.length} chars`);
+          extractedText = textByLines;
+        } else {
+          // Try pattern-based extraction as last resort
+          const patternText = extractTextPatterns(pdfBytes);
+          if (patternText && patternText.length > 100) {
+            console.log(`Using pattern extraction as fallback: ${patternText.length} chars`);
+            extractedText = patternText;
+          } else {
+            return {
+              text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
+              success: false,
+              error: "Text extraction failed",
+              totalPages: pageCount,
+              processedPages: 0
+            };
           }
         }
-        
-        console.log(`Final cleaning complete: ${extractedText.length} characters remain`);
       }
       
-      // Additional pattern extraction for very problematic PDFs
-      if (options?.useTextPatternExtraction && extractedText.length < 500) {
-        // Try to extract text by looking for patterns and semantic structures
-        const altText = extractAlternativePatterns(pdfBytes);
-        if (altText && altText.length > extractedText.length * 1.5) {
-          console.log(`Pattern extraction found better results: ${altText.length} vs ${extractedText.length} chars`);
-          extractedText = altText;
+      console.log(`Raw text extracted, length: ${extractedText.length} characters`);
+      
+      // Apply ultra-aggressive text cleaning - this is the key improvement
+      console.log("Applying advanced multi-stage text cleaning");
+      
+      // First pass - remove clearly binary/non-text content
+      let cleanedText = extractedText
+        .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')   // Control characters
+        .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF\u2000-\u206F]/g, ' ')  // Keep printable ASCII, Latin-1 and punctuation
+        .replace(/\uFFFD/g, ' ');                                  // Replace Unicode replacement char
+        
+      // Second pass - extract meaningful words
+      const words = cleanedText.split(/\s+/)
+        .filter(word => {
+          // Look for words with 3+ consecutive letters (likely real text)
+          return word.length >= 3 && /[a-zA-Z]{3,}/.test(word);
+        })
+        .join(' ');
+      
+      if (words.length > 300) {
+        console.log(`Extracted ${words.length} chars of meaningful text after cleaning`);
+        cleanedText = words;
+      } else {
+        console.log("Text quality still poor after cleaning, trying deeper extraction");
+        
+        // Look for chunks of meaningful text
+        const textChunks = extractedText.match(/[A-Za-z .,;:!?]{20,}/g);
+        if (textChunks && textChunks.length > 0) {
+          const betterText = textChunks.join('\n\n');
+          if (betterText.length > 200) {
+            console.log(`Found ${textChunks.length} meaningful text chunks, total ${betterText.length} chars`);
+            cleanedText = betterText;
+          }
         }
       }
+      
+      // If still no good text, extract sequences of letters as fallback
+      if (cleanedText.length < 200) {
+        console.log("Using letter sequence extraction as last resort");
+        const letterSequences = extractedText.match(/[A-Za-z]{3,}[A-Za-z\s.,;:!?]{5,}/g);
+        if (letterSequences && letterSequences.length > 5) {
+          cleanedText = letterSequences.join(' ');
+        }
+      }
+      
+      // Final normalization
+      cleanedText = cleanedText
+        .replace(/\s+/g, ' ')
+        .trim();
+        
+      console.log(`Final cleaned text: ${cleanedText.length} characters`);
+      extractedText = cleanedText;
     } catch (error) {
       console.error("Text extraction error:", error);
       return {
@@ -159,44 +186,6 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       error: error.message,
       available: true
     };
-  }
-}
-
-// Try to extract text using alternative pattern-based approaches
-function extractAlternativePatterns(pdfBytes: string): string | null {
-  try {
-    // Look for sequences that match typical text patterns
-    const patterns = [
-      // Look for sequences that start with capital letters followed by lowercase
-      /([A-Z][a-z]{2,}\s+([a-z]+\s+){2,})/g,
-      
-      // Look for common paragraph patterns
-      /([\w\s.,;:!?(){}\[\]"'-]{20,})/g,
-      
-      // Look for runs of ASCII text
-      /([A-Za-z0-9\s.,;:!?(){}\[\]"'-]{15,})/g
-    ];
-    
-    // Try each pattern in turn
-    for (const pattern of patterns) {
-      const matches = pdfBytes.match(pattern);
-      if (matches && matches.length > 5) {
-        // Join the matches, filter to remove duplicates
-        const uniqueMatches = Array.from(new Set(matches));
-        const result = uniqueMatches
-          .filter(text => text.length > 15)
-          .join('\n\n');
-          
-        if (result.length > 100) {
-          return result;
-        }
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error("Error in pattern extraction:", error);
-    return null;
   }
 }
 
@@ -295,9 +284,7 @@ serve(async (req) => {
       timeout: options.timeout || 60,
       forceTextMode: options.forceTextMode || false,
       disableBinaryOutput: options.disableBinaryOutput || false,
-      strictTextCleaning: options.strictTextCleaning || false,
-      useAdvancedExtraction: options.useAdvancedExtraction || false,
-      useTextPatternExtraction: options.useTextPatternExtraction || false
+      strictTextCleaning: options.strictTextCleaning || false
     }));
 
     // Process the PDF with a timeout to prevent function timeouts
