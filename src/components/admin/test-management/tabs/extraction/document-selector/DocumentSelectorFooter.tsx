@@ -34,19 +34,21 @@ export function DocumentSelectorFooter({
   const [isButtonClicked, setIsButtonClicked] = useState(false);
   
   // Calculate if extract button should be enabled
-  const hasSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
+  // Ensure selectedDocumentIds is an array before checking length
+  const hasSelection = Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0;
   const canExtract = !isLoading && !isExtracting && (hasSelection || (extractAllDocuments && documents.length > 0));
 
   // Log state for debugging
   useEffect(() => {
     console.log("DocumentSelectorFooter state:", {
       hasSelection,
-      selectedCount: selectedDocumentIds?.length || 0,
+      selectedCount: Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0,
       extractAll: extractAllDocuments,
       canExtract,
       documentsCount: documents.length,
       isExtracting,
-      selectionError
+      selectionError,
+      selectedIds: JSON.stringify(selectedDocumentIds)
     });
   }, [selectedDocumentIds, extractAllDocuments, documents.length, isExtracting, canExtract, selectionError]);
 
@@ -54,9 +56,10 @@ export function DocumentSelectorFooter({
   const handleExtractClick = () => {
     console.log("Extract button clicked with state:", {
       selectedIds: JSON.stringify(selectedDocumentIds),
-      selectedCount: selectedDocumentIds?.length || 0,
+      selectedCount: Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0,
       extractAll: extractAllDocuments,
-      canExtract
+      canExtract,
+      hasSelection
     });
     
     // Add visual feedback for button click
@@ -87,7 +90,7 @@ export function DocumentSelectorFooter({
         <div className="text-sm text-muted-foreground">
           {extractAllDocuments 
             ? `All ${documents.length} documents will be processed` 
-            : `${selectedDocumentIds?.length || 0} document(s) selected`}
+            : `${Array.isArray(selectedDocumentIds) ? selectedDocumentIds.length : 0} document(s) selected`}
         </div>
         
         <Button 

@@ -32,8 +32,9 @@ export function DocumentTable({
     });
   }, [documents, selectedDocumentIds]);
 
+  // Check if we should show the empty state
   if (isLoading || documents.length === 0) {
-    return <EmptyTableState isLoading={isLoading} />;
+    return <EmptyTableState isLoading={isLoading} documentsCount={documents.length} />;
   }
 
   // Safety check for selectedDocumentIds

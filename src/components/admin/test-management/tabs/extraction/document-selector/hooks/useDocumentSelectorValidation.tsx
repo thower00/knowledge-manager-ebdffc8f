@@ -24,11 +24,12 @@ export function useDocumentSelectorValidation({
       documentsCount: documents.length,
       selectedIds: selectedDocumentIds,
       selectedCount: selectedDocumentIds?.length || 0,
-      extractAll: extractAllDocuments
+      extractAll: extractAllDocuments,
+      hasSelection: Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0
     });
     
     // Clear error message if we have a valid selection
-    if ((selectedDocumentIds && selectedDocumentIds.length > 0) || extractAllDocuments) {
+    if ((Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0) || extractAllDocuments) {
       setSelectionError(null);
     }
   }, [documents, selectedDocumentIds, extractAllDocuments]);
@@ -38,14 +39,23 @@ export function useDocumentSelectorValidation({
     console.log("Extraction requested with state:", {
       selectedIds: selectedDocumentIds,
       selectedCount: selectedDocumentIds?.length || 0, 
-      extractAll: extractAllDocuments
+      extractAll: extractAllDocuments,
+      hasSelection: Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0
     });
 
     // Validate selection before triggering extraction
-    const hasSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
+    const hasSelection = Array.isArray(selectedDocumentIds) && selectedDocumentIds.length > 0;
+    
     if (!extractAllDocuments && !hasSelection) {
       console.error("Extraction attempted with no documents selected and extract all not enabled");
       setSelectionError("No documents selected. Please select at least one document or enable 'Extract All'.");
+      return;
+    }
+    
+    // Additional validation: check if documents array is empty
+    if (documents.length === 0) {
+      console.error("Extraction attempted with empty documents list");
+      setSelectionError("No documents available in the database. Please upload documents first.");
       return;
     }
     
