@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
@@ -49,7 +50,7 @@ export const useDocumentSelection = () => {
     }
   };
 
-  const toggleDocumentSelection = (documentId: string) => {
+  const toggleDocumentSelection = useCallback((documentId: string) => {
     console.log("Toggling document selection:", documentId);
     setSelectedDocumentIds(prev => {
       if (prev.includes(documentId)) {
@@ -62,9 +63,9 @@ export const useDocumentSelection = () => {
         return newSelection;
       }
     });
-  };
+  }, []);
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     console.log("toggleSelectAll called with current state:", {
       selectedCount: selectedDocumentIds.length,
       totalDocs: dbDocuments.length
@@ -80,7 +81,7 @@ export const useDocumentSelection = () => {
       console.log("Selecting all documents:", allIds);
       setSelectedDocumentIds(allIds);
     }
-  };
+  }, [selectedDocumentIds.length, dbDocuments]);
 
   // Return a Promise explicitly for refresh
   const refreshDocuments = useCallback(async () => {

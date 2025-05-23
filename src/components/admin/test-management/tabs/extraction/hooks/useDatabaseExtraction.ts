@@ -41,8 +41,7 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Compute the documents to process based on selection state
-    // This should be consistent with what's shown in the UI
+    // Compute the documents to process here directly rather than relying on the passed documentsToProcess
     const docsToProcess = extractAllDocuments ? 
       dbDocuments : 
       dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
@@ -50,7 +49,8 @@ export const useDatabaseExtraction = (
     console.log("Documents to process:", {
       computedLocally: docsToProcess.length,
       fromHookState: documentsToProcess.length,
-      docsToProcess
+      docsToProcess,
+      selectedDocumentIds
     });
     
     // Validate selection
@@ -84,7 +84,7 @@ export const useDatabaseExtraction = (
       let combinedText = "";
       let processedCount = 0;
       
-      // Process the first document for now (we can enhance this later)
+      // Process each selected document (for now just the first one)
       const doc = docsToProcess[0];
       
       if (!doc) {

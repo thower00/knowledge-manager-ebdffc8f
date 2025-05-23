@@ -23,6 +23,7 @@ export const useExtractionHandlers = (
   } = useUrlValidation();
   
   // Get document selection and handling
+  const documentSelection = useDocumentSelection();
   const {
     selectedDocumentIds,
     dbDocuments,
@@ -33,7 +34,7 @@ export const useExtractionHandlers = (
     toggleSelectAll,
     refreshDocuments,
     documentsToProcess
-  } = useDocumentSelection();
+  } = documentSelection;
   
   // Server extraction process
   const {
@@ -72,7 +73,7 @@ export const useExtractionHandlers = (
   // Use the refactored database extraction hook
   const { 
     setExtractionText: setDbExtractionText,
-    handleExtractFromDatabase 
+    handleExtractFromDatabase: handleExtractFromDbBase
   } = useDatabaseExtraction(
     selectedDocumentIds,
     extractAllDocuments,
@@ -85,6 +86,16 @@ export const useExtractionHandlers = (
     setProcessExtractionText,
     onComplete ? (text) => onComplete(text) : undefined
   );
+  
+  // Create a wrapped handler that console logs the current state before extraction
+  const handleExtractFromDatabase = () => {
+    console.log("Extract button clicked - current state:", {
+      selectedIds: selectedDocumentIds,
+      documentsToProcess,
+      extractAllDocuments
+    });
+    return handleExtractFromDbBase();
+  };
   
   // Use the refactored refresh hook
   const { handleRefresh } = useRefresh(
