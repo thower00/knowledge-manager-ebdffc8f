@@ -21,16 +21,18 @@ export const useDatabaseExtraction = (
   
   // Extract text from database documents
   const handleExtractFromDatabase = useCallback(async () => {
-    // Log selection state to help debugging
+    // Log selection state for debugging
     console.log("handleExtractFromDatabase called with state:", {
       selectedDocumentIds,
       extractAllDocuments,
       dbDocumentsCount: dbDocuments?.length || 0,
-      documentsToProcessCount: documentsToProcess?.length || 0
+      documentsToProcessLength: documentsToProcess?.length || 0,
+      documentsToProcess
     });
     
     // Safety checks
     if (!dbDocuments || dbDocuments.length === 0) {
+      console.error("No documents available");
       toast({
         title: "No Documents Available",
         description: "There are no documents in the database",
@@ -39,8 +41,21 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Validate selected documents
-    if (!extractAllDocuments && selectedDocumentIds.length === 0) {
+    // Compute the documents to process based on selection state
+    // This should be consistent with what's shown in the UI
+    const docsToProcess = extractAllDocuments ? 
+      dbDocuments : 
+      dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    
+    console.log("Documents to process:", {
+      computedLocally: docsToProcess.length,
+      fromHookState: documentsToProcess.length,
+      docsToProcess
+    });
+    
+    // Validate selection
+    if (docsToProcess.length === 0) {
+      console.error("No documents selected for processing");
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
@@ -49,30 +64,12 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Verify documentsToProcess directly
-    const docsToProcess = extractAllDocuments ? dbDocuments : 
-                         dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-    
-    console.log("Final documents computation:", {
-      extractAll: extractAllDocuments,
-      selectedIds: selectedDocumentIds,
-      computed: docsToProcess.length
-    });
-    
-    if (docsToProcess.length === 0) {
-      toast({
-        title: "No Documents to Process",
-        description: "No valid documents were selected for processing",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Check connection first
+    // Start extraction process
     setIsExtracting(true);
+    setExtractionError(null);
     
     try {
-      // Make sure we have a connection to the proxy
+      // Check proxy connection first
       const isConnected = await checkProxyConnection();
       if (!isConnected) {
         setIsExtracting(false);
@@ -87,10 +84,11 @@ export const useDatabaseExtraction = (
       let combinedText = "";
       let processedCount = 0;
       
-      // Get the first document for extraction
+      // Process the first document for now (we can enhance this later)
       const doc = docsToProcess[0];
       
       if (!doc) {
+        console.error("Document not found");
         setIsExtracting(false);
         toast({
           title: "Document Not Found",
@@ -101,7 +99,6 @@ export const useDatabaseExtraction = (
       }
       
       try {
-        // Extract text from this document
         console.log("Processing document:", doc.title);
         const extractedText = await extractFromDocument(doc);
         
@@ -113,7 +110,7 @@ export const useDatabaseExtraction = (
         setExtractionText(combinedText);
         setProcessExtractionText(combinedText);
         
-        // Wait a moment before marking as complete to ensure UI updates
+        // Wait briefly before completing to ensure UI updates
         await sleep(100);
         
         // Call complete callback if provided
@@ -123,13 +120,14 @@ export const useDatabaseExtraction = (
       } catch (docError) {
         console.error(`Error extracting from document ${doc.title}:`, docError);
         
-        // Continue with next document, add error note to combined text
+        // Add error note to combined text
         combinedText += `\n\nError extracting from ${doc.title}: ${docError instanceof Error ? docError.message : "Unknown error"}`;
         
         // Set extraction error
         setExtractionError(docError instanceof Error ? docError.message : "Error extracting from document");
       }
       
+      // Show appropriate message based on results
       if (processedCount === 0) {
         toast({
           title: "Extraction Failed",

@@ -11,7 +11,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
 
-import { DatabaseDocumentSelector } from "./DatabaseDocumentSelector";
+import { ExtractDocumentsSelector } from "./ExtractDocumentsSelector";
 import { UrlExtractionInput } from "./UrlExtractionInput";
 import { ExtractionProgress } from "./ExtractionProgress";
 import { ExtractionErrorDisplay } from "./ExtractionErrorDisplay";
@@ -157,21 +157,21 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           </Alert>
         )}
 
-        {/* Database Document Selector Component */}
-        <DatabaseDocumentSelector 
-          dbDocuments={dbDocuments}
+        {/* New Document Selector Component */}
+        <ExtractDocumentsSelector 
+          documents={dbDocuments}
           selectedDocumentIds={selectedDocumentIds}
           toggleDocumentSelection={toggleDocumentSelection}
           toggleSelectAll={toggleSelectAll}
-          isLoadingDocuments={isLoadingDocuments}
           refreshDocuments={refreshDocuments}
+          isLoading={isLoadingDocuments}
+          isExtracting={isExtracting}
+          onExtract={handleExtractFromDatabase}
           extractAllDocuments={extractAllDocuments}
           setExtractAllDocuments={setExtractAllDocuments}
-          handleExtractFromDatabase={handleExtractFromDatabase}
-          isExtracting={isExtracting}
-          currentDocumentIndex={currentDocumentIndex}
-          documentsToProcess={documentsToProcess}
           proxyConnected={proxyConnected}
+          currentDocumentIndex={currentDocumentIndex}
+          documentsToProcessCount={documentsToProcess.length}
         />
 
         {/* URL Input Component */}

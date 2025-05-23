@@ -10,7 +10,7 @@ export const useDocumentSelection = () => {
   const [extractAllDocuments, setExtractAllDocuments] = useState(false);
   const { toast } = useToast();
 
-  // Define documentsToProcess as a memoized value - NOT a function
+  // Define documentsToProcess as a memoized value based on selection state
   const documentsToProcess = useMemo(() => {
     console.log("Computing documentsToProcess with:", {
       extractAll: extractAllDocuments,
@@ -18,12 +18,13 @@ export const useDocumentSelection = () => {
       docsCount: dbDocuments.length
     });
     
+    // Return all documents when extractAllDocuments is true
     if (extractAllDocuments) {
       return dbDocuments;
-    } else {
-      // Filter the documents based on selected IDs
-      return dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
     }
+    
+    // Return only selected documents
+    return dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
   }, [dbDocuments, selectedDocumentIds, extractAllDocuments]);
 
   // Fetch documents from the database
@@ -32,8 +33,10 @@ export const useDocumentSelection = () => {
     try {
       const documents = await fetchProcessedDocuments();
       console.log("Fetched documents:", documents);
-      setDbDocuments(documents.filter(doc => doc.status === 'completed'));
-      setIsLoadingDocuments(false);
+      // Only keep documents with 'completed' status
+      const completedDocs = documents.filter(doc => doc.status === 'completed');
+      console.log("Filtered completed documents:", completedDocs);
+      setDbDocuments(completedDocs);
     } catch (error) {
       console.error("Error fetching documents:", error);
       toast({
@@ -41,6 +44,7 @@ export const useDocumentSelection = () => {
         description: "Failed to fetch documents from the database",
         variant: "destructive"
       });
+    } finally {
       setIsLoadingDocuments(false);
     }
   };
@@ -49,39 +53,47 @@ export const useDocumentSelection = () => {
     console.log("Toggling document selection:", documentId);
     setSelectedDocumentIds(prev => {
       if (prev.includes(documentId)) {
-        return prev.filter(id => id !== documentId);
+        const newSelection = prev.filter(id => id !== documentId);
+        console.log("Document removed from selection, new selection:", newSelection);
+        return newSelection;
       } else {
-        return [...prev, documentId];
+        const newSelection = [...prev, documentId];
+        console.log("Document added to selection, new selection:", newSelection);
+        return newSelection;
       }
     });
   };
 
   const toggleSelectAll = () => {
-    console.log("Current selection:", selectedDocumentIds);
-    console.log("All documents:", dbDocuments.map(d => d.id));
+    console.log("toggleSelectAll called with current state:", {
+      selectedCount: selectedDocumentIds.length,
+      totalDocs: dbDocuments.length
+    });
     
-    // Fix: Check actual array lengths for equality check instead of direct comparison
     if (selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0) {
       // Deselect all
-      console.log("Deselecting all");
+      console.log("Deselecting all documents");
       setSelectedDocumentIds([]);
     } else {
       // Select all
-      console.log("Selecting all");
-      setSelectedDocumentIds(dbDocuments.map(doc => doc.id));
+      const allIds = dbDocuments.map(doc => doc.id);
+      console.log("Selecting all documents:", allIds);
+      setSelectedDocumentIds(allIds);
     }
   };
 
-  // Modified to return a Promise explicitly and preserve the correct functionality
+  // Return a Promise explicitly for refresh
   const refreshDocuments = useCallback(async () => {
+    console.log("Refreshing documents...");
     await fetchDocuments();
-    // Keep this to reset selection when refreshing
+    // Reset selection when refreshing
     setSelectedDocumentIds([]);
     return Promise.resolve();
   }, []);
 
-  // Fetch documents on mount
+  // Fetch documents on component mount
   useEffect(() => {
+    console.log("useDocumentSelection hook mounted, fetching documents");
     fetchDocuments();
   }, []);
 
@@ -95,6 +107,6 @@ export const useDocumentSelection = () => {
     toggleSelectAll,
     refreshDocuments,
     fetchDocuments,
-    documentsToProcess // Return the memoized value, not a function
+    documentsToProcess
   };
 };
