@@ -89,21 +89,37 @@ export const useExtractionHandlers = (
   
   // Create a wrapped handler that verifies document selection before extraction
   const handleExtractFromDatabase = () => {
+    // Get the current state directly from the hook
+    const currentSelectedIds = documentSelection.selectedDocumentIds;
+    const currentExtractAll = extractAllDocuments;
+    const docsToProcess = documentSelection.documentsToProcess;
+    
     // Log the current state for debugging
-    console.log("Extract button clicked - current state:", {
-      selectedIds: selectedDocumentIds,
-      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title })),
-      extractAllDocuments,
+    console.log("Extract button clicked - extraction handler state:", {
+      selectedIds: currentSelectedIds,
+      documentsToProcess: docsToProcess.length > 0 ? docsToProcess.map(d => ({ id: d.id, title: d.title })) : [],
+      extractAll: currentExtractAll,
       docsCount: dbDocuments?.length || 0
     });
     
     // Verify we have valid selection before proceeding
-    const hasSelection = selectedDocumentIds.length > 0 || extractAllDocuments;
+    const hasSelection = currentSelectedIds.length > 0 || currentExtractAll;
     if (!hasSelection) {
-      console.error("No document selection detected");
+      console.error("No document selection detected in extraction handler");
+      // Set error message
+      setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       return;
     }
     
+    // Check if we have docs to process
+    if (docsToProcess.length === 0) {
+      console.error("No documents to process after selection validation");
+      setExtractionError("Could not find documents matching your selection.");
+      return;
+    }
+    
+    // Proceed with extraction
+    console.log("Starting extraction with documents:", docsToProcess.map(d => d.title));
     return handleExtractFromDbBase();
   };
   

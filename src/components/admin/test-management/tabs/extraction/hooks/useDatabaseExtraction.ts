@@ -27,7 +27,7 @@ export const useDatabaseExtraction = (
       extractAllDocuments,
       dbDocumentsCount: dbDocuments?.length || 0,
       documentsToProcessLength: documentsToProcess?.length || 0,
-      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title }))
+      documentsToProcess: documentsToProcess?.map(d => ({ id: d.id, title: d.title }))
     });
     
     // Safety checks
@@ -41,28 +41,31 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Use the passed documentsToProcess directly - this should be pre-filtered based on selection
-    // If it's empty, compute locally as a fallback
+    // Compute document selection locally if necessary
     let docsToProcess = documentsToProcess;
     
-    // Double-check that docsToProcess is correct
+    // If documentsToProcess is empty but we have selection, compute it directly
     if (docsToProcess.length === 0) {
-      console.warn("documentsToProcess is empty, computing locally as fallback");
-      docsToProcess = extractAllDocuments 
-        ? dbDocuments 
-        : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+      console.log("Computing document selection manually");
+      if (extractAllDocuments) {
+        docsToProcess = dbDocuments;
+        console.log("Using all documents:", dbDocuments.length);
+      } else if (selectedDocumentIds.length > 0) {
+        docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+        console.log("Using selected documents:", docsToProcess.length);
+      }
     }
     
     console.log("Documents to process:", {
-      computedLocally: docsToProcess.length,
-      fromHookState: documentsToProcess.length,
-      docsToProcess: docsToProcess.map(d => ({ id: d.id, title: d.title })),
-      selectedDocumentIds
+      finalCount: docsToProcess.length,
+      selectedIds: selectedDocumentIds,
+      docsToProcess: docsToProcess.map(d => ({ id: d.id, title: d.title }))
     });
     
     // Validate selection
     if (docsToProcess.length === 0) {
       console.error("No documents selected for processing");
+      setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document or enable 'Extract All'",
@@ -80,6 +83,7 @@ export const useDatabaseExtraction = (
       const isConnected = await checkProxyConnection();
       if (!isConnected) {
         setIsExtracting(false);
+        setExtractionError("Could not connect to the document proxy service.");
         toast({
           title: "Connection Failed",
           description: "Could not connect to the document proxy service",
@@ -88,63 +92,41 @@ export const useDatabaseExtraction = (
         return;
       }
       
-      let combinedText = "";
-      let processedCount = 0;
-      
-      // Process each selected document (for now just the first one)
+      // For debugging: always select the first document to process
       const doc = docsToProcess[0];
-      
-      if (!doc) {
-        console.error("Document not found");
-        setIsExtracting(false);
-        toast({
-          title: "Document Not Found",
-          description: "Selected document could not be found",
-          variant: "destructive"
-        });
-        return;
-      }
+      console.log("Processing document:", doc.title);
       
       try {
-        console.log("Processing document:", doc.title);
+        // Extract text from the document
         const extractedText = await extractFromDocument(doc);
-        
-        // Add header for this document
-        combinedText = `Document: ${doc.title}\n\n${extractedText}`;
-        processedCount++;
+        console.log("Extraction completed successfully, text length:", extractedText.length);
         
         // Update state with results
-        setExtractionText(combinedText);
-        setProcessExtractionText(combinedText);
+        setExtractionText(extractedText);
+        setProcessExtractionText(extractedText);
         
         // Wait briefly before completing to ensure UI updates
         await sleep(100);
         
         // Call complete callback if provided
         if (onComplete) {
-          onComplete(combinedText);
+          onComplete(extractedText);
         }
+        
+        toast({
+          title: "Extraction Complete",
+          description: `Successfully extracted text from "${doc.title}"`
+        });
       } catch (docError) {
         console.error(`Error extracting from document ${doc.title}:`, docError);
         
-        // Add error note to combined text
-        combinedText += `\n\nError extracting from ${doc.title}: ${docError instanceof Error ? docError.message : "Unknown error"}`;
-        
         // Set extraction error
         setExtractionError(docError instanceof Error ? docError.message : "Error extracting from document");
-      }
-      
-      // Show appropriate message based on results
-      if (processedCount === 0) {
+        
         toast({
           title: "Extraction Failed",
-          description: "Could not extract text from any of the selected documents",
+          description: docError instanceof Error ? docError.message : "Unknown error during extraction",
           variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Extraction Complete",
-          description: `Successfully extracted text from ${processedCount} document(s)`
         });
       }
     } catch (error) {

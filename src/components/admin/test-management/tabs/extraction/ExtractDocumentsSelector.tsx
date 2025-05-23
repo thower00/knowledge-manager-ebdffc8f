@@ -40,12 +40,19 @@ export function ExtractDocumentsSelector({
   documentsToProcessCount
 }: ExtractDocumentsSelectorProps) {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
+
+  // Sync local state with prop
+  useEffect(() => {
+    setLocalSelectedIds(selectedDocumentIds);
+  }, [selectedDocumentIds]);
 
   // Log selection state on render for debugging
   useEffect(() => {
     console.log("ExtractDocumentsSelector rendered with:", {
       documentsCount: documents.length,
       selectedIds: selectedDocumentIds,
+      localSelectedIds,
       extractAll: extractAllDocuments,
       isLoading,
       isExtracting
@@ -55,7 +62,7 @@ export function ExtractDocumentsSelector({
     if (selectedDocumentIds.length > 0) {
       console.log("Document selection validated:", selectedDocumentIds);
     }
-  }, [documents, selectedDocumentIds, extractAllDocuments, isLoading, isExtracting]);
+  }, [documents, selectedDocumentIds, localSelectedIds, extractAllDocuments, isLoading, isExtracting]);
 
   const handleRefresh = async () => {
     await refreshDocuments();
@@ -73,6 +80,30 @@ export function ExtractDocumentsSelector({
       return "bg-primary-foreground/30 border-l-4 border-l-primary";
     }
     return "";
+  };
+
+  // Handle direct row click for selection
+  const handleRowClick = (docId: string) => {
+    console.log("Row clicked for document:", docId);
+    toggleDocumentSelection(docId);
+  };
+
+  // Handle extract button click with validation
+  const handleExtractClick = () => {
+    console.log("Extract button clicked with state:", {
+      selectedCount: selectedDocumentIds.length,
+      localSelectedIds: localSelectedIds.length,
+      extractAll: extractAllDocuments,
+      canExtract,
+      documents: documents.map(d => ({ id: d.id, title: d.title }))
+    });
+    
+    if (!canExtract) {
+      console.error("Extract button clicked but extraction is not allowed");
+      return;
+    }
+    
+    onExtract();
   };
 
   return (
@@ -144,10 +175,7 @@ export function ExtractDocumentsSelector({
                     <TableRow 
                       key={doc.id} 
                       className={getRowClass(doc.id)}
-                      onClick={() => {
-                        console.log("Row clicked for document:", doc.id);
-                        toggleDocumentSelection(doc.id);
-                      }}
+                      onClick={() => handleRowClick(doc.id)}
                       style={{ cursor: 'pointer' }}
                       data-selected={selectedDocumentIds.includes(doc.id)}
                       data-testid={`document-row-${doc.id}`}
@@ -204,21 +232,7 @@ export function ExtractDocumentsSelector({
                 </div>
                 
                 <Button 
-                  onClick={() => {
-                    console.log("Extract button clicked with:", {
-                      selectedCount: selectedDocumentIds.length,
-                      extractAll: extractAllDocuments,
-                      canExtract
-                    });
-                    
-                    // Verify selection before calling onExtract
-                    if (!canExtract) {
-                      console.error("Extract button clicked but extraction is not allowed");
-                      return;
-                    }
-                    
-                    onExtract();
-                  }}
+                  onClick={handleExtractClick}
                   disabled={!canExtract}
                   data-testid="extract-selected-button"
                 >

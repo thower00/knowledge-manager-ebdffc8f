@@ -30,6 +30,7 @@ export const useDocumentSelection = () => {
 
   // Fetch documents from the database
   const fetchDocuments = useCallback(async () => {
+    console.log("Fetching processed documents from the database");
     setIsLoadingDocuments(true);
     try {
       const documents = await fetchProcessedDocuments();
@@ -108,6 +109,7 @@ export const useDocumentSelection = () => {
     toggleSelectAll,
     refreshDocuments,
     fetchDocuments,
-    documentsToProcess
+    documentsToProcess,
+    setSelectedDocumentIds // Export this to allow direct setting of selectedDocumentIds
   };
 };
