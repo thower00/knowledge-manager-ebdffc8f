@@ -90,10 +90,10 @@ export function DocumentList({
                 <TableCell className="font-medium cursor-pointer" onClick={() => handleToggleDocument(document.id)}>
                   {document.title}
                 </TableCell>
-                <TableCell className="hidden md:table-cell">{document.type || "Unknown"}</TableCell>
+                <TableCell className="hidden md:table-cell">{document.source_type || "Unknown"}</TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {document.updated_at 
-                    ? new Date(document.updated_at).toLocaleDateString() 
+                  {document.created_at 
+                    ? new Date(document.created_at).toLocaleDateString() 
                     : "Unknown"}
                 </TableCell>
               </TableRow>

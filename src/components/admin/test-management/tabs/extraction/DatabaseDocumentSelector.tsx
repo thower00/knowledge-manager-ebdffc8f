@@ -13,7 +13,7 @@ interface DatabaseDocumentSelectorProps {
   toggleDocumentSelection: (documentId: string) => void;
   toggleSelectAll: () => void;
   isLoadingDocuments: boolean;
-  refreshDocuments: () => void;
+  refreshDocuments: () => Promise<void>;
   extractAllDocuments: boolean;
   setExtractAllDocuments: (checked: boolean) => void;
   handleExtractFromDatabase: () => void;
