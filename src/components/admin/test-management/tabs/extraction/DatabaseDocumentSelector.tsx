@@ -63,7 +63,7 @@ export const DatabaseDocumentSelector = ({
     canExtract
   });
 
-  // Handle document selection click with proper event handling
+  // Handle document selection click with improved event handling
   const handleDocumentClick = (documentId: string, event: React.MouseEvent) => {
     // Stop event propagation to prevent double-toggling when clicking on the checkbox directly
     event.stopPropagation();
@@ -120,17 +120,16 @@ export const DatabaseDocumentSelector = ({
                       className={`flex items-center space-x-2 p-2 rounded-md ${
                         selectedDocumentIds.includes(doc.id) ? 'bg-blue-50' : 'hover:bg-gray-100'
                       }`}
+                      onClick={(e) => handleDocumentClick(doc.id, e)}
                     >
                       <Checkbox 
                         id={`doc-${doc.id}`} 
                         checked={selectedDocumentIds.includes(doc.id)}
                         onCheckedChange={() => toggleDocumentSelection(doc.id)}
+                        onClick={(e) => e.stopPropagation()}
                         className="cursor-pointer"
                       />
-                      <div 
-                        className="flex-grow cursor-pointer" 
-                        onClick={(e) => handleDocumentClick(doc.id, e)}
-                      >
+                      <div className="flex-grow cursor-pointer">
                         <Label htmlFor={`doc-${doc.id}`} className="cursor-pointer">{doc.title}</Label>
                         <div className="flex gap-2 items-center mt-1">
                           <Badge variant="outline" className="text-xs font-normal">

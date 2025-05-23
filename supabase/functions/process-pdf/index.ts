@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { 
   isPdfData,
@@ -73,15 +72,13 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       
       console.log(`Successfully extracted ${extractedText.length} characters of text`);
       
-      // Check if the extracted text contains binary indicators
-      if (textContainsBinaryIndicators(extractedText)) {
-        console.log("Detected binary data in extracted text, applying additional cleaning");
+      // Always check for binary data and clean aggressively
+      console.log("Detected binary data in extracted text, applying additional cleaning");
+      
+      // Clean text more aggressively
+      extractedText = cleanAndNormalizeText(extractedText);
         
-        // Clean text more aggressively
-        extractedText = cleanAndNormalizeText(extractedText);
-          
-        console.log(`After cleaning: ${extractedText.length} characters of text remain`);
-      }
+      console.log(`After cleaning: ${extractedText.length} characters of text remain`);
       
       // Apply final aggressive cleaning to guarantee no binary data
       if (options?.disableBinaryOutput || options?.strictTextCleaning) {

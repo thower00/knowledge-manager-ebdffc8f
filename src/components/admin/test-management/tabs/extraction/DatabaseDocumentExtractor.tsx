@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useExtractionHandlers } from "./hooks/useExtractionHandlers";
 import { ProcessedDocument } from "@/types/document";
 import { useToast } from "@/hooks/use-toast";
+import { ExtractionProgress } from "./ExtractionProgress"; // Import the ExtractionProgress component
 
 interface DatabaseDocumentExtractorProps {
   onExtract: (text: string) => void;
@@ -20,6 +21,7 @@ export const DatabaseDocumentExtractor = ({
 }: DatabaseDocumentExtractorProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0); // Add state for progress
   
   // Get document selection state
   const {
@@ -41,6 +43,9 @@ export const DatabaseDocumentExtractor = ({
       sample: text?.substring(0, 100) || "no text"
     });
     
+    // Set extraction to complete
+    setExtractionProgress(100);
+    
     // Pass the actual extracted text to the parent component
     if (text && typeof text === 'string') {
       onExtract(text);
@@ -58,11 +63,15 @@ export const DatabaseDocumentExtractor = ({
   const handleExtractDocument = (document: ProcessedDocument) => {
     console.log(`Extracting text from document: ${document.title}`);
     setIsSubmitting(true);
+    setExtractionProgress(10); // Start progress
     
     try {
       handleDirectExtraction(document);
+      // Progress updates will happen in the extraction process
+      setExtractionProgress(30); // Update progress after extraction starts
     } catch (error) {
       console.error("Error during document extraction:", error);
+      setExtractionProgress(0); // Reset progress on error
     } finally {
       setIsSubmitting(false);
     }
@@ -71,11 +80,14 @@ export const DatabaseDocumentExtractor = ({
   // This function will be passed as the handleExtractFromDatabase prop
   const handleExtractFromDatabase = () => {
     console.log("Extract from database initiated");
+    setExtractionProgress(10); // Start progress
+    
     // If there's a selected document, extract from the first one
     if (documentsToProcess && documentsToProcess.length > 0) {
       handleExtractDocument(documentsToProcess[0]);
     } else {
       console.warn("No documents selected for extraction");
+      setExtractionProgress(0); // Reset progress
       toast({
         title: "No Documents Selected",
         description: "Please select at least one document to extract",
@@ -105,6 +117,14 @@ export const DatabaseDocumentExtractor = ({
         handleExtractFromDatabase={handleExtractFromDatabase}
         isExtracting={isExtracting}
       />
+      
+      {/* Add extraction progress indicator */}
+      {(isExtracting || extractionProgress > 0) && (
+        <ExtractionProgress 
+          extractionProgress={extractionProgress} 
+          isProgressiveMode={false}
+        />
+      )}
     </div>
   );
 };
