@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { 
   isPdfData,
@@ -6,7 +5,10 @@ import {
   extractTextWithTimeout,
   cleanAndNormalizeText,
   extractTextByLines,
-  extractTextPatterns
+  extractTextPatterns,
+  extractTextFromParentheses,
+  extractTextFromTextObjects,
+  textContainsBinaryIndicators
 } from "./text-extraction.ts";
 
 // Define proper CORS headers
@@ -76,18 +78,53 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
             console.log(`Using pattern extraction as fallback: ${patternText.length} chars`);
             extractedText = patternText;
           } else {
-            return {
-              text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
-              success: false,
-              error: "Text extraction failed",
-              totalPages: pageCount,
-              processedPages: 0
-            };
+            // One more attempt - try to extract text from parentheses
+            const parenthesesText = extractTextFromParentheses(pdfBytes);
+            if (parenthesesText && parenthesesText.length > 100) {
+              console.log(`Using parentheses extraction as fallback: ${parenthesesText.length} chars`);
+              extractedText = parenthesesText;
+            } else {
+              // Try extracting text from text objects
+              const textObjectsText = extractTextFromTextObjects(pdfBytes);
+              if (textObjectsText && textObjectsText.length > 100) {
+                console.log(`Using text objects extraction as fallback: ${textObjectsText.length} chars`);
+                extractedText = textObjectsText;
+              } else {
+                return {
+                  text: "The document appears to be a PDF, but the text could not be extracted. The PDF might be scan-based or have security restrictions.",
+                  success: false,
+                  error: "Text extraction failed",
+                  totalPages: pageCount,
+                  processedPages: 0
+                };
+              }
+            }
           }
         }
       }
       
       console.log(`Raw text extracted, length: ${extractedText.length} characters`);
+      
+      // Check if the text appears to contain binary data
+      if (textContainsBinaryIndicators(extractedText)) {
+        console.log("Detected binary indicators in extracted text, applying ultra-aggressive cleaning");
+        
+        // First pass - extract text patterns
+        const patternText = extractTextPatterns(pdfBytes);
+        if (patternText && patternText.length > 200) {
+          console.log(`Pattern extraction found ${patternText.length} chars of text`);
+          extractedText = patternText;
+        } else {
+          // Second pass - extract any letter sequences
+          const letterSequences = pdfBytes.match(/[a-zA-Z]{4,}/g);
+          if (letterSequences && letterSequences.length > 20) {
+            extractedText = letterSequences.join(' ');
+            console.log(`Letter sequence extraction found ${extractedText.length} chars`);
+          } else {
+            console.log("Ultra-aggressive cleaning failed to find readable text");
+          }
+        }
+      }
       
       // Apply ultra-aggressive text cleaning - this is the key improvement
       console.log("Applying advanced multi-stage text cleaning");
@@ -126,7 +163,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       // If still no good text, extract sequences of letters as fallback
       if (cleanedText.length < 200) {
         console.log("Using letter sequence extraction as last resort");
-        const letterSequences = extractedText.match(/[A-Za-z]{3,}[A-Za-z\s.,;:!?]{5,}/g);
+        const letterSequences = pdfBytes.match(/[A-Za-z]{3,}[A-Za-z\s.,;:!?]{5,}/g);
         if (letterSequences && letterSequences.length > 5) {
           cleanedText = letterSequences.join(' ');
         }

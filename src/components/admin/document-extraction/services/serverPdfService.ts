@@ -1,8 +1,8 @@
 
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
-import { cleanAndNormalizeText } from "./textCleaningService";
 import { extractPdfWithProxy } from "./pdfExtractionService";
+import { cleanPdfText, extractPlainText } from "../utils/textCleaningUtils";
 
 interface ServerPdfExtractionOptions {
   maxPages?: number;
@@ -12,6 +12,7 @@ interface ServerPdfExtractionOptions {
 
 /**
  * Extract text from a PDF using the server-side processing function
+ * with enhanced text cleaning
  */
 export async function extractPdfTextServerSide(
   documentData: ArrayBuffer | string, 
@@ -43,12 +44,24 @@ export async function extractPdfTextServerSide(
       forceTextMode: true, // Force text-only extraction
       disableBinaryOutput: true, // Prevent binary data in output
       strictTextCleaning: true, // Request aggressive cleaning
-      useAdvancedExtraction: true, // New flag to use our most advanced extraction
-      useTextPatternExtraction: true // Enable pattern extraction for difficult PDFs
+      useAdvancedExtraction: true, // Flag for advanced extraction
+      useTextPatternExtraction: true // Enable pattern extraction
     };
     
-    const result = await extractPdfWithProxy(base64Data, extractionOptions, progressCallback);
-    return result;
+    // Get initial text from proxy
+    let extractedText = await extractPdfWithProxy(base64Data, extractionOptions, progressCallback);
+    
+    // Apply additional client-side cleaning for better results
+    if (progressCallback) progressCallback(90);
+    console.log("Applying additional client-side text cleaning to improve readability");
+    
+    // Check if text appears to be binary and apply more aggressive cleaning if needed
+    if (extractedText) {
+      extractedText = extractPlainText(extractedText);
+    }
+    
+    if (progressCallback) progressCallback(100);
+    return extractedText;
   } catch (error) {
     console.error("Error in server-side PDF extraction:", error);
     throw error;
@@ -57,6 +70,7 @@ export async function extractPdfTextServerSide(
 
 /**
  * Fetch a document from URL and extract text using server-side processing
+ * with enhanced text cleaning
  */
 export async function fetchAndExtractPdfServerSide(
   documentUrl: string,
@@ -91,7 +105,7 @@ export async function fetchAndExtractPdfServerSide(
     if (progressCallback) progressCallback(40);
     
     // Process with server-side extraction
-    return extractPdfTextServerSide(
+    let extractedText = await extractPdfTextServerSide(
       documentData, 
       options,
       progress => {
@@ -102,6 +116,19 @@ export async function fetchAndExtractPdfServerSide(
         }
       }
     );
+    
+    // Run an additional cleaning pass for particularly problematic documents
+    if (extractedText) {
+      // Check if the text still looks like binary data after initial cleaning
+      const sampleText = extractedText.substring(0, 500);
+      if (/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]/.test(sampleText) || 
+          /[^\x20-\x7E\r\n\t\u00A0-\u00FF\u2000-\u206F]/.test(sampleText)) {
+        console.log("Text still appears corrupted, applying ultra-aggressive cleaning");
+        extractedText = cleanPdfText(extractedText);
+      }
+    }
+    
+    return extractedText;
   } catch (error) {
     console.error("Error in fetch and extract:", error);
     throw error;

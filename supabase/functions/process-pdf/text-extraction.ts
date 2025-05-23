@@ -17,7 +17,10 @@ export function extractTextPatterns(pdfBytes: string): string {
       /([A-Z][a-z]{2,}[\s.,;:!?]+){2,}/g,
       
       // Common sentence structures
-      /([A-Z][a-z]{1,}[\s][a-z]+[\s][a-z]+[\s.,;:!?])/g
+      /([A-Z][a-z]{1,}[\s][a-z]+[\s][a-z]+[\s.,;:!?])/g,
+      
+      // Simple word patterns (any alphabetic strings)
+      /[a-zA-Z]{4,}(?:\s+[a-zA-Z]{2,}){2,}/g
     ];
     
     let extractedText = "";
@@ -33,6 +36,17 @@ export function extractTextPatterns(pdfBytes: string): string {
           extractedText = matchText;
         }
       }
+    }
+    
+    // If the pattern-based extraction found some text, use it
+    if (extractedText.length > 200) {
+      return extractedText;
+    }
+    
+    // As a last resort, just grab any words with 3+ letters
+    const wordExtraction = pdfBytes.match(/[a-zA-Z]{3,}/g);
+    if (wordExtraction && wordExtraction.length > 20) {
+      return wordExtraction.join(" ");
     }
     
     return extractedText;
@@ -69,9 +83,10 @@ export function extractTextFromStreams(pdfBytes: string): string {
     
     for (const stream of sortedStreams) {
       // Look for text patterns in the stream
-      const potentialText = stream.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-                                  .replace(/\s+/g, ' ')
-                                  .trim();
+      const potentialText = stream
+        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       
       if (potentialText.length > 100 && 
           (potentialText.split(' ').length > 20)) {
@@ -95,6 +110,7 @@ export function extractTextByLines(pdfBytes: string): string {
       /\(([^\)]{5,})\)/g,  // Text in parentheses (common in PDF)
       /BT\s*(.*?)\s*ET/gs, // Text between Begin Text and End Text markers
       /TJ\s*\[(.*?)\]/gs,  // Text array in TJ operators
+      /Td\s*\((.*?)\)\s*Tj/gs, // Text with Td and Tj operators
     ];
     
     let lines: string[] = [];
@@ -126,6 +142,27 @@ export function extractTextByLines(pdfBytes: string): string {
         if (extractedLines.length > lines.length) {
           lines = extractedLines;
         }
+      }
+    }
+    
+    // Additional extraction method - look for text directly after TJ commands
+    const tjTextPattern = /TJ[\s\n\r]*\[(.*?)\]/gs;
+    const tjMatches = [...pdfBytes.matchAll(tjTextPattern)];
+    if (tjMatches && tjMatches.length > 0) {
+      const tjTexts = tjMatches.map(match => {
+        // Extract text parts from TJ arrays - these often contain actual text
+        const tjContent = match[1];
+        // Look for text in parentheses within TJ array
+        const textParts = [...tjContent.matchAll(/\(([^\)]*)\)/g)]
+          .map(m => m[1])
+          .filter(text => text.length > 0);
+          
+        return textParts.join(' ');
+      }).filter(text => text.length > 0);
+      
+      if (tjTexts.length > 10) {
+        console.log(`Found ${tjTexts.length} text fragments from TJ operators`);
+        lines = [...lines, ...tjTexts];
       }
     }
     
@@ -179,6 +216,24 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
       }
     }
     
+    // If we found good text, return it
+    if (objectText.length > 100) {
+      return objectText;
+    }
+    
+    // Otherwise try another extraction method - search for letters after operator codes
+    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)[^\)]+\(/gs;
+    const letterMatches = pdfBytes.match(letterSequencePattern);
+    
+    if (letterMatches && letterMatches.length > 10) {
+      // Process and join matches
+      return letterMatches
+        .map(match => match.replace(/\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)|\(/g, ' '))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
     return objectText;
   } catch (error) {
     console.error("Error extracting text from text objects:", error);
@@ -229,6 +284,14 @@ export function extractTextFromParentheses(pdfBytes: string): string {
       }
       
       prevTextEndsWithWordBreak = /[.,;:!? ]$/.test(text);
+    }
+    
+    // Additional step: extract actual words
+    if (joinedText.length > 100) {
+      const words = joinedText.match(/[A-Za-z]{3,}[A-Za-z\s.,;:!?]*/g);
+      if (words && words.length > 20) {
+        return words.join(' ');
+      }
     }
     
     return joinedText;
@@ -310,13 +373,16 @@ export function cleanAndNormalizeText(text: string): string {
     return paragraphs.join(' ');
   }
   
-  // Stage 4: As last resort, extract all letter sequences
+  // Stage 4: Look for any text with letters
   const letterSequences = stage1.match(/[A-Za-z]{3,}/g);
   if (letterSequences && letterSequences.length > 10) {
     return letterSequences.join(' ');
   }
   
-  return stage1;
+  // Stage 5: Ultra aggressive - strip everything but letters and spaces
+  return stage1.replace(/[^A-Za-z\s]/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
 }
 
 // Wrapper that tries all extraction methods
@@ -345,18 +411,18 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
     results.push({ text: cleaned, method: 'lines', score: cleaned.length * 1.1 });
   }
   
-  // Method 4: Pattern-based as last resort
-  const patternResult = extractTextPatterns(pdfBytes);
-  if (patternResult && patternResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(patternResult);
-    results.push({ text: cleaned, method: 'patterns', score: cleaned.length });
-  }
-  
-  // Method 5: Parentheses
+  // Method 4: Parentheses
   const parenthesesResult = extractTextFromParentheses(pdfBytes);
   if (parenthesesResult && parenthesesResult.length > 100) {
     const cleaned = cleanAndNormalizeText(parenthesesResult);
     results.push({ text: cleaned, method: 'parentheses', score: cleaned.length });
+  }
+  
+  // Method 5: Pattern-based as last resort
+  const patternResult = extractTextPatterns(pdfBytes);
+  if (patternResult && patternResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(patternResult);
+    results.push({ text: cleaned, method: 'patterns', score: cleaned.length * 0.9 });
   }
   
   // If we have results, select the best one based on score
@@ -366,6 +432,22 @@ async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
     
     // Log the winning method
     console.log(`Best extraction method: ${results[0].method} with score ${results[0].score}`);
+    
+    // If the best method has very few actual words, try an ultra-aggressive approach
+    const bestResult = results[0].text;
+    const wordCount = bestResult.split(/\s+/).filter(word => /^[a-zA-Z]{3,}$/.test(word)).length;
+    
+    if (wordCount < 20) {
+      console.log("Best extraction has few meaningful words, trying ultra-aggressive approach");
+      
+      // Last resort - find any sequences of letters in the entire PDF
+      const letterSequences = pdfBytes.match(/[a-zA-Z]{4,}/g);
+      if (letterSequences && letterSequences.length > 20) {
+        const letterOnlyText = letterSequences.join(' ');
+        console.log(`Found ${letterSequences.length} letter sequences, total length: ${letterOnlyText.length}`);
+        return letterOnlyText;
+      }
+    }
     
     // Return the text from the best method
     return results[0].text;
@@ -387,6 +469,21 @@ export function textContainsBinaryIndicators(text: string): boolean {
     /[\u0080-\u009F]/                          // More control characters
   ];
   
+  // Sample the text for better performance
+  const sampleSize = Math.min(text.length, 1000);
+  const sample = text.substring(0, sampleSize);
+  
   // If any pattern is found, consider it binary
-  return binaryPatterns.some(pattern => pattern.test(text));
+  for (const pattern of binaryPatterns) {
+    if (pattern.test(sample)) {
+      return true;
+    }
+  }
+  
+  // Also check for unusual character distribution
+  const letters = sample.match(/[a-zA-Z]/g);
+  const letterRatio = letters ? letters.length / sample.length : 0;
+  
+  // Very low letter ratio suggests binary data
+  return letterRatio < 0.2;
 }

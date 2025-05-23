@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { cleanAndNormalizeText } from "./textCleaningService";
+import { cleanPdfText } from "../utils/textCleaningUtils";
 
 interface ProxyExtractionOptions {
   maxPages?: number;
@@ -15,6 +15,7 @@ interface ProxyExtractionOptions {
 
 /**
  * Extract PDF text using the server-side proxy
+ * with enhanced error handling and text cleaning
  */
 export async function extractPdfWithProxy(
   base64Data: string,
@@ -42,8 +43,8 @@ export async function extractPdfWithProxy(
           forceTextMode: true,
           disableBinaryOutput: true,
           strictTextCleaning: true,
-          useAdvancedExtraction: true, // Enhanced extraction
-          useTextPatternExtraction: true // Pattern-based extraction
+          useAdvancedExtraction: true,
+          useTextPatternExtraction: true
         },
         timestamp: Date.now(),
         nonce: Math.random().toString(36).substring(2, 15)
@@ -70,16 +71,17 @@ export async function extractPdfWithProxy(
       // Report success
       if (progressCallback) progressCallback(95);
       
-      // Additional text validation and transformation
+      // Apply additional text validation and transformation
       if (typeof data.text === 'string') {
         const extractedText = data.text;
         console.log(`PDF text extracted successfully, length: ${extractedText.length} chars`);
         console.log(`First 200 characters of extracted text: "${extractedText.substring(0, 200)}"`);
         
-        // Apply additional cleaning if it appears to be binary data
-        if (isBinaryLooking(extractedText)) {
+        // Use our improved text cleaning for binary-looking data
+        const containsBinaryIndicators = isBinaryLooking(extractedText);
+        if (containsBinaryIndicators) {
           console.log("Detected potential binary content, applying extra client-side cleaning");
-          return cleanBinaryLookingText(extractedText);
+          return cleanPdfText(extractedText);
         }
         
         return extractedText;
@@ -114,68 +116,30 @@ export async function extractPdfWithProxy(
 function isBinaryLooking(text: string): boolean {
   if (!text || text.length < 100) return false;
   
+  // Sample a portion of the text to check for binary indicators
+  const sample = text.substring(0, Math.min(1000, text.length));
+  
   // Check for indicators of binary content
   const binaryIndicators = [
     // High percentage of non-alphanumeric characters
-    text.replace(/[a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, '').length > text.length * 0.3,
+    sample.replace(/[a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, '').length > sample.length * 0.25,
     
     // Low word-to-character ratio
-    text.split(/\s+/).filter(word => /^[a-zA-Z]{2,}$/.test(word)).length < text.length / 40,
+    sample.split(/\s+/).filter(word => /^[a-zA-Z]{2,}$/.test(word)).length < sample.length / 40,
     
     // Random-looking sequences of special chars and letters
-    /([\\\/\^~\*#@!\(\)\[\]{}]+[A-Za-z0-9]+){5,}/.test(text),
+    /([\\\/\^~\*#@!\(\)\[\]{}]+[A-Za-z0-9]+){5,}/.test(sample),
     
-    // Low percentage of common English words
-    countCommonWords(text) < text.length / 200
+    // Low percentage of spaces (natural text has many spaces)
+    (sample.match(/\s/g)?.length || 0) < sample.length / 15,
+    
+    // Excessive use of Unicode characters
+    sample.replace(/[\x00-\x7F]/g, '').length > sample.length * 0.2,
+    
+    // Contains characters that are often binary artifacts
+    /[ÝîòôÐðÞþ±×÷§¥®©]/.test(sample)
   ];
   
   // Return true if at least two indicators are found
   return binaryIndicators.filter(Boolean).length >= 2;
-}
-
-/**
- * Count occurrences of common English words as a heuristic for meaningful text
- */
-function countCommonWords(text: string): number {
-  const commonWords = ['the', 'and', 'that', 'have', 'for', 'not', 'this', 'with', 'you', 'which'];
-  let count = 0;
-  
-  for (const word of commonWords) {
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    const matches = text.match(regex);
-    count += matches ? matches.length : 0;
-  }
-  
-  return count;
-}
-
-/**
- * Clean text that appears to contain binary data using more aggressive methods
- */
-function cleanBinaryLookingText(text: string): string {
-  // First apply standard cleaning
-  let cleaned = cleanAndNormalizeText(text);
-  
-  // Extract complete sentences for better readability
-  const sentencesMatch = cleaned.match(/[A-Z][^.!?]+[.!?]/g);
-  if (sentencesMatch && sentencesMatch.join(' ').length > 200) {
-    return sentencesMatch.join(' ');
-  }
-  
-  // Extract meaningful word sequences as fallback
-  const wordSequences = cleaned.match(/[a-zA-Z]{3,}(\s+[a-zA-Z]{2,}){3,}/g);
-  if (wordSequences && wordSequences.length > 5) {
-    return wordSequences.join(' ');
-  }
-  
-  // If still problematic, use only the most likely real text parts
-  const letterOnlyWords = cleaned.split(/\s+/)
-    .filter(word => /^[a-zA-Z]{3,}$/.test(word))
-    .join(' ');
-    
-  if (letterOnlyWords.length > 100) {
-    return letterOnlyWords;
-  }
-  
-  return cleaned;
 }
