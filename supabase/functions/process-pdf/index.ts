@@ -84,7 +84,8 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       }
       
       // Apply final aggressive cleaning to guarantee no binary data
-      if (options?.disableBinaryOutput) {
+      if (options?.disableBinaryOutput || options?.strictTextCleaning) {
+        // Enhanced version with more aggressive cleaning for binary data
         extractedText = extractedText
           .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only ASCII printable chars and line breaks
           .replace(/\s+/g, ' ')                 // Collapse whitespace
@@ -246,7 +247,8 @@ serve(async (req) => {
       streamMode: options.streamMode || false,
       timeout: options.timeout || 60,
       forceTextMode: options.forceTextMode || false,
-      disableBinaryOutput: options.disableBinaryOutput || false
+      disableBinaryOutput: options.disableBinaryOutput || false,
+      strictTextCleaning: options.strictTextCleaning || false
     }));
 
     // Process the PDF with a timeout to prevent function timeouts

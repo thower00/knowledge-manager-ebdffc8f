@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
@@ -58,7 +57,8 @@ export async function extractPdfTextServerSide(
             ...options,
             timeout: effectiveTimeout,
             forceTextMode: true, // Force text-only extraction to avoid binary data
-            disableBinaryOutput: true // New option to prevent binary data in output
+            disableBinaryOutput: true, // New option to prevent binary data in output
+            strictTextCleaning: true  // Add an extra flag for aggressive cleaning
           },
           timestamp: Date.now(),  // Add timestamp to avoid caching issues
           nonce: Math.random().toString(36).substring(2, 15)  // Add random nonce
@@ -97,9 +97,10 @@ export async function extractPdfTextServerSide(
           // Do not use placeholder text - use actual extracted text
           if (data.text.includes("Sample extracted text from") && data.text.length < 150) {
             console.warn("Detected placeholder text in extraction result, actual extraction may have failed");
+            throw new Error("Received placeholder text instead of actual content");
           }
           
-          // Apply improved text cleaning to prevent binary display issues
+          // Apply enhanced text cleaning to prevent binary display issues
           const cleanedText = ensureReadableText(data.text);
           
           // Log the cleaning results
@@ -137,19 +138,19 @@ export async function extractPdfTextServerSide(
 }
 
 /**
- * Comprehensive text cleaning function to ensure we get readable text, not binary
+ * Enhanced text cleaning function to ensure we get readable text, not binary
  * This uses multiple strategies to clean text and prevent binary data showing up
  */
 function ensureReadableText(text: string): string {
   if (!text || text.length === 0) return "";
   
-  console.log("Running comprehensive text cleaning...");
+  console.log("Running enhanced text cleaning for readability...");
   
   // Keep original text for comparison
   const originalText = text;
   
   try {
-    // STRATEGY 1: Basic binary data removal - more aggressive than before
+    // STRATEGY 1: Aggressive binary data removal
     let cleanedText = text
       .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
       .replace(/[^\x20-\x7E\r\n\t]/g, ' ')                    // Keep ASCII printable
@@ -179,46 +180,39 @@ function ensureReadableText(text: string): string {
       return words;
     }
     
-    // STRATEGY 3: Character frequency analysis - even more aggressive
-    console.log("Strategy 2 insufficient, using enhanced character frequency analysis...");
+    // STRATEGY 3: New approach - Pattern-based text extraction
+    console.log("Trying pattern-based extraction...");
     
-    // Count character frequencies
-    const charCount = new Map();
-    for (const char of originalText) {
-      charCount.set(char, (charCount.get(char) || 0) + 1);
-    }
-    
-    // Get all printable ASCII characters
-    const commonChars = [...charCount.entries()]
-      .filter(([char]) => {
-        const code = char.charCodeAt(0);
-        return (code >= 32 && code <= 126) || code === 10 || code === 13; // ASCII + line breaks
-      })
-      .sort((a, b) => b[1] - a[1]); // Sort by frequency
+    // Look for common patterns in text documents
+    const pagePatterns = originalText.match(/--- Page \d+ ---[\s\S]*?(?=--- Page \d+ ---|$)/g);
+    if (pagePatterns && pagePatterns.length > 0) {
+      const cleanedPages = pagePatterns.map(page => {
+        // Extract title
+        const pageTitle = page.match(/--- Page \d+ ---/) || ["Page"];
+        
+        // Clean page content
+        const cleanContent = page
+          .replace(/--- Page \d+ ---/, '')
+          .replace(/[^\x20-\x7E\r\n\t]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+          
+        return `${pageTitle[0]}\n${cleanContent}`;
+      }).join('\n\n');
       
-    // Make a set for faster lookups - use more characters
-    const validChars = new Set(commonChars.map(([char]) => char));
-    
-    // Keep only the valid characters
-    cleanedText = originalText
-      .split('')
-      .map(char => validChars.has(char) ? char : ' ')
-      .join('')
-      .replace(/\s+/g, ' ')
-      .trim();
+      console.log(`Page pattern extraction result: ${cleanedPages.length} chars`);
       
-    console.log(`Strategy 3 result: ${cleanedText.length} chars`);
-      
-    if (cleanedText.length > 100) {
-      return cleanedText;
+      if (cleanedPages.length > 200) {
+        return cleanedPages;
+      }
     }
     
     // STRATEGY 4: Last resort - extract anything that looks like words with regex
     console.log("Using regex pattern matching as last resort...");
     
     // Extract sequences that look like words with more aggressive pattern
-    const textMatches = originalText.match(/[a-zA-Z][a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]{2,}/g) || [];
-    const extractedText = textMatches.join(' ');
+    const textMatches = originalText.match(/([a-zA-Z][a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]{2,})/g) || [];
+    const extractedText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
     
     console.log(`Strategy 4 result: ${extractedText.length} chars`);
     
@@ -228,9 +222,9 @@ function ensureReadableText(text: string): string {
     
     // If all else fails, attempt one more with pure ASCII filtering
     const asciiOnly = originalText.replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-                             .replace(/\s+/g, ' ')
-                             .trim();
-                             
+                           .replace(/\s+/g, ' ')
+                           .trim();
+                           
     console.log(`ASCII-only filtering result: ${asciiOnly.length} chars`);
     
     if (asciiOnly.length > 50) {
