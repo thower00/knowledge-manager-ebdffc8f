@@ -43,10 +43,10 @@ export function ExtractDocumentsSelector({
     console.log("ExtractDocumentsSelector rendered with:", {
       documentsCount: documents.length,
       selectedIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds.length,
       extractAll: extractAllDocuments,
       isLoading,
-      isExtracting,
-      selectedDocIds: JSON.stringify(selectedDocumentIds)
+      isExtracting
     });
   }, [documents, selectedDocumentIds, extractAllDocuments, isLoading, isExtracting]);
 

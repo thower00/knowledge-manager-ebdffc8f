@@ -32,17 +32,29 @@ export function DocumentSelectorFooter({
   const [isButtonClicked, setIsButtonClicked] = useState(false);
   const [hasTriedExtraction, setHasTriedExtraction] = useState(false);
   const [canExtract, setCanExtract] = useState(false);
+  const [showError, setShowError] = useState(false);
+
+  // Log selection state for debugging
+  useEffect(() => {
+    console.log("DocumentSelectorFooter selection state:", {
+      selectedIds: selectedDocumentIds,
+      extractAll: extractAllDocuments,
+      documentsCount: documents.length
+    });
+  }, [selectedDocumentIds, extractAllDocuments, documents]);
 
   // Calculate if extract button should be enabled - updated for better debugging
   useEffect(() => {
+    const hasSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
     const shouldEnableExtract = (!isLoading && !isExtracting && 
-      ((selectedDocumentIds.length > 0 && !extractAllDocuments) || 
+      ((hasSelection && !extractAllDocuments) || 
       (extractAllDocuments && documents.length > 0)));
     
     console.log("Extract button state calculation:", {
       shouldEnable: shouldEnableExtract,
+      hasSelection,
       selectedDocIds: selectedDocumentIds,
-      selectedCount: selectedDocumentIds.length,
+      selectedCount: selectedDocumentIds ? selectedDocumentIds.length : 0,
       extractAll: extractAllDocuments,
       docsCount: documents.length,
       isLoading,
@@ -50,17 +62,31 @@ export function DocumentSelectorFooter({
     });
     
     setCanExtract(shouldEnableExtract);
+    
+    // Hide error if we have a valid selection
+    if (shouldEnableExtract) {
+      setShowError(false);
+    }
   }, [selectedDocumentIds, extractAllDocuments, documents, isLoading, isExtracting]);
 
   // Handle extract button click with visual feedback and debugging
   const handleExtractClick = () => {
     console.log("Extract button clicked with state:", {
-      selectedCount: selectedDocumentIds.length,
+      selectedCount: selectedDocumentIds ? selectedDocumentIds.length : 0,
       extractAll: extractAllDocuments,
       canExtract,
       documents: documents.map(d => ({ id: d.id, title: d.title })),
       selectedIds: selectedDocumentIds
     });
+    
+    setHasTriedExtraction(true);
+    
+    // Validation check - show error if needed
+    if (!extractAllDocuments && (!selectedDocumentIds || selectedDocumentIds.length === 0)) {
+      console.error("No documents selected for extraction and extract all not enabled");
+      setShowError(true);
+      return;
+    }
     
     if (!canExtract) {
       console.error("Extract button clicked but extraction is not allowed");
@@ -69,7 +95,6 @@ export function DocumentSelectorFooter({
     
     // Add visual feedback for button click
     setIsButtonClicked(true);
-    setHasTriedExtraction(true);
     setTimeout(() => setIsButtonClicked(false), 300);
     
     // Call the extraction handler after a slight delay to ensure state updates have propagated
@@ -102,12 +127,12 @@ export function DocumentSelectorFooter({
         <div className="text-sm text-muted-foreground">
           {extractAllDocuments 
             ? `All ${documents.length} documents will be processed` 
-            : `${selectedDocumentIds.length} document(s) selected`}
+            : `${selectedDocumentIds ? selectedDocumentIds.length : 0} document(s) selected`}
         </div>
         
         <Button 
           onClick={handleExtractClick}
-          disabled={!canExtract}
+          disabled={isExtracting} // Allow clicking even if validation might fail
           data-testid="extract-selected-button"
           className={isButtonClicked ? "bg-primary/80" : ""}
         >
@@ -128,7 +153,7 @@ export function DocumentSelectorFooter({
       </div>
       
       {/* Error feedback - shown when validation fails */}
-      {hasTriedExtraction && !isExtracting && selectedDocumentIds.length === 0 && !extractAllDocuments && (
+      {(showError || (hasTriedExtraction && !isExtracting && (!selectedDocumentIds || selectedDocumentIds.length === 0) && !extractAllDocuments)) && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 flex items-center text-sm">
           <AlertTriangle className="h-4 w-4 mr-2" />
           <span>Please select at least one document or enable "Extract All"</span>

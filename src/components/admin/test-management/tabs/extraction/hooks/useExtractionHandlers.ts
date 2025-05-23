@@ -96,13 +96,17 @@ export const useExtractionHandlers = (
   const handleExtractFromDatabase = useCallback(() => {
     console.log("handleExtractFromDatabase called - current selection state:", {
       selectedIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds?.length || 0,
       extractAll: extractAllDocuments,
       documentsCount: dbDocuments?.length || 0,
       documentsToProcessCount: documentsToProcess?.length || 0
     });
     
     // Double-check that we have documents to process before attempting extraction
-    if (!extractAllDocuments && (!selectedDocumentIds || selectedDocumentIds.length === 0)) {
+    const hasValidSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
+    const shouldExtract = extractAllDocuments || hasValidSelection;
+    
+    if (!shouldExtract) {
       console.error("No documents selected and extract all not enabled");
       setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({

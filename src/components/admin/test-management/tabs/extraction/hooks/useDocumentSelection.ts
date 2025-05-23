@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchProcessedDocuments } from "@/components/content/utils/documentDbService";
 import { ProcessedDocument } from "@/types/document";
@@ -16,6 +15,7 @@ export const useDocumentSelection = () => {
     console.log("Computing documentsToProcess with:", {
       extractAll: extractAllDocuments,
       selectedIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds.length,
       docsCount: dbDocuments.length
     });
     
@@ -26,7 +26,7 @@ export const useDocumentSelection = () => {
     }
     
     // Return only selected documents - ensure we handle empty selections properly
-    if (selectedDocumentIds.length === 0) {
+    if (!selectedDocumentIds || selectedDocumentIds.length === 0) {
       console.log("No documents selected, returning empty array");
       return [];
     }
@@ -47,11 +47,6 @@ export const useDocumentSelection = () => {
       const completedDocs = documents.filter(doc => doc.status === 'completed');
       console.log("Filtered completed documents:", completedDocs);
       setDbDocuments(completedDocs);
-      
-      // Important: If extract all is enabled, update the selection accordingly
-      if (extractAllDocuments) {
-        console.log("Extract all is enabled, updating selection state");
-      }
     } catch (error) {
       console.error("Error fetching documents:", error);
       toast({
@@ -62,17 +57,19 @@ export const useDocumentSelection = () => {
     } finally {
       setIsLoadingDocuments(false);
     }
-  }, [toast, extractAllDocuments]);
+  }, [toast]);
 
   const toggleDocumentSelection = useCallback((documentId: string) => {
     console.log("Toggling document selection:", documentId);
     setSelectedDocumentIds(prev => {
-      if (prev.includes(documentId)) {
-        const newSelection = prev.filter(id => id !== documentId);
+      const prevIds = prev || []; // Ensure prev is an array
+      
+      if (prevIds.includes(documentId)) {
+        const newSelection = prevIds.filter(id => id !== documentId);
         console.log("Document removed from selection, new selection:", newSelection);
         return newSelection;
       } else {
-        const newSelection = [...prev, documentId];
+        const newSelection = [...prevIds, documentId];
         console.log("Document added to selection, new selection:", newSelection);
         return newSelection;
       }
@@ -81,11 +78,11 @@ export const useDocumentSelection = () => {
 
   const toggleSelectAll = useCallback(() => {
     console.log("toggleSelectAll called with current state:", {
-      selectedCount: selectedDocumentIds.length,
+      selectedCount: selectedDocumentIds?.length || 0,
       totalDocs: dbDocuments.length
     });
     
-    if (selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0) {
+    if (selectedDocumentIds && selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0) {
       // Deselect all
       console.log("Deselecting all documents");
       setSelectedDocumentIds([]);
@@ -95,7 +92,7 @@ export const useDocumentSelection = () => {
       console.log("Selecting all documents:", allIds);
       setSelectedDocumentIds(allIds);
     }
-  }, [selectedDocumentIds.length, dbDocuments]);
+  }, [selectedDocumentIds, dbDocuments]);
 
   // Return a Promise explicitly for refresh
   const refreshDocuments = useCallback(async () => {
@@ -105,15 +102,6 @@ export const useDocumentSelection = () => {
     setSelectedDocumentIds([]);
     return Promise.resolve();
   }, [fetchDocuments]);
-
-  // Effect to update selection state when extractAllDocuments changes
-  useEffect(() => {
-    if (extractAllDocuments) {
-      console.log("Extract all toggled ON - documents will be processed regardless of selection");
-    } else {
-      console.log("Extract all toggled OFF - only selected documents will be processed");
-    }
-  }, [extractAllDocuments, dbDocuments.length]);
 
   // Fetch documents on component mount
   useEffect(() => {
@@ -125,6 +113,7 @@ export const useDocumentSelection = () => {
   useEffect(() => {
     console.log("Selection state updated:", {
       selectedIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds?.length || 0,
       documentsToProcess: documentsToProcess.length,
       extractAll: extractAllDocuments
     });

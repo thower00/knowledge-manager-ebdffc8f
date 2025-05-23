@@ -24,6 +24,7 @@ export const useDatabaseExtraction = (
     // Log extraction state for debugging
     console.log("useDatabaseExtraction handleExtractFromDatabase called with state:", {
       selectedDocumentIds,
+      selectedCount: selectedDocumentIds?.length || 0,
       extractAllDocuments,
       dbDocumentsCount: dbDocuments?.length || 0,
       documentsToProcessLength: documentsToProcess?.length || 0
@@ -46,7 +47,7 @@ export const useDatabaseExtraction = (
     if (extractAllDocuments) {
       console.log("Extract all is enabled, using all documents");
       docsToProcess = dbDocuments;
-    } else if (selectedDocumentIds.length > 0) {
+    } else if (selectedDocumentIds && selectedDocumentIds.length > 0) {
       console.log("Using selected documents:", selectedDocumentIds);
       docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
       console.log("Filtered documents for processing:", docsToProcess.map(d => d.title));

@@ -97,22 +97,20 @@ export function DocumentTable({
                 data-selected={selectedDocumentIds.includes(doc.id)}
                 data-testid={`document-row-${doc.id}`}
               >
-                <TableCell onClick={(e) => {
-                  // Important: Stop propagation so the row click handler doesn't fire
-                  e.stopPropagation();
-                }}>
-                  <Checkbox
-                    checked={selectedDocumentIds.includes(doc.id)}
-                    onCheckedChange={() => {
-                      console.log("Checkbox changed for document:", doc.id);
-                      toggleDocumentSelection(doc.id);
-                    }}
-                    data-testid={`document-checkbox-${doc.id}`}
-                    onClick={(e) => {
-                      // Make sure the event doesn't bubble up to the row
-                      e.stopPropagation();
-                    }}
-                  />
+                <TableCell>
+                  <div onClick={(e) => {
+                    // Important: Stop propagation so the row click handler doesn't fire
+                    e.stopPropagation();
+                  }}>
+                    <Checkbox
+                      checked={selectedDocumentIds.includes(doc.id)}
+                      onCheckedChange={() => {
+                        console.log("Checkbox changed for document:", doc.id);
+                        toggleDocumentSelection(doc.id);
+                      }}
+                      data-testid={`document-checkbox-${doc.id}`}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell className="font-medium">{doc.title}</TableCell>
                 <TableCell>
