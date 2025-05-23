@@ -26,7 +26,7 @@ export const ManualTextInput = ({
       <div className="grid gap-2">
         <Label>Or paste document text for extraction test</Label>
         <Textarea
-          value={isDisabled ? "" : extractionText}
+          value={extractionText}
           onChange={handleChange}
           placeholder={placeholder}
           rows={5}

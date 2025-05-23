@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { DatabaseDocumentExtractor } from "../DatabaseDocumentExtractor";
 import { ManualTextInput } from "../ManualTextInput";
 import { UrlExtractionInput } from "../UrlExtractionInput";
@@ -24,6 +25,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   // State for showing extracted text
   const [showExtractedText, setShowExtractedText] = useState(true);
   const [extractionText, setExtractionText] = useState("");
+  const [manualInputText, setManualInputText] = useState("");
   
   // Initialize extraction process
   const { proxyConnected, handleRefresh } = useExtractionInitialization();
@@ -55,9 +57,9 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   
   // Create a handler for text input changes
   const handleExtractFromText = () => {
-    // Simply pass the current text to onRunTest
-    if (onRunTest && extractionText) {
-      onRunTest({ extractionText });
+    // Simply pass the manual input text to onRunTest
+    if (onRunTest && manualInputText) {
+      onRunTest({ extractionText: manualInputText });
     }
   };
 
@@ -108,10 +110,19 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
           {/* Manual Text Input Section */}
           <ManualTextInput
-            extractionText={extractionText}
-            setExtractionText={setExtractionText}
+            extractionText={manualInputText}
+            setExtractionText={setManualInputText}
             isDisabled={isExtracting}
           />
+          
+          {/* Add a run button for manual text extraction */}
+          <Button
+            onClick={handleExtractFromText}
+            disabled={isExtracting || !manualInputText}
+            className="mt-2"
+          >
+            Extract from Pasted Text
+          </Button>
 
           {/* Progress Display */}
           {isExtracting && (

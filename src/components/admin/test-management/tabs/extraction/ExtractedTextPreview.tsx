@@ -14,6 +14,11 @@ export const ExtractedTextPreview = ({
   showExtractedText,
   setShowExtractedText,
 }: ExtractedTextPreviewProps) => {
+  // Ensure there's actual content to display
+  const hasContent = extractionText && extractionText.trim().length > 0;
+  
+  if (!hasContent) return null;
+  
   return (
     <div className="mt-4 p-4 border rounded-md bg-gray-50">
       <div className="flex justify-between items-center mb-2">
@@ -45,4 +50,4 @@ export const ExtractedTextPreview = ({
       )}
     </div>
   );
-};
+}
