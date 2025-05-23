@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { 
   isPdfData,
@@ -81,24 +82,35 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       console.log(`After cleaning: ${extractedText.length} characters of text remain`);
       
       // Apply final aggressive cleaning to guarantee no binary data
-      if (options?.disableBinaryOutput || options?.strictTextCleaning) {
+      if (options?.disableBinaryOutput || options?.strictTextCleaning || options?.useAdvancedExtraction) {
         // Enhanced version with more aggressive cleaning for binary data
         extractedText = extractedText
           .replace(/[^\x20-\x7E\r\n\t]/g, ' ')  // Keep only ASCII printable chars and line breaks
           .replace(/\s+/g, ' ')                 // Collapse whitespace
           .trim();
-        
-        // Extract any words we can find that contain letters
-        const words = extractedText.split(/\s+/)
-          .filter(word => /[a-zA-Z]{2,}/.test(word))
-          .join(' ');
-        
-        // Use word extraction if it gives us meaningful content
-        if (words.length > extractedText.length * 0.3 && words.length > 100) {
-          extractedText = words;
+          
+        if (options?.useAdvancedExtraction) {
+          // Extract meaningful words with multiple consecutive letters
+          const meaningfulWords = extractedText.split(/\s+/)
+            .filter(word => /[a-zA-Z]{3,}/.test(word))
+            .join(' ');
+            
+          if (meaningfulWords.length > 200) {
+            extractedText = meaningfulWords;
+          }
         }
         
         console.log(`Final cleaning complete: ${extractedText.length} characters remain`);
+      }
+      
+      // Additional pattern extraction for very problematic PDFs
+      if (options?.useTextPatternExtraction && extractedText.length < 500) {
+        // Try to extract text by looking for patterns and semantic structures
+        const altText = extractAlternativePatterns(pdfBytes);
+        if (altText && altText.length > extractedText.length * 1.5) {
+          console.log(`Pattern extraction found better results: ${altText.length} vs ${extractedText.length} chars`);
+          extractedText = altText;
+        }
       }
     } catch (error) {
       console.error("Text extraction error:", error);
@@ -147,6 +159,44 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       error: error.message,
       available: true
     };
+  }
+}
+
+// Try to extract text using alternative pattern-based approaches
+function extractAlternativePatterns(pdfBytes: string): string | null {
+  try {
+    // Look for sequences that match typical text patterns
+    const patterns = [
+      // Look for sequences that start with capital letters followed by lowercase
+      /([A-Z][a-z]{2,}\s+([a-z]+\s+){2,})/g,
+      
+      // Look for common paragraph patterns
+      /([\w\s.,;:!?(){}\[\]"'-]{20,})/g,
+      
+      // Look for runs of ASCII text
+      /([A-Za-z0-9\s.,;:!?(){}\[\]"'-]{15,})/g
+    ];
+    
+    // Try each pattern in turn
+    for (const pattern of patterns) {
+      const matches = pdfBytes.match(pattern);
+      if (matches && matches.length > 5) {
+        // Join the matches, filter to remove duplicates
+        const uniqueMatches = Array.from(new Set(matches));
+        const result = uniqueMatches
+          .filter(text => text.length > 15)
+          .join('\n\n');
+          
+        if (result.length > 100) {
+          return result;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error in pattern extraction:", error);
+    return null;
   }
 }
 
@@ -245,7 +295,9 @@ serve(async (req) => {
       timeout: options.timeout || 60,
       forceTextMode: options.forceTextMode || false,
       disableBinaryOutput: options.disableBinaryOutput || false,
-      strictTextCleaning: options.strictTextCleaning || false
+      strictTextCleaning: options.strictTextCleaning || false,
+      useAdvancedExtraction: options.useAdvancedExtraction || false,
+      useTextPatternExtraction: options.useTextPatternExtraction || false
     }));
 
     // Process the PDF with a timeout to prevent function timeouts
