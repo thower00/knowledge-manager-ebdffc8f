@@ -27,7 +27,7 @@ export const useDatabaseExtraction = (
       extractAllDocuments,
       dbDocumentsCount: dbDocuments?.length || 0,
       documentsToProcessLength: documentsToProcess?.length || 0,
-      documentsToProcess
+      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title }))
     });
     
     // Safety checks
@@ -41,15 +41,22 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Compute the documents to process here directly rather than relying on the passed documentsToProcess
-    const docsToProcess = extractAllDocuments ? 
-      dbDocuments : 
-      dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    // Use the passed documentsToProcess directly - this should be pre-filtered based on selection
+    // If it's empty, compute locally as a fallback
+    let docsToProcess = documentsToProcess;
+    
+    // Double-check that docsToProcess is correct
+    if (docsToProcess.length === 0) {
+      console.warn("documentsToProcess is empty, computing locally as fallback");
+      docsToProcess = extractAllDocuments 
+        ? dbDocuments 
+        : dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    }
     
     console.log("Documents to process:", {
       computedLocally: docsToProcess.length,
       fromHookState: documentsToProcess.length,
-      docsToProcess,
+      docsToProcess: docsToProcess.map(d => ({ id: d.id, title: d.title })),
       selectedDocumentIds
     });
     

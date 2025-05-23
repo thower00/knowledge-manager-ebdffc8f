@@ -29,7 +29,7 @@ export const useDocumentSelection = () => {
   }, [dbDocuments, selectedDocumentIds, extractAllDocuments]);
 
   // Fetch documents from the database
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     setIsLoadingDocuments(true);
     try {
       const documents = await fetchProcessedDocuments();
@@ -48,7 +48,7 @@ export const useDocumentSelection = () => {
     } finally {
       setIsLoadingDocuments(false);
     }
-  };
+  }, [toast]);
 
   const toggleDocumentSelection = useCallback((documentId: string) => {
     console.log("Toggling document selection:", documentId);
@@ -90,13 +90,13 @@ export const useDocumentSelection = () => {
     // Reset selection when refreshing
     setSelectedDocumentIds([]);
     return Promise.resolve();
-  }, []);
+  }, [fetchDocuments]);
 
   // Fetch documents on component mount
   useEffect(() => {
     console.log("useDocumentSelection hook mounted, fetching documents");
     fetchDocuments();
-  }, []);
+  }, [fetchDocuments]);
 
   return {
     dbDocuments,

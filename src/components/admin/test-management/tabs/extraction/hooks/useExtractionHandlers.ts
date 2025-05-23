@@ -87,13 +87,23 @@ export const useExtractionHandlers = (
     onComplete ? (text) => onComplete(text) : undefined
   );
   
-  // Create a wrapped handler that console logs the current state before extraction
+  // Create a wrapped handler that verifies document selection before extraction
   const handleExtractFromDatabase = () => {
+    // Log the current state for debugging
     console.log("Extract button clicked - current state:", {
       selectedIds: selectedDocumentIds,
-      documentsToProcess,
-      extractAllDocuments
+      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title })),
+      extractAllDocuments,
+      docsCount: dbDocuments?.length || 0
     });
+    
+    // Verify we have valid selection before proceeding
+    const hasSelection = selectedDocumentIds.length > 0 || extractAllDocuments;
+    if (!hasSelection) {
+      console.error("No document selection detected");
+      return;
+    }
+    
     return handleExtractFromDbBase();
   };
   

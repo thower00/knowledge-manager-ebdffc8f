@@ -50,6 +50,11 @@ export function ExtractDocumentsSelector({
       isLoading,
       isExtracting
     });
+    
+    // Force re-check document selection when component updates
+    if (selectedDocumentIds.length > 0) {
+      console.log("Document selection validated:", selectedDocumentIds);
+    }
   }, [documents, selectedDocumentIds, extractAllDocuments, isLoading, isExtracting]);
 
   const handleRefresh = async () => {
@@ -61,6 +66,14 @@ export function ExtractDocumentsSelector({
   const canExtract = (!isLoading && !isExtracting && 
     ((selectedDocumentIds.length > 0 && !extractAllDocuments) || 
      (extractAllDocuments && documents.length > 0)));
+     
+  // Force row class to be very visible when selected
+  const getRowClass = (docId: string) => {
+    if (selectedDocumentIds.includes(docId)) {
+      return "bg-primary-foreground/30 border-l-4 border-l-primary";
+    }
+    return "";
+  };
 
   return (
     <Card>
@@ -130,12 +143,14 @@ export function ExtractDocumentsSelector({
                   {documents.map((doc) => (
                     <TableRow 
                       key={doc.id} 
-                      className={selectedDocumentIds.includes(doc.id) ? "bg-muted/50" : ""}
+                      className={getRowClass(doc.id)}
                       onClick={() => {
                         console.log("Row clicked for document:", doc.id);
                         toggleDocumentSelection(doc.id);
                       }}
                       style={{ cursor: 'pointer' }}
+                      data-selected={selectedDocumentIds.includes(doc.id)}
+                      data-testid={`document-row-${doc.id}`}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
@@ -144,6 +159,7 @@ export function ExtractDocumentsSelector({
                             console.log("Checkbox clicked for document:", doc.id);
                             toggleDocumentSelection(doc.id);
                           }}
+                          data-testid={`document-checkbox-${doc.id}`}
                         />
                       </TableCell>
                       <TableCell className="font-medium">{doc.title}</TableCell>
@@ -194,9 +210,17 @@ export function ExtractDocumentsSelector({
                       extractAll: extractAllDocuments,
                       canExtract
                     });
+                    
+                    // Verify selection before calling onExtract
+                    if (!canExtract) {
+                      console.error("Extract button clicked but extraction is not allowed");
+                      return;
+                    }
+                    
                     onExtract();
                   }}
                   disabled={!canExtract}
+                  data-testid="extract-selected-button"
                 >
                   {isExtracting ? (
                     <>
@@ -208,7 +232,7 @@ export function ExtractDocumentsSelector({
                   ) : (
                     <>
                       <FileText className="h-4 w-4 mr-2" />
-                      Extract Selected
+                      {extractAllDocuments ? "Extract All" : "Extract Selected"}
                     </>
                   )}
                 </Button>
