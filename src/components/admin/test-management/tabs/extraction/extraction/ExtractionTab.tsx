@@ -7,12 +7,13 @@ import { UrlExtractionInput } from "../UrlExtractionInput";
 import { ExtractionProgress } from "../ExtractionProgress";
 import { ExtractedTextPreview } from "../ExtractedTextPreview";
 import { ExtractionErrorDisplay } from "../ExtractionErrorDisplay";
-import { useExtractionInitialization } from "../hooks/useExtractionInitialization";
+import { useState } from "react";
+import { useServerExtractionProcess } from "../hooks/useServerExtractionProcess";
 import { useDocumentSelection } from "../hooks/useDocumentSelection";
 import { useExtractionHandlers } from "../hooks/useExtractionHandlers";
 import { useUrlValidation } from "../hooks/useUrlValidation";
 import { useExtractionOptions } from "../hooks/useExtractionOptions";
-import { useState } from "react";
+import { useExtractionInitialization } from "../hooks/useExtractionInitialization";
 
 interface ExtractionTabProps {
   isLoading: boolean;
@@ -20,30 +21,36 @@ interface ExtractionTabProps {
 }
 
 export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
-  // Initialize all the extraction state and data
-  const {
-    documents,
-    proxyConnected,
-    refreshDocuments,
-    isExtracting,
-    extractionProgress,
-    extractionText,
-    setExtractionText,
+  // State for showing extracted text
+  const [showExtractedText, setShowExtractedText] = useState(true);
+  const [extractionText, setExtractionText] = useState("");
+  
+  // Initialize extraction process
+  const { proxyConnected, handleRefresh } = useExtractionInitialization();
+  
+  // Get extraction process state
+  const extractionProcess = useServerExtractionProcess();
+  const { 
+    isExtracting, 
+    extractionProgress, 
     extractionError,
-    showExtractedText,
-    setShowExtractedText,
     currentDocumentIndex,
-    documentsToProcessCount
-  } = useExtractionInitialization();
-
+    pagesProcessed,
+    totalPages,
+    isProgressiveMode 
+  } = extractionProcess;
+  
   // Document selection logic
   const {
+    dbDocuments: documents,
     selectedDocumentIds,
     toggleDocumentSelection,
     toggleSelectAll,
     extractAllDocuments,
-    setExtractAllDocuments
-  } = useDocumentSelection(documents);
+    setExtractAllDocuments,
+    refreshDocuments
+  } = useDocumentSelection();
+  const documentsToProcessCount = documents?.length || 0;
 
   // URL validation logic
   const {
@@ -54,30 +61,30 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   } = useUrlValidation();
 
   // Extraction options
-  const {
-    useServerExtraction,
-    setUseServerExtraction,
-    useProgressiveMode,
-    setUseProgressiveMode
-  } = useExtractionOptions();
+  const { extractionOptions, setExtractionOptions } = useExtractionOptions();
+  // Use the progressive mode from extraction options
+  const useProgressiveMode = extractionOptions.extractionMode === 'progressive';
+  // Legacy option for backward compatibility
+  const useServerExtraction = true;
+  
+  // Create a handler for text input changes
+  const handleExtractFromText = () => {
+    // Simply pass the current text to onRunTest
+    if (onRunTest && extractionText) {
+      onRunTest({ extractionText });
+    }
+  };
 
   // Extraction handlers
-  const {
+  const { 
     handleExtractFromDatabase,
-    handleExtractFromUrl,
-    handleExtractFromText
-  } = useExtractionHandlers({
-    selectedDocumentIds,
-    extractAllDocuments,
-    documents,
-    testUrl,
-    extractionText,
-    useServerExtraction,
-    useProgressiveMode,
-    onRunTest,
-    setExtractionText,
-    refreshDocuments
-  });
+    handleExtractFromUrl
+  } = useExtractionHandlers(
+    (extractedText, testUrl) => {
+      setExtractionText(extractedText);
+      onRunTest({ extractionText: extractedText, testUrl });
+    }
+  );
 
   return (
     <div className="space-y-6">
@@ -130,8 +137,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
             <ExtractionProgress
               extractionProgress={extractionProgress}
               isProgressiveMode={useProgressiveMode}
-              pagesProcessed={currentDocumentIndex}
-              totalPages={documentsToProcessCount}
+              pagesProcessed={pagesProcessed}
+              totalPages={totalPages}
             />
           )}
 
