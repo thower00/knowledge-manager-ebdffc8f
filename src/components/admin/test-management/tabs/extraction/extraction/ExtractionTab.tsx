@@ -8,7 +8,7 @@ import { UrlExtractionInput } from "../UrlExtractionInput";
 import { ExtractionProgress } from "../ExtractionProgress";
 import { ExtractedTextPreview } from "../ExtractedTextPreview";
 import { ExtractionErrorDisplay } from "../ExtractionErrorDisplay";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerExtractionProcess } from "../hooks/useServerExtractionProcess";
 import { useDocumentSelection } from "../hooks/useDocumentSelection";
 import { useExtractionHandlers } from "../hooks/useExtractionHandlers";
@@ -82,6 +82,13 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     setExtractionText(extractedText);
     onRunTest({ extractionText: extractedText });
   };
+  
+  // Debug log for tracking extraction text
+  useEffect(() => {
+    if (extractionText) {
+      console.log(`Current extraction text (${extractionText.length} chars): "${extractionText.substring(0, 50)}..."`);
+    }
+  }, [extractionText]);
 
   return (
     <div className="space-y-6">
