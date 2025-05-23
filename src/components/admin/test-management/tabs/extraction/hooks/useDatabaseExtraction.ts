@@ -40,8 +40,18 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Ensure we have documents to process
-    if (documentsToProcess.length === 0) {
+    // Ensure we have documents to process - either through selection or "extract all"
+    let docsToProcess: ProcessedDocument[] = [];
+    
+    if (extractAllDocuments) {
+      console.log("Extract all is enabled, using all documents");
+      docsToProcess = dbDocuments;
+    } else if (selectedDocumentIds.length > 0) {
+      console.log("Using selected documents");
+      docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    }
+    
+    if (docsToProcess.length === 0) {
       console.error("No documents selected for processing");
       setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({
@@ -70,9 +80,9 @@ export const useDatabaseExtraction = (
         return;
       }
       
-      // For debugging: always select the first document to process
-      const doc = documentsToProcess[0];
-      console.log("Processing document:", doc.title);
+      // Select the first document to process (we'll handle multiple documents later if needed)
+      const doc = docsToProcess[0];
+      console.log("Processing document:", doc.title, "with ID:", doc.id);
       
       try {
         // Extract text from the document

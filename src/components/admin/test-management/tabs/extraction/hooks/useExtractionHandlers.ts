@@ -8,11 +8,13 @@ import { useDatabaseExtraction } from "./useDatabaseExtraction";
 import { useRefresh } from "./useRefresh";
 import { ExtractionOptionsType } from "../ExtractionOptions";
 import { ProcessedDocument } from "@/types/document";
+import { useToast } from "@/hooks/use-toast";
 
 export const useExtractionHandlers = (
   onComplete?: (extractedText: string, testUrl?: string) => void
 ) => {
   const [extractionText, setExtractionText] = useState("");
+  const { toast } = useToast();
   
   // Import other hooks
   const {
@@ -92,31 +94,45 @@ export const useExtractionHandlers = (
   const handleExtractFromDatabase = () => {
     console.log("handleExtractFromDatabase called - current selection state:", {
       selectedIds: selectedDocumentIds,
-      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title })),
-      extractAll: extractAllDocuments
+      extractAll: extractAllDocuments,
+      documentsCount: dbDocuments.length,
+      documentsToProcessCount: documentsToProcess.length
     });
 
-    // Get documents to process directly from the hook
-    const docsToProcess = documentsToProcess;
+    // Get direct reference to documents that should be processed
+    let docsToProcess: ProcessedDocument[] = [];
+    
+    if (extractAllDocuments && dbDocuments.length > 0) {
+      docsToProcess = dbDocuments;
+      console.log("Processing all documents:", docsToProcess.length);
+    } else if (selectedDocumentIds.length > 0) {
+      docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+      console.log("Processing selected documents:", docsToProcess.length);
+    }
     
     // Verify we have valid selection before proceeding
     if (docsToProcess.length === 0) {
       console.error("No documents to process in extraction handler");
       setExtractionError("No documents selected or documents are unavailable. Please select at least one document or enable 'Extract All'.");
+      
+      toast({
+        title: "No Documents Selected",
+        description: "Please select at least one document or enable 'Extract All'",
+        variant: "destructive"
+      });
       return;
     }
     
-    // For debugging, log the first document we'll process
-    const firstDoc = docsToProcess[0];
-    console.log("Starting extraction with first document:", firstDoc.title);
+    // For debugging, log the document we'll process
+    console.log("Starting extraction with document:", docsToProcess[0].title);
     
     // Process directly with the document object instead of through IDs
-    return handleStartDatabaseExtraction(firstDoc);
+    return handleDirectExtraction(docsToProcess[0]);
   };
   
-  // Direct extraction function that bypasses ID lookups
-  const handleStartDatabaseExtraction = (doc: ProcessedDocument) => {
-    console.log("Starting direct extraction for document:", doc.title);
+  // Direct extraction function for immediate processing
+  const handleDirectExtraction = (doc: ProcessedDocument) => {
+    console.log("Starting direct extraction for document:", doc.title, doc.id);
     
     // Check if we're already extracting
     if (isExtracting) {
@@ -128,13 +144,20 @@ export const useExtractionHandlers = (
     setIsExtracting(true);
     setExtractionError(null);
     
-    // Note: Should return a promise, but we'll handle everything internally
+    console.log("Calling extractFromDocument with:", doc.title);
+    
+    // Extract directly using the document
     extractFromDocument(doc)
       .then(text => {
-        console.log("Extraction completed successfully");
+        console.log("Extraction completed successfully, text length:", text.length);
         setExtractionText(text);
         setDbExtractionText(text);
         setProcessExtractionText(text);
+        
+        toast({
+          title: "Extraction Complete",
+          description: `Successfully extracted text from "${doc.title}"`
+        });
         
         if (onComplete) {
           onComplete(text);
@@ -143,6 +166,11 @@ export const useExtractionHandlers = (
       .catch(error => {
         console.error("Extraction failed:", error);
         setExtractionError(error instanceof Error ? error.message : String(error));
+        
+        toast({
+          title: "Extraction Failed", 
+          description: error instanceof Error ? error.message : "Unknown extraction error"
+        });
       })
       .finally(() => {
         setIsExtracting(false);

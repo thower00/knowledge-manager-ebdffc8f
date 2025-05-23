@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2, RefreshCw } from "lucide-react";
+import { FileText, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProcessedDocumentStatusBadge } from "@/components/content/processed-documents/ProcessedDocumentStatusBadge";
 
@@ -41,6 +41,7 @@ export function ExtractDocumentsSelector({
 }: ExtractDocumentsSelectorProps) {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [isButtonClicked, setIsButtonClicked] = useState(false);
+  const [hasTriedExtraction, setHasTriedExtraction] = useState(false);
 
   // Log selection state on render for debugging
   useEffect(() => {
@@ -49,13 +50,9 @@ export function ExtractDocumentsSelector({
       selectedIds: selectedDocumentIds,
       extractAll: extractAllDocuments,
       isLoading,
-      isExtracting
+      isExtracting,
+      selectedDocIds: JSON.stringify(selectedDocumentIds)
     });
-    
-    // Force re-check document selection when component updates
-    if (selectedDocumentIds.length > 0) {
-      console.log("Document selection validated:", selectedDocumentIds);
-    }
   }, [documents, selectedDocumentIds, extractAllDocuments, isLoading, isExtracting]);
 
   const handleRefresh = async () => {
@@ -82,13 +79,14 @@ export function ExtractDocumentsSelector({
     toggleDocumentSelection(docId);
   };
 
-  // Handle extract button click with visual feedback
+  // Handle extract button click with visual feedback and debugging
   const handleExtractClick = () => {
     console.log("Extract button clicked with state:", {
       selectedCount: selectedDocumentIds.length,
       extractAll: extractAllDocuments,
       canExtract,
-      documents: documents.map(d => ({ id: d.id, title: d.title }))
+      documents: documents.map(d => ({ id: d.id, title: d.title })),
+      selectedIds: selectedDocumentIds
     });
     
     if (!canExtract) {
@@ -98,10 +96,14 @@ export function ExtractDocumentsSelector({
     
     // Add visual feedback for button click
     setIsButtonClicked(true);
+    setHasTriedExtraction(true);
     setTimeout(() => setIsButtonClicked(false), 300);
     
     // Call the extraction handler
     onExtract();
+    
+    // Additional logging to confirm handler was called
+    console.log("Extract handler called! Extraction should now be starting...");
   };
 
   return (
@@ -250,6 +252,14 @@ export function ExtractDocumentsSelector({
                   )}
                 </Button>
               </div>
+              
+              {/* Error feedback - shown when validation fails */}
+              {hasTriedExtraction && !isExtracting && selectedDocumentIds.length === 0 && !extractAllDocuments && (
+                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 flex items-center text-sm">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <span>Please select at least one document or enable "Extract All"</span>
+                </div>
+              )}
             </div>
           </>
         )}
