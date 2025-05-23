@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { ProcessedDocument } from "@/types/document";
 import { ProcessedDocumentStatusBadge } from "@/components/content/processed-documents/ProcessedDocumentStatusBadge";
 import { CardContent } from "@/components/ui/card";
+import { useEffect } from "react";
 
 interface DocumentTableProps {
   documents: ProcessedDocument[];
@@ -21,6 +22,11 @@ export function DocumentTable({
   toggleSelectAll,
   isLoading
 }: DocumentTableProps) {
+  // Debug log for document selection
+  useEffect(() => {
+    console.log("DocumentTable rendered with selected IDs:", selectedDocumentIds);
+  }, [selectedDocumentIds]);
+
   // Force row class to be very visible when selected
   const getRowClass = (docId: string) => {
     if (selectedDocumentIds.includes(docId)) {
@@ -91,11 +97,17 @@ export function DocumentTable({
                 data-selected={selectedDocumentIds.includes(doc.id)}
                 data-testid={`document-row-${doc.id}`}
               >
-                <TableCell onClick={(e) => e.stopPropagation()}>
+                <TableCell onClick={(e) => {
+                  // Stop propagation to prevent row click from being triggered
+                  e.stopPropagation();
+                  // Toggle document selection directly
+                  toggleDocumentSelection(doc.id);
+                  console.log("Checkbox toggled for document:", doc.id);
+                }}>
                   <Checkbox
                     checked={selectedDocumentIds.includes(doc.id)}
                     onCheckedChange={() => {
-                      console.log("Checkbox clicked for document:", doc.id);
+                      console.log("Checkbox changed for document:", doc.id);
                       toggleDocumentSelection(doc.id);
                     }}
                     data-testid={`document-checkbox-${doc.id}`}

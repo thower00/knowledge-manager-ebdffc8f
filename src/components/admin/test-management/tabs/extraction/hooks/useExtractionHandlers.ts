@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useDocumentSelection } from "./useDocumentSelection";
 import { useUrlValidation } from "./useUrlValidation";
 import { useServerExtractionProcess } from "./useServerExtractionProcess";
@@ -10,8 +10,10 @@ import { ExtractionOptionsType } from "../ExtractionOptions";
 import { ProcessedDocument } from "@/types/document";
 import { useToast } from "@/hooks/use-toast";
 
+export type ExtractionCallbackFunction = (extractedText: string, testUrl?: string) => void;
+
 export const useExtractionHandlers = (
-  onComplete?: (extractedText: string, testUrl?: string) => void
+  onComplete?: ExtractionCallbackFunction
 ) => {
   const [extractionText, setExtractionText] = useState("");
   const { toast } = useToast();
@@ -87,11 +89,11 @@ export const useExtractionHandlers = (
     setIsExtracting,
     setExtractionError,
     setProcessExtractionText,
-    onComplete ? (text) => onComplete(text) : undefined
+    onComplete
   );
   
   // Create a wrapper that passes the current state directly to the extraction function
-  const handleExtractFromDatabase = () => {
+  const handleExtractFromDatabase = useCallback(() => {
     console.log("handleExtractFromDatabase called - current selection state:", {
       selectedIds: selectedDocumentIds,
       extractAll: extractAllDocuments,
@@ -99,12 +101,32 @@ export const useExtractionHandlers = (
       documentsToProcessCount: documentsToProcess?.length || 0
     });
     
+    // Check for documents to process before attempting extraction
+    if (selectedDocumentIds.length === 0 && !extractAllDocuments) {
+      console.error("No documents selected and extract all not enabled");
+      setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
+      toast({
+        title: "No Documents Selected",
+        description: "Please select at least one document or enable 'Extract All'",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Call the base handler which has the dependency array with current state values
     return handleExtractFromDbBase();
-  };
+  }, [
+    selectedDocumentIds,
+    extractAllDocuments,
+    dbDocuments,
+    documentsToProcess,
+    handleExtractFromDbBase,
+    setExtractionError,
+    toast
+  ]);
   
   // Direct extraction function for immediate processing
-  const handleDirectExtraction = (doc: ProcessedDocument) => {
+  const handleDirectExtraction = useCallback((doc: ProcessedDocument) => {
     console.log("Starting direct extraction for document:", doc.title, doc.id);
     
     // Check if we're already extracting
@@ -148,7 +170,17 @@ export const useExtractionHandlers = (
       .finally(() => {
         setIsExtracting(false);
       });
-  };
+  }, [
+    isExtracting,
+    setIsExtracting,
+    setExtractionError,
+    extractFromDocument,
+    setExtractionText,
+    setDbExtractionText,
+    setProcessExtractionText,
+    onComplete,
+    toast
+  ]);
   
   // Use the refactored refresh hook
   const { handleRefresh } = useRefresh(

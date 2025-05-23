@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CardContent } from "@/components/ui/card";
 import { FileText, Loader2, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProcessedDocument } from "@/types/document";
 
 interface DocumentSelectorFooterProps {
@@ -31,11 +31,26 @@ export function DocumentSelectorFooter({
 }: DocumentSelectorFooterProps) {
   const [isButtonClicked, setIsButtonClicked] = useState(false);
   const [hasTriedExtraction, setHasTriedExtraction] = useState(false);
+  const [canExtract, setCanExtract] = useState(false);
 
-  // Calculate if extract button should be enabled
-  const canExtract = (!isLoading && !isExtracting && 
-    ((selectedDocumentIds.length > 0 && !extractAllDocuments) || 
-     (extractAllDocuments && documents.length > 0)));
+  // Calculate if extract button should be enabled - updated for better debugging
+  useEffect(() => {
+    const shouldEnableExtract = (!isLoading && !isExtracting && 
+      ((selectedDocumentIds.length > 0 && !extractAllDocuments) || 
+      (extractAllDocuments && documents.length > 0)));
+    
+    console.log("Extract button state calculation:", {
+      shouldEnable: shouldEnableExtract,
+      selectedDocIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds.length,
+      extractAll: extractAllDocuments,
+      docsCount: documents.length,
+      isLoading,
+      isExtracting
+    });
+    
+    setCanExtract(shouldEnableExtract);
+  }, [selectedDocumentIds, extractAllDocuments, documents, isLoading, isExtracting]);
 
   // Handle extract button click with visual feedback and debugging
   const handleExtractClick = () => {
