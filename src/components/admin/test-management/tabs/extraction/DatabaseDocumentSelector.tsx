@@ -21,6 +21,8 @@ interface DatabaseDocumentSelectorProps {
   currentDocumentIndex: number;
   documentsToProcess: ProcessedDocument[];
   proxyConnected: boolean | null;
+  disabled?: boolean;
+  onExtract: (document: ProcessedDocument) => void;
 }
 
 export const DatabaseDocumentSelector = ({
@@ -37,6 +39,8 @@ export const DatabaseDocumentSelector = ({
   currentDocumentIndex,
   documentsToProcess,
   proxyConnected,
+  disabled,
+  onExtract,
 }: DatabaseDocumentSelectorProps) => {
   // Debug: Log selection state when component renders
   console.log("DatabaseDocumentSelector rendering with:", {
@@ -168,11 +172,10 @@ export const DatabaseDocumentSelector = ({
             console.log("Extract button clicked", {
               selectedCount: selectedDocumentIds.length,
               extractAll: extractAllDocuments,
-              disabled: !canExtract
             });
             handleExtractFromDatabase();
           }} 
-          disabled={!canExtract}
+          disabled={disabled || (!canExtract)}
         >
           {isExtracting ? (
             <>

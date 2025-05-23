@@ -68,6 +68,22 @@ export const DatabaseDocumentExtractor = ({
     }
   };
   
+  // This function will be passed as the handleExtractFromDatabase prop
+  const handleExtractFromDatabase = () => {
+    console.log("Extract from database initiated");
+    // If there's a selected document, extract from the first one
+    if (documentsToProcess && documentsToProcess.length > 0) {
+      handleExtractDocument(documentsToProcess[0]);
+    } else {
+      console.warn("No documents selected for extraction");
+      toast({
+        title: "No Documents Selected",
+        description: "Please select at least one document to extract",
+        variant: "destructive"
+      });
+    }
+  };
+  
   return (
     <div className="space-y-4">
       <h3 className="text-base font-medium">Extract from Database Documents</h3>
@@ -86,6 +102,8 @@ export const DatabaseDocumentExtractor = ({
         disabled={isExtracting}
         currentDocumentIndex={0}
         documentsToProcess={documentsToProcess || []}
+        handleExtractFromDatabase={handleExtractFromDatabase}
+        isExtracting={isExtracting}
       />
     </div>
   );
