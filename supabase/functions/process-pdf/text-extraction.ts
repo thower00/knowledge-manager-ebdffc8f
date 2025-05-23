@@ -1,3 +1,4 @@
+
 // PDF text extraction utility functions
 
 // Helper for detecting PDF format
@@ -97,6 +98,78 @@ export function extractTextFromStreams(pdfBytes: string): string {
     return streamText;
   } catch (error) {
     console.error("Error extracting text from streams:", error);
+    return "";
+  }
+}
+
+// Enhanced method to extract text from BT/ET blocks and TJ commands
+export function extractTextFromBTETBlocks(pdfBytes: string): string {
+  try {
+    // Look for BT...ET blocks which contain text commands
+    const btEtPattern = /BT\s*([\s\S]*?)\s*ET/g;
+    const btEtBlocks = [...pdfBytes.matchAll(btEtPattern)];
+    
+    if (!btEtBlocks || btEtBlocks.length === 0) {
+      console.log("No BT/ET blocks found");
+      return "";
+    }
+    
+    console.log(`Found ${btEtBlocks.length} BT/ET text blocks`);
+    
+    let extractedText = "";
+    
+    for (const [_, blockContent] of btEtBlocks) {
+      // Look for TJ commands with text arrays
+      const tjPattern = /TJ\s*\[(.*?)\]/g;
+      const tjMatches = [...blockContent.matchAll(tjPattern)];
+      
+      if (tjMatches && tjMatches.length > 0) {
+        for (const [_, tjContent] of tjMatches) {
+          // Extract text from parentheses in TJ arrays
+          const textInParens = [...tjContent.matchAll(/\(([^)]*)\)/g)];
+          if (textInParens && textInParens.length > 0) {
+            const textParts = textInParens.map(match => match[1]).join(' ');
+            if (textParts.length > 0) {
+              extractedText += textParts + " ";
+            }
+          }
+        }
+      }
+      
+      // Also look for simple Tj commands
+      const tjSimplePattern = /\(([^)]+)\)\s*Tj/g;
+      const tjSimpleMatches = [...blockContent.matchAll(tjSimplePattern)];
+      
+      if (tjSimpleMatches && tjSimpleMatches.length > 0) {
+        for (const [_, text] of tjSimpleMatches) {
+          extractedText += text + " ";
+        }
+      }
+      
+      // Look for "show text" commands
+      const showTextPattern = /\(([^)]+)\)\s*'/g;
+      const showTextMatches = [...blockContent.matchAll(showTextPattern)];
+      
+      if (showTextMatches && showTextMatches.length > 0) {
+        for (const [_, text] of showTextMatches) {
+          extractedText += text + " ";
+        }
+      }
+    }
+    
+    // Clean up the extracted text
+    extractedText = extractedText
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '')
+      .replace(/\\\\/g, '\\')
+      .replace(/\\t/g, '\t')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    console.log(`Extracted ${extractedText.length} characters from BT/ET blocks`);
+    return extractedText;
+  } catch (error) {
+    console.error("Error extracting text from BT/ET blocks:", error);
     return "";
   }
 }
@@ -385,40 +458,47 @@ export function cleanAndNormalizeText(text: string): string {
               .trim();
 }
 
-// Wrapper that tries all extraction methods
+// NEW: Enhanced wrapper that tries all extraction methods with priority on BT/ET blocks
 async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Try each method in order of reliability and take the best result
   const results = [];
   
-  // Method 1: Text Objects (usually most reliable)
+  // Method 1: BT/ET blocks (highest priority for structured PDFs)
+  const btEtResult = extractTextFromBTETBlocks(pdfBytes);
+  if (btEtResult && btEtResult.length > 100) {
+    const cleaned = cleanAndNormalizeText(btEtResult);
+    results.push({ text: cleaned, method: 'btEtBlocks', score: cleaned.length * 1.5 });
+  }
+  
+  // Method 2: Text Objects (usually most reliable for general PDFs)
   const textObjectsResult = extractTextFromTextObjects(pdfBytes);
   if (textObjectsResult && textObjectsResult.length > 100) {
     const cleaned = cleanAndNormalizeText(textObjectsResult);
     results.push({ text: cleaned, method: 'textObjects', score: cleaned.length * 1.2 });
   }
   
-  // Method 2: Streams
+  // Method 3: Streams
   const streamsResult = extractTextFromStreams(pdfBytes);
   if (streamsResult && streamsResult.length > 100) {
     const cleaned = cleanAndNormalizeText(streamsResult);
     results.push({ text: cleaned, method: 'streams', score: cleaned.length });
   }
   
-  // Method 3: Line-based extraction
+  // Method 4: Line-based extraction
   const lineResult = extractTextByLines(pdfBytes);
   if (lineResult && lineResult.length > 100) {
     const cleaned = cleanAndNormalizeText(lineResult);
     results.push({ text: cleaned, method: 'lines', score: cleaned.length * 1.1 });
   }
   
-  // Method 4: Parentheses
+  // Method 5: Parentheses
   const parenthesesResult = extractTextFromParentheses(pdfBytes);
   if (parenthesesResult && parenthesesResult.length > 100) {
     const cleaned = cleanAndNormalizeText(parenthesesResult);
     results.push({ text: cleaned, method: 'parentheses', score: cleaned.length });
   }
   
-  // Method 5: Pattern-based as last resort
+  // Method 6: Pattern-based as last resort
   const patternResult = extractTextPatterns(pdfBytes);
   if (patternResult && patternResult.length > 100) {
     const cleaned = cleanAndNormalizeText(patternResult);
