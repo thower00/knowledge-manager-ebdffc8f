@@ -15,7 +15,7 @@ export const useDocumentSelection = () => {
     console.log("Computing documentsToProcess with:", {
       extractAll: extractAllDocuments,
       selectedIds: selectedDocumentIds,
-      selectedCount: selectedDocumentIds.length,
+      selectedCount: selectedDocumentIds?.length || 0,
       docsCount: dbDocuments.length
     });
     
@@ -32,7 +32,7 @@ export const useDocumentSelection = () => {
     }
     
     const selectedDocs = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-    console.log("Selected documents for extraction:", selectedDocs.map(d => d.title));
+    console.log("Selected documents for extraction:", selectedDocs.length, "docs:", selectedDocs.map(d => d.title));
     return selectedDocs;
   }, [dbDocuments, selectedDocumentIds, extractAllDocuments]);
 
@@ -42,10 +42,10 @@ export const useDocumentSelection = () => {
     setIsLoadingDocuments(true);
     try {
       const documents = await fetchProcessedDocuments();
-      console.log("Fetched documents:", documents);
+      console.log("Fetched documents:", documents.length);
       // Only keep documents with 'completed' status
       const completedDocs = documents.filter(doc => doc.status === 'completed');
-      console.log("Filtered completed documents:", completedDocs);
+      console.log("Filtered completed documents:", completedDocs.length);
       setDbDocuments(completedDocs);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -60,19 +60,32 @@ export const useDocumentSelection = () => {
   }, [toast]);
 
   const toggleDocumentSelection = useCallback((documentId: string) => {
-    console.log("Toggling document selection:", documentId);
+    console.log("toggleDocumentSelection called for:", documentId);
+    
     setSelectedDocumentIds(prev => {
-      const prevIds = prev || []; // Ensure prev is an array
+      // Ensure prev is an array to avoid TypeScript errors
+      const currentIds = prev || []; 
+      console.log("Current selection:", currentIds);
       
-      if (prevIds.includes(documentId)) {
-        const newSelection = prevIds.filter(id => id !== documentId);
-        console.log("Document removed from selection, new selection:", newSelection);
-        return newSelection;
+      // Check if document is already selected
+      const isAlreadySelected = currentIds.includes(documentId);
+      
+      let newSelection: string[];
+      if (isAlreadySelected) {
+        // Remove the document from selection
+        newSelection = currentIds.filter(id => id !== documentId);
+        console.log("Removing document from selection, new selection:", newSelection);
       } else {
-        const newSelection = [...prevIds, documentId];
-        console.log("Document added to selection, new selection:", newSelection);
-        return newSelection;
+        // Add the document to selection
+        newSelection = [...currentIds, documentId];
+        console.log("Adding document to selection, new selection:", newSelection);
       }
+      
+      // Log the new selection state for debugging
+      console.log(`Document ${documentId} ${isAlreadySelected ? 'removed from' : 'added to'} selection.`,
+                  "New selection state:", newSelection);
+      
+      return newSelection;
     });
   }, []);
 
@@ -82,14 +95,17 @@ export const useDocumentSelection = () => {
       totalDocs: dbDocuments.length
     });
     
-    if (selectedDocumentIds && selectedDocumentIds.length === dbDocuments.length && dbDocuments.length > 0) {
+    // Check if all documents are currently selected
+    const allSelected = selectedDocumentIds?.length === dbDocuments.length && dbDocuments.length > 0;
+    
+    if (allSelected) {
       // Deselect all
       console.log("Deselecting all documents");
       setSelectedDocumentIds([]);
     } else {
       // Select all
       const allIds = dbDocuments.map(doc => doc.id);
-      console.log("Selecting all documents:", allIds);
+      console.log("Selecting all documents:", allIds.length);
       setSelectedDocumentIds(allIds);
     }
   }, [selectedDocumentIds, dbDocuments]);

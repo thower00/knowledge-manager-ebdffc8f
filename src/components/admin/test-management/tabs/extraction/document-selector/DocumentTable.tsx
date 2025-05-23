@@ -22,23 +22,28 @@ export function DocumentTable({
   toggleSelectAll,
   isLoading
 }: DocumentTableProps) {
-  // Debug log for document selection
+  // Enhanced debug logging for document selection
   useEffect(() => {
-    console.log("DocumentTable rendered with selected IDs:", selectedDocumentIds);
-  }, [selectedDocumentIds]);
+    console.log("DocumentTable rendered with:", {
+      documentsCount: documents.length,
+      selectedIds: selectedDocumentIds,
+      selectedCount: selectedDocumentIds?.length || 0,
+      selectedDocIds: JSON.stringify(selectedDocumentIds)
+    });
+  }, [documents, selectedDocumentIds]);
 
   // Force row class to be very visible when selected
   const getRowClass = (docId: string) => {
-    if (selectedDocumentIds.includes(docId)) {
-      return "bg-primary-foreground/30 border-l-4 border-l-primary";
-    }
-    return "";
+    const isSelected = selectedDocumentIds?.includes(docId);
+    return isSelected ? "bg-primary-foreground/30 border-l-4 border-l-primary" : "";
   };
 
-  // Handle direct row click for selection
+  // Handle row click for selection with improved debugging
   const handleRowClick = (docId: string) => {
     console.log("Row clicked for document:", docId);
+    console.log("Before toggle - Selected IDs:", JSON.stringify(selectedDocumentIds));
     toggleDocumentSelection(docId);
+    // Cannot log after state update since it's asynchronous
   };
 
   if (isLoading) {
@@ -65,6 +70,9 @@ export function DocumentTable({
     );
   }
 
+  // Safety check for selectedDocumentIds
+  const safeSelectedIds = selectedDocumentIds || [];
+
   return (
     <CardContent className="p-0">
       <div className="overflow-x-auto">
@@ -73,7 +81,7 @@ export function DocumentTable({
             <TableRow>
               <TableHead className="w-[50px]">
                 <Checkbox 
-                  checked={selectedDocumentIds.length === documents.length && documents.length > 0}
+                  checked={safeSelectedIds.length === documents.length && documents.length > 0}
                   onCheckedChange={() => {
                     console.log("Toggle all checkbox clicked");
                     toggleSelectAll();
@@ -88,45 +96,48 @@ export function DocumentTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.map((doc) => (
-              <TableRow 
-                key={doc.id} 
-                className={getRowClass(doc.id)}
-                onClick={() => handleRowClick(doc.id)}
-                style={{ cursor: 'pointer' }}
-                data-selected={selectedDocumentIds.includes(doc.id)}
-                data-testid={`document-row-${doc.id}`}
-              >
-                <TableCell>
-                  <div onClick={(e) => {
-                    // Important: Stop propagation so the row click handler doesn't fire
-                    e.stopPropagation();
-                  }}>
-                    <Checkbox
-                      checked={selectedDocumentIds.includes(doc.id)}
-                      onCheckedChange={() => {
-                        console.log("Checkbox changed for document:", doc.id);
-                        toggleDocumentSelection(doc.id);
-                      }}
-                      data-testid={`document-checkbox-${doc.id}`}
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="font-medium">{doc.title}</TableCell>
-                <TableCell>
-                  <span className="text-xs whitespace-nowrap">{doc.mime_type}</span>
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {doc.source_type}
-                </TableCell>
-                <TableCell>
-                  <ProcessedDocumentStatusBadge status={doc.status} />
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {doc.processed_at ? new Date(doc.processed_at).toLocaleString() : 'N/A'}
-                </TableCell>
-              </TableRow>
-            ))}
+            {documents.map((doc) => {
+              const isSelected = safeSelectedIds.includes(doc.id);
+              return (
+                <TableRow 
+                  key={doc.id} 
+                  className={getRowClass(doc.id)}
+                  onClick={() => handleRowClick(doc.id)}
+                  style={{ cursor: 'pointer' }}
+                  data-selected={isSelected}
+                  data-testid={`document-row-${doc.id}`}
+                >
+                  <TableCell>
+                    <div onClick={(e) => {
+                      // Important: Stop propagation so the row click handler doesn't fire
+                      e.stopPropagation();
+                    }}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => {
+                          console.log("Checkbox changed for document:", doc.id);
+                          toggleDocumentSelection(doc.id);
+                        }}
+                        data-testid={`document-checkbox-${doc.id}`}
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{doc.title}</TableCell>
+                  <TableCell>
+                    <span className="text-xs whitespace-nowrap">{doc.mime_type}</span>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {doc.source_type}
+                  </TableCell>
+                  <TableCell>
+                    <ProcessedDocumentStatusBadge status={doc.status} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {doc.processed_at ? new Date(doc.processed_at).toLocaleString() : 'N/A'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

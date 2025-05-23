@@ -16,6 +16,7 @@ interface DocumentSelectorFooterProps {
   onExtract: () => void;
   currentDocumentIndex: number;
   documentsToProcessCount: number;
+  selectionError?: string | null;
 }
 
 export function DocumentSelectorFooter({
@@ -27,84 +28,43 @@ export function DocumentSelectorFooter({
   isExtracting,
   onExtract,
   currentDocumentIndex,
-  documentsToProcessCount
+  documentsToProcessCount,
+  selectionError
 }: DocumentSelectorFooterProps) {
   const [isButtonClicked, setIsButtonClicked] = useState(false);
-  const [hasTriedExtraction, setHasTriedExtraction] = useState(false);
-  const [canExtract, setCanExtract] = useState(false);
-  const [showError, setShowError] = useState(false);
+  
+  // Calculate if extract button should be enabled
+  const hasSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
+  const canExtract = !isLoading && !isExtracting && (hasSelection || (extractAllDocuments && documents.length > 0));
 
-  // Log selection state for debugging
+  // Log state for debugging
   useEffect(() => {
-    console.log("DocumentSelectorFooter selection state:", {
-      selectedIds: selectedDocumentIds,
-      extractAll: extractAllDocuments,
-      documentsCount: documents.length
-    });
-  }, [selectedDocumentIds, extractAllDocuments, documents]);
-
-  // Calculate if extract button should be enabled - updated for better debugging
-  useEffect(() => {
-    const hasSelection = selectedDocumentIds && selectedDocumentIds.length > 0;
-    const shouldEnableExtract = (!isLoading && !isExtracting && 
-      ((hasSelection && !extractAllDocuments) || 
-      (extractAllDocuments && documents.length > 0)));
-    
-    console.log("Extract button state calculation:", {
-      shouldEnable: shouldEnableExtract,
+    console.log("DocumentSelectorFooter state:", {
       hasSelection,
-      selectedDocIds: selectedDocumentIds,
-      selectedCount: selectedDocumentIds ? selectedDocumentIds.length : 0,
-      extractAll: extractAllDocuments,
-      docsCount: documents.length,
-      isLoading,
-      isExtracting
-    });
-    
-    setCanExtract(shouldEnableExtract);
-    
-    // Hide error if we have a valid selection
-    if (shouldEnableExtract) {
-      setShowError(false);
-    }
-  }, [selectedDocumentIds, extractAllDocuments, documents, isLoading, isExtracting]);
-
-  // Handle extract button click with visual feedback and debugging
-  const handleExtractClick = () => {
-    console.log("Extract button clicked with state:", {
-      selectedCount: selectedDocumentIds ? selectedDocumentIds.length : 0,
+      selectedCount: selectedDocumentIds?.length || 0,
       extractAll: extractAllDocuments,
       canExtract,
-      documents: documents.map(d => ({ id: d.id, title: d.title })),
-      selectedIds: selectedDocumentIds
+      documentsCount: documents.length,
+      isExtracting,
+      selectionError
     });
-    
-    setHasTriedExtraction(true);
-    
-    // Validation check - show error if needed
-    if (!extractAllDocuments && (!selectedDocumentIds || selectedDocumentIds.length === 0)) {
-      console.error("No documents selected for extraction and extract all not enabled");
-      setShowError(true);
-      return;
-    }
-    
-    if (!canExtract) {
-      console.error("Extract button clicked but extraction is not allowed");
-      return;
-    }
+  }, [selectedDocumentIds, extractAllDocuments, documents.length, isExtracting, canExtract, selectionError]);
+
+  // Handle extract button click with visual feedback
+  const handleExtractClick = () => {
+    console.log("Extract button clicked with state:", {
+      selectedIds: JSON.stringify(selectedDocumentIds),
+      selectedCount: selectedDocumentIds?.length || 0,
+      extractAll: extractAllDocuments,
+      canExtract
+    });
     
     // Add visual feedback for button click
     setIsButtonClicked(true);
     setTimeout(() => setIsButtonClicked(false), 300);
     
-    // Call the extraction handler after a slight delay to ensure state updates have propagated
-    setTimeout(() => {
-      // Call the extraction handler
-      onExtract();
-      
-      // Additional logging to confirm handler was called
-      console.log("Extract handler called! Extraction should now be starting...");
-    }, 50);
+    // Call the extraction handler
+    onExtract();
   };
 
   return (
@@ -127,12 +87,12 @@ export function DocumentSelectorFooter({
         <div className="text-sm text-muted-foreground">
           {extractAllDocuments 
             ? `All ${documents.length} documents will be processed` 
-            : `${selectedDocumentIds ? selectedDocumentIds.length : 0} document(s) selected`}
+            : `${selectedDocumentIds?.length || 0} document(s) selected`}
         </div>
         
         <Button 
           onClick={handleExtractClick}
-          disabled={isExtracting} // Allow clicking even if validation might fail
+          disabled={!canExtract}
           data-testid="extract-selected-button"
           className={isButtonClicked ? "bg-primary/80" : ""}
         >
@@ -152,11 +112,11 @@ export function DocumentSelectorFooter({
         </Button>
       </div>
       
-      {/* Error feedback - shown when validation fails */}
-      {(showError || (hasTriedExtraction && !isExtracting && (!selectedDocumentIds || selectedDocumentIds.length === 0) && !extractAllDocuments)) && (
+      {/* Error feedback - shown when selection validation fails */}
+      {selectionError && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 flex items-center text-sm">
           <AlertTriangle className="h-4 w-4 mr-2" />
-          <span>Please select at least one document or enable "Extract All"</span>
+          <span>{selectionError}</span>
         </div>
       )}
     </CardContent>

@@ -30,7 +30,7 @@ export const useDatabaseExtraction = (
       documentsToProcessLength: documentsToProcess?.length || 0
     });
     
-    // Safety checks
+    // Safety checks - ensure dbDocuments exists
     if (!dbDocuments || dbDocuments.length === 0) {
       console.error("No documents available");
       toast({
@@ -41,7 +41,7 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Ensure we have documents to process - either through selection or "extract all"
+    // Determine which documents to process based on selection or "extract all" setting
     let docsToProcess: ProcessedDocument[] = [];
     
     if (extractAllDocuments) {
@@ -72,6 +72,8 @@ export const useDatabaseExtraction = (
       });
       return;
     }
+    
+    console.log("Document extraction will proceed with", docsToProcess.length, "documents");
     
     // Start extraction process
     setIsExtracting(true);
