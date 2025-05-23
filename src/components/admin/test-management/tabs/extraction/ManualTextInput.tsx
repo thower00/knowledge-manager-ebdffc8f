@@ -15,8 +15,6 @@ export const ManualTextInput = ({
   isDisabled = false,
   placeholder = "Paste document content to test extraction..."
 }: ManualTextInputProps) => {
-  // Create a separate value for the textarea that's not tied to extraction results
-  // This prevents the extraction results from showing in this input
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setExtractionText(e.target.value);
   };

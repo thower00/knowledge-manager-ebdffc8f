@@ -55,11 +55,13 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   // Use the progressive mode from extraction options
   const useProgressiveMode = extractionOptions.extractionMode === 'progressive';
   
-  // Create a handler for text input changes
+  // Handler for manual text extraction
   const handleExtractFromText = () => {
-    // Simply pass the manual input text to onRunTest
     if (onRunTest && manualInputText) {
-      onRunTest({ extractionText: manualInputText });
+      // Create a real extraction result based on the manual text
+      const processedText = manualInputText;
+      setExtractionText(processedText);
+      onRunTest({ extractionText: processedText });
     }
   };
 
@@ -68,6 +70,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     handleExtractFromUrl
   } = useExtractionHandlers(
     (extractedText, testUrl) => {
+      console.log("Extraction complete callback triggered with text of length:", extractedText?.length);
       setExtractionText(extractedText);
       onRunTest({ extractionText: extractedText, testUrl });
     }
@@ -75,6 +78,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
   // Handler for database document extraction
   const handleDatabaseExtraction = (extractedText: string) => {
+    console.log("Database extraction complete with text of length:", extractedText?.length);
     setExtractionText(extractedText);
     onRunTest({ extractionText: extractedText });
   };
