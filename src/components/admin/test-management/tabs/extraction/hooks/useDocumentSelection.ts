@@ -24,8 +24,14 @@ export const useDocumentSelection = () => {
       return dbDocuments;
     }
     
-    // Return only selected documents
-    return dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    // Return only selected documents - ensure we handle empty selections properly
+    if (selectedDocumentIds.length === 0) {
+      return [];
+    }
+    
+    const selectedDocs = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
+    console.log("Selected documents for extraction:", selectedDocs.map(d => d.title));
+    return selectedDocs;
   }, [dbDocuments, selectedDocumentIds, extractAllDocuments]);
 
   // Fetch documents from the database
@@ -99,6 +105,14 @@ export const useDocumentSelection = () => {
     fetchDocuments();
   }, [fetchDocuments]);
 
+  // Debug log for selection state changes
+  useEffect(() => {
+    console.log("Selection state updated:", {
+      selectedIds: selectedDocumentIds,
+      documentsToProcess: documentsToProcess.length
+    });
+  }, [selectedDocumentIds, documentsToProcess]);
+
   return {
     dbDocuments,
     selectedDocumentIds,
@@ -110,6 +124,6 @@ export const useDocumentSelection = () => {
     refreshDocuments,
     fetchDocuments,
     documentsToProcess,
-    setSelectedDocumentIds // Export this to allow direct setting of selectedDocumentIds
+    setSelectedDocumentIds
   };
 };

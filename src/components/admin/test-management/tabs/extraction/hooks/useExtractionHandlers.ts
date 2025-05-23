@@ -7,6 +7,7 @@ import { useUrlExtraction } from "./useUrlExtraction";
 import { useDatabaseExtraction } from "./useDatabaseExtraction";
 import { useRefresh } from "./useRefresh";
 import { ExtractionOptionsType } from "../ExtractionOptions";
+import { ProcessedDocument } from "@/types/document";
 
 export const useExtractionHandlers = (
   onComplete?: (extractedText: string, testUrl?: string) => void
@@ -89,38 +90,63 @@ export const useExtractionHandlers = (
   
   // Create a wrapped handler that verifies document selection before extraction
   const handleExtractFromDatabase = () => {
-    // Get the current state directly from the hook
-    const currentSelectedIds = documentSelection.selectedDocumentIds;
-    const currentExtractAll = extractAllDocuments;
-    const docsToProcess = documentSelection.documentsToProcess;
-    
-    // Log the current state for debugging
-    console.log("Extract button clicked - extraction handler state:", {
-      selectedIds: currentSelectedIds,
-      documentsToProcess: docsToProcess.length > 0 ? docsToProcess.map(d => ({ id: d.id, title: d.title })) : [],
-      extractAll: currentExtractAll,
-      docsCount: dbDocuments?.length || 0
+    console.log("handleExtractFromDatabase called - current selection state:", {
+      selectedIds: selectedDocumentIds,
+      documentsToProcess: documentsToProcess.map(d => ({ id: d.id, title: d.title })),
+      extractAll: extractAllDocuments
     });
+
+    // Get documents to process directly from the hook
+    const docsToProcess = documentsToProcess;
     
     // Verify we have valid selection before proceeding
-    const hasSelection = currentSelectedIds.length > 0 || currentExtractAll;
-    if (!hasSelection) {
-      console.error("No document selection detected in extraction handler");
-      // Set error message
-      setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
-      return;
-    }
-    
-    // Check if we have docs to process
     if (docsToProcess.length === 0) {
-      console.error("No documents to process after selection validation");
-      setExtractionError("Could not find documents matching your selection.");
+      console.error("No documents to process in extraction handler");
+      setExtractionError("No documents selected or documents are unavailable. Please select at least one document or enable 'Extract All'.");
       return;
     }
     
-    // Proceed with extraction
-    console.log("Starting extraction with documents:", docsToProcess.map(d => d.title));
-    return handleExtractFromDbBase();
+    // For debugging, log the first document we'll process
+    const firstDoc = docsToProcess[0];
+    console.log("Starting extraction with first document:", firstDoc.title);
+    
+    // Process directly with the document object instead of through IDs
+    return handleStartDatabaseExtraction(firstDoc);
+  };
+  
+  // Direct extraction function that bypasses ID lookups
+  const handleStartDatabaseExtraction = (doc: ProcessedDocument) => {
+    console.log("Starting direct extraction for document:", doc.title);
+    
+    // Check if we're already extracting
+    if (isExtracting) {
+      console.log("Extraction already in progress, ignoring request");
+      return;
+    }
+    
+    // Start extraction immediately with the document
+    setIsExtracting(true);
+    setExtractionError(null);
+    
+    // Note: Should return a promise, but we'll handle everything internally
+    extractFromDocument(doc)
+      .then(text => {
+        console.log("Extraction completed successfully");
+        setExtractionText(text);
+        setDbExtractionText(text);
+        setProcessExtractionText(text);
+        
+        if (onComplete) {
+          onComplete(text);
+        }
+      })
+      .catch(error => {
+        console.error("Extraction failed:", error);
+        setExtractionError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        setIsExtracting(false);
+      });
   };
   
   // Use the refactored refresh hook

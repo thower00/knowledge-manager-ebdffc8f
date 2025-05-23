@@ -21,13 +21,12 @@ export const useDatabaseExtraction = (
   
   // Extract text from database documents
   const handleExtractFromDatabase = useCallback(async () => {
-    // Log selection state for debugging
-    console.log("handleExtractFromDatabase called with state:", {
+    // Log extraction state for debugging
+    console.log("useDatabaseExtraction handleExtractFromDatabase called with state:", {
       selectedDocumentIds,
       extractAllDocuments,
       dbDocumentsCount: dbDocuments?.length || 0,
-      documentsToProcessLength: documentsToProcess?.length || 0,
-      documentsToProcess: documentsToProcess?.map(d => ({ id: d.id, title: d.title }))
+      documentsToProcessLength: documentsToProcess?.length || 0
     });
     
     // Safety checks
@@ -41,29 +40,8 @@ export const useDatabaseExtraction = (
       return;
     }
     
-    // Compute document selection locally if necessary
-    let docsToProcess = documentsToProcess;
-    
-    // If documentsToProcess is empty but we have selection, compute it directly
-    if (docsToProcess.length === 0) {
-      console.log("Computing document selection manually");
-      if (extractAllDocuments) {
-        docsToProcess = dbDocuments;
-        console.log("Using all documents:", dbDocuments.length);
-      } else if (selectedDocumentIds.length > 0) {
-        docsToProcess = dbDocuments.filter(doc => selectedDocumentIds.includes(doc.id));
-        console.log("Using selected documents:", docsToProcess.length);
-      }
-    }
-    
-    console.log("Documents to process:", {
-      finalCount: docsToProcess.length,
-      selectedIds: selectedDocumentIds,
-      docsToProcess: docsToProcess.map(d => ({ id: d.id, title: d.title }))
-    });
-    
-    // Validate selection
-    if (docsToProcess.length === 0) {
+    // Ensure we have documents to process
+    if (documentsToProcess.length === 0) {
       console.error("No documents selected for processing");
       setExtractionError("No documents selected. Please select at least one document or enable 'Extract All'.");
       toast({
@@ -93,7 +71,7 @@ export const useDatabaseExtraction = (
       }
       
       // For debugging: always select the first document to process
-      const doc = docsToProcess[0];
+      const doc = documentsToProcess[0];
       console.log("Processing document:", doc.title);
       
       try {

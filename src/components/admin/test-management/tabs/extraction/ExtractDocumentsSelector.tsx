@@ -40,19 +40,13 @@ export function ExtractDocumentsSelector({
   documentsToProcessCount
 }: ExtractDocumentsSelectorProps) {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
-
-  // Sync local state with prop
-  useEffect(() => {
-    setLocalSelectedIds(selectedDocumentIds);
-  }, [selectedDocumentIds]);
+  const [isButtonClicked, setIsButtonClicked] = useState(false);
 
   // Log selection state on render for debugging
   useEffect(() => {
     console.log("ExtractDocumentsSelector rendered with:", {
       documentsCount: documents.length,
       selectedIds: selectedDocumentIds,
-      localSelectedIds,
       extractAll: extractAllDocuments,
       isLoading,
       isExtracting
@@ -62,7 +56,7 @@ export function ExtractDocumentsSelector({
     if (selectedDocumentIds.length > 0) {
       console.log("Document selection validated:", selectedDocumentIds);
     }
-  }, [documents, selectedDocumentIds, localSelectedIds, extractAllDocuments, isLoading, isExtracting]);
+  }, [documents, selectedDocumentIds, extractAllDocuments, isLoading, isExtracting]);
 
   const handleRefresh = async () => {
     await refreshDocuments();
@@ -88,11 +82,10 @@ export function ExtractDocumentsSelector({
     toggleDocumentSelection(docId);
   };
 
-  // Handle extract button click with validation
+  // Handle extract button click with visual feedback
   const handleExtractClick = () => {
     console.log("Extract button clicked with state:", {
       selectedCount: selectedDocumentIds.length,
-      localSelectedIds: localSelectedIds.length,
       extractAll: extractAllDocuments,
       canExtract,
       documents: documents.map(d => ({ id: d.id, title: d.title }))
@@ -103,6 +96,11 @@ export function ExtractDocumentsSelector({
       return;
     }
     
+    // Add visual feedback for button click
+    setIsButtonClicked(true);
+    setTimeout(() => setIsButtonClicked(false), 300);
+    
+    // Call the extraction handler
     onExtract();
   };
 
@@ -235,6 +233,7 @@ export function ExtractDocumentsSelector({
                   onClick={handleExtractClick}
                   disabled={!canExtract}
                   data-testid="extract-selected-button"
+                  className={isButtonClicked ? "bg-primary/80" : ""}
                 >
                   {isExtracting ? (
                     <>
