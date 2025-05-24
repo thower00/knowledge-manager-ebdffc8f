@@ -1,4 +1,3 @@
-
 import { fetchDocumentViaProxy } from "./documentFetchService";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
 import { extractPdfWithProxy } from "./pdfExtractionService";
@@ -8,6 +7,11 @@ interface ServerPdfExtractionOptions {
   maxPages?: number;
   streamMode?: boolean;
   timeout?: number;
+  forceTextMode?: boolean;
+  disableBinaryOutput?: boolean;
+  strictTextCleaning?: boolean;
+  useAdvancedExtraction?: boolean;
+  useTextPatternExtraction?: boolean;
 }
 
 /**
