@@ -69,8 +69,12 @@ export const useServerExtractionProcess = () => {
           {
             maxPages: options?.extractFirstPagesOnly ? options.pageLimit : 0,
             streamMode: options?.extractionMode === 'progressive',
-            // Reduce timeout slightly to ensure server responds before client times out
-            timeout: Math.max(15, timeoutValue - 3)
+            // Reduce timeout to ensure server responds before client times out
+            timeout: Math.max(15, timeoutValue - 5),
+            // Add these flags for better extraction
+            forceTextMode: true,
+            disableBinaryOutput: true,
+            strictTextCleaning: true
           },
           progress => {
             setExtractionProgress(progress);
@@ -88,17 +92,17 @@ export const useServerExtractionProcess = () => {
         // Clear the timeout since extraction completed successfully
         clearExtractionTimeout();
         
-        // Mark as complete even if text is empty
+        // Mark as complete
         setExtractionProgress(100);
         setExtractionStatus('Extraction completed successfully');
         
-        if (!text || text.length < 100) {
+        if (!text || text.length < 50) {
           throw new Error("No meaningful text could be extracted from the document.");
         }
         
         return text;
       } catch (serverError) {
-        console.error("Server-side extraction failed, checking if we have PDF data...", serverError);
+        console.error("Server-side extraction failed:", serverError);
         
         // Set status to indicate fallback mode
         setExtractionStatus('Server extraction failed. Using fallback method...');
@@ -112,9 +116,9 @@ export const useServerExtractionProcess = () => {
         
         // Show a toast for fallback mode
         toast({
-          title: "Using Fallback Extraction",
-          description: "The server extraction failed. Limited text has been provided as a fallback.",
-          variant: "warning"
+          title: "Extraction Failed", 
+          description: `Could not extract text from "${document.title}". ${serverError instanceof Error ? serverError.message : 'Unknown error'}`,
+          variant: "destructive"
         });
         
         // Clear the timeout since we're done
