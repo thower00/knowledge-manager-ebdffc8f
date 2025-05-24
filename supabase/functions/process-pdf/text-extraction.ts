@@ -61,69 +61,168 @@ function extractTextFromPdfBytes(pdfBytes: string): string {
   return text.trim();
 }
 
-// Clean and normalize extracted text
+// Ultra-aggressive text cleaning for binary-contaminated PDFs
 export function cleanAndNormalizeText(text: string): string {
-  return text
-    .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
-    .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF\u2000-\u206F]/g, ' ')
-    .replace(/\uFFFD/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  if (!text || text.length === 0) return "";
+  
+  console.log("Running ultra-aggressive text cleaning for binary-contaminated PDF");
+  console.log(`Original text length: ${text.length}`);
+  
+  // Step 1: Extract readable words using multiple strategies
+  const words = extractReadableWords(text);
+  
+  if (words.length > 50) {
+    console.log(`Successfully extracted ${words.length} readable words`);
+    return words.join(' ');
+  }
+  
+  // Step 2: Try sentence extraction
+  const sentences = extractReadableSentences(text);
+  
+  if (sentences.length > 10) {
+    console.log(`Successfully extracted ${sentences.length} readable sentences`);
+    return sentences.join(' ');
+  }
+  
+  // Step 3: Extract any meaningful text patterns
+  const meaningfulText = extractMeaningfulPatterns(text);
+  
+  if (meaningfulText.length > 20) {
+    console.log(`Successfully extracted meaningful text patterns: ${meaningfulText.length} chars`);
+    return meaningfulText;
+  }
+  
+  console.log("Could not extract readable text from binary-contaminated PDF");
+  return "Could not extract readable text from this PDF. The document appears to contain primarily binary data or encoded content.";
 }
 
-// Extract text by looking for line breaks
-export function extractTextByLineBreaks(pdfBytes: string): string {
-  const lines = pdfBytes.split(/[\r\n]+/);
-  let text = '';
+// Extract readable words from contaminated text
+function extractReadableWords(text: string): string[] {
+  const words: string[] = [];
   
-  for (const line of lines) {
-    // Look for text patterns in each line
-    const textMatch = line.match(/\((.*?)\)/);
-    if (textMatch && textMatch[1]) {
-      text += textMatch[1] + '\n';
+  // Split by common separators and filter for actual words
+  const tokens = text.split(/[\s\n\r\t\u0000-\u001F\u007F-\u009F\uFFFD]+/);
+  
+  for (const token of tokens) {
+    // Look for words that are likely to be actual text
+    if (isReadableWord(token)) {
+      words.push(token);
     }
   }
   
-  return cleanAndNormalizeText(text);
+  return words;
 }
 
-// Extract text using pattern matching
-export function extractTextPatterns(pdfBytes: string): string {
-  let text = '';
+// Check if a token looks like a readable word
+function isReadableWord(token: string): boolean {
+  if (!token || token.length < 2) return false;
   
-  // Pattern 1: Look for BT...ET blocks (text blocks)
-  const textBlocks = pdfBytes.match(/BT\s+(.*?)\s+ET/gs);
-  if (textBlocks) {
-    for (const block of textBlocks) {
-      const textMatches = block.match(/\((.*?)\)\s*Tj/g);
-      if (textMatches) {
-        for (const match of textMatches) {
-          const content = match.match(/\((.*?)\)/)?.[1];
-          if (content) {
-            text += content + ' ';
-          }
+  // Must contain mostly letters
+  const letterCount = (token.match(/[a-zA-Z]/g) || []).length;
+  const letterRatio = letterCount / token.length;
+  
+  // Accept tokens that are mostly letters or common punctuation
+  if (letterRatio >= 0.7 && token.length >= 2) {
+    // Exclude tokens with too many special characters
+    const specialChars = token.match(/[^\w\s.,;:!?()\-'"/]/g);
+    const specialRatio = specialChars ? specialChars.length / token.length : 0;
+    
+    return specialRatio < 0.3;
+  }
+  
+  return false;
+}
+
+// Extract readable sentences from contaminated text
+function extractReadableSentences(text: string): string[] {
+  const sentences: string[] = [];
+  
+  // Look for patterns that might be sentences
+  const sentencePatterns = [
+    /[A-Z][a-z]{2,}[^.!?]*[.!?]/g,  // Traditional sentences
+    /[A-Z][a-z]+ [a-z]+ [a-z]+/g,   // Multiple words starting with capital
+    /[a-zA-Z]{3,} [a-zA-Z]{3,} [a-zA-Z]{3,}/g // Three consecutive words
+  ];
+  
+  for (const pattern of sentencePatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      for (const match of matches) {
+        if (isReadableSentence(match)) {
+          sentences.push(match.trim());
         }
       }
     }
   }
   
-  return cleanAndNormalizeText(text);
+  return [...new Set(sentences)]; // Remove duplicates
 }
 
-// Extract text from parentheses patterns
-export function extractTextFromParentheses(pdfBytes: string): string {
-  const parenthesesMatches = pdfBytes.match(/\([^)]+\)/g);
-  if (!parenthesesMatches) return '';
+// Check if text looks like a readable sentence
+function isReadableSentence(text: string): boolean {
+  if (!text || text.length < 10) return false;
   
-  let text = '';
-  for (const match of parenthesesMatches) {
-    const content = match.slice(1, -1); // Remove parentheses
-    if (content.length > 2 && /[a-zA-Z]/.test(content)) {
-      text += content + ' ';
+  // Must contain mostly letters and spaces
+  const alphaSpaceCount = (text.match(/[a-zA-Z\s]/g) || []).length;
+  const alphaSpaceRatio = alphaSpaceCount / text.length;
+  
+  return alphaSpaceRatio >= 0.8;
+}
+
+// Extract meaningful patterns from binary-contaminated text
+function extractMeaningfulPatterns(text: string): string {
+  const patterns: string[] = [];
+  
+  // Look for common document metadata patterns
+  const metadataPatterns = [
+    /[A-Z][a-z]+ [A-Z][a-z]+/g, // Names like "Thomas Wernerheim"
+    /Microsoft [A-Z][a-z]+/g,    // Microsoft products
+    /Adobe [A-Z][a-z]+/g,        // Adobe products
+    /\b[A-Z][a-z]{2,}\.(docx?|pdf|txt)/g, // File names
+    /\b[A-Z][a-z]{3,}[:\s][A-Z][a-z]+/g   // Labels and values
+  ];
+  
+  for (const pattern of metadataPatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      patterns.push(...matches);
     }
   }
   
-  return cleanAndNormalizeText(text);
+  // Extract any remaining readable chunks
+  const readableChunks = text.match(/[A-Za-z]{3,}(?:\s+[A-Za-z]{3,}){1,5}/g);
+  if (readableChunks) {
+    patterns.push(...readableChunks);
+  }
+  
+  return [...new Set(patterns)].join(' ').trim();
+}
+
+// Clean and normalize extracted text
+export function extractTextByLineBreaks(text: string): string {
+  const cleanedWords = extractReadableWords(text);
+  return cleanedWords.join(' ');
+}
+
+// Extract text using pattern matching
+export function extractTextPatterns(text: string): string {
+  return extractMeaningfulPatterns(text);
+}
+
+// Extract text from parentheses patterns
+export function extractTextFromParentheses(text: string): string {
+  const parenthesesMatches = text.match(/\([^)]+\)/g);
+  if (!parenthesesMatches) return '';
+  
+  const readableWords: string[] = [];
+  
+  for (const match of parenthesesMatches) {
+    const content = match.slice(1, -1); // Remove parentheses
+    const words = extractReadableWords(content);
+    readableWords.push(...words);
+  }
+  
+  return readableWords.join(' ');
 }
 
 // Check if text contains binary indicators
@@ -132,5 +231,13 @@ export function textContainsBinaryIndicators(text: string): boolean {
   const nonPrintable = text.match(/[\x00-\x1F\x7F-\x9F]/g);
   const ratio = nonPrintable ? nonPrintable.length / text.length : 0;
   
-  return ratio > 0.1 || text.includes('\uFFFD');
+  // Check for Unicode replacement characters
+  const replacementChars = text.match(/\uFFFD/g);
+  const replacementRatio = replacementChars ? replacementChars.length / text.length : 0;
+  
+  // Check for suspicious character sequences
+  const suspiciousSequences = text.match(/[^\x20-\x7E\r\n\t]{3,}/g);
+  const suspiciousRatio = suspiciousSequences ? suspiciousSequences.length : 0;
+  
+  return ratio > 0.05 || replacementRatio > 0.01 || suspiciousRatio > 2;
 }
