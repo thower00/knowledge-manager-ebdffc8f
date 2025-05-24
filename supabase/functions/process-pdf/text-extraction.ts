@@ -395,7 +395,7 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
     if (letterMatches && letterMatches.length > 10) {
       // Process and join matches
       return letterMatches
-        .map(match => match.replace(/\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)|\(/g, ' '))
+        .map(match => match.replace(/\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T*)|\(/g, ' '))
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -583,7 +583,7 @@ export function textContainsBinaryIndicators(text: string): boolean {
   return letterRatio < 0.2;
 }
 
-// NEW: Enhanced wrapper that tries all extraction methods with focus on readable content
+// Enhanced wrapper that tries all extraction methods with focus on readable content
 async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
   // Method 1: Enhanced readable text extraction (highest priority)
   const readableResult = extractReadableText(pdfBytes);
