@@ -269,7 +269,7 @@ export function extractTextFromBTETBlocks(pdfBytes: string): string {
 }
 
 // Extract text by examining line breaks and spacing patterns
-export function extractTextByLines(pdfBytes: string): string {
+export function extractTextByLineBreaks(pdfBytes: string): string {
   try {
     // Extract strings that might be text lines based on common PDF text encodings
     const linePatterns = [
@@ -389,13 +389,13 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
     }
     
     // Otherwise try another extraction method - search for letters after operator codes
-    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T*)|\(/gs;
+    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)/g;
     const letterMatches = pdfBytes.match(letterSequencePattern);
     
     if (letterMatches && letterMatches.length > 10) {
       // Process and join matches
       return letterMatches
-        .map(match => match.replace(/\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T*)|\(/g, ' '))
+        .map(match => match.replace(/\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)/g, ' '))
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();
