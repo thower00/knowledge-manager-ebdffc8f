@@ -4,7 +4,7 @@ import {
   extractPdfMetadata,
   extractTextWithTimeout,
   cleanAndNormalizeText,
-  extractTextByLines,
+  extractTextByLineBreaks,
   extractTextPatterns,
   extractTextFromParentheses,
   extractTextFromTextObjects,
@@ -17,6 +17,111 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
+
+// Enhanced wrapper that tries all extraction methods with focus on readable content
+async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
+  // Method 1: Enhanced readable text extraction (highest priority)
+  const readableResult = extractReadableText(pdfBytes);
+  if (readableResult && readableResult.length > 100 && hasEnoughWords(readableResult)) {
+    console.log(`Enhanced extraction found readable text: ${readableResult.length} chars`);
+    return readableResult;
+  }
+  
+  // Method 2: BT/ET blocks with enhanced processing
+  const btEtResult = extractTextFromBTETBlocks(pdfBytes);
+  if (btEtResult && btEtResult.length > 100 && hasEnoughWords(btEtResult)) {
+    console.log(`Enhanced BT/ET extraction found readable text: ${btEtResult.length} chars`);
+    return btEtResult;
+  }
+  
+  // Method 3: Content streams
+  const streamsResult = extractFromContentStreams(pdfBytes);
+  if (streamsResult && streamsResult.length > 100) {
+    console.log(`Stream extraction found text: ${streamsResult.length} chars`);
+    return streamsResult;
+  }
+  
+  // Method 4: Unicode text
+  const unicodeResult = extractUnicodeText(pdfBytes);
+  if (unicodeResult && unicodeResult.length > 50) {
+    console.log(`Unicode extraction found text: ${unicodeResult.length} chars`);
+    return unicodeResult;
+  }
+  
+  // Method 5: Word patterns as last resort
+  const patternResult = extractWordPatterns(pdfBytes);
+  if (patternResult && patternResult.length > 50) {
+    console.log(`Pattern extraction found text: ${patternResult.length} chars`);
+    return patternResult;
+  }
+  
+  // If nothing worked, return a clear message
+  return "No readable text could be extracted. This PDF may contain only images, have complex formatting, or use unsupported fonts.";
+}
+
+// Helper functions that were missing
+function extractReadableText(pdfBytes: string): string {
+  try {
+    // Use the main extraction function from text-extraction.ts
+    return extractTextPatterns(pdfBytes);
+  } catch (error) {
+    console.error("Error in extractReadableText:", error);
+    return "";
+  }
+}
+
+function extractTextFromBTETBlocks(pdfBytes: string): string {
+  try {
+    return extractTextFromTextObjects(pdfBytes);
+  } catch (error) {
+    console.error("Error in extractTextFromBTETBlocks:", error);
+    return "";
+  }
+}
+
+function extractFromContentStreams(pdfBytes: string): string {
+  try {
+    return extractTextByLineBreaks(pdfBytes);
+  } catch (error) {
+    console.error("Error in extractFromContentStreams:", error);
+    return "";
+  }
+}
+
+function extractUnicodeText(pdfBytes: string): string {
+  try {
+    return extractTextFromParentheses(pdfBytes);
+  } catch (error) {
+    console.error("Error in extractUnicodeText:", error);
+    return "";
+  }
+}
+
+function extractWordPatterns(pdfBytes: string): string {
+  try {
+    // Extract word patterns using regex
+    const wordPattern = /\b[A-Za-z]{3,}(?:\s+[A-Za-z]{2,}){2,}\b/g;
+    const matches = pdfBytes.match(wordPattern);
+    
+    if (matches && matches.length > 5) {
+      return matches
+        .filter(match => !match.includes('findresource') && !match.includes('begincmap'))
+        .join(' ');
+    }
+    
+    return "";
+  } catch (error) {
+    console.error("Error in extractWordPatterns:", error);
+    return "";
+  }
+}
+
+function hasEnoughWords(text: string): boolean {
+  const words = text.split(/\s+/).filter(word => 
+    word.length >= 3 && /^[a-zA-Z]/.test(word)
+  );
+  return words.length >= 5;
+}
 
 // Main function to extract text from PDF
 async function extractTextFromPdf(base64Data: string, options = {}) {
@@ -67,7 +172,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
         console.log("Couldn't extract meaningful text using standard methods, trying alternatives");
         
         // Try alternative extraction methods
-        const textByLines = extractTextByLines(pdfBytes);
+        const textByLines = extractTextByLineBreaks(pdfBytes);
         if (textByLines && textByLines.length > 100) {
           console.log(`Got better results using line-based extraction: ${textByLines.length} chars`);
           extractedText = textByLines;
@@ -231,7 +336,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { 
       status: 204,
-      headers: corsHeaders
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      }
     });
   }
   
@@ -249,7 +357,8 @@ serve(async (req) => {
           status: 200, 
           headers: { 
             "Content-Type": "application/json", 
-            ...corsHeaders 
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
           } 
         }
       );
@@ -270,7 +379,8 @@ serve(async (req) => {
           status: 400, 
           headers: { 
             "Content-Type": "application/json", 
-            ...corsHeaders 
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
           } 
         }
       );
@@ -292,7 +402,8 @@ serve(async (req) => {
           status: 200, 
           headers: { 
             "Content-Type": "application/json", 
-            ...corsHeaders,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
             // Add cache control headers to prevent caching
             "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
             "Pragma": "no-cache",
@@ -309,7 +420,8 @@ serve(async (req) => {
           status: 400, 
           headers: { 
             "Content-Type": "application/json", 
-            ...corsHeaders 
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
           } 
         }
       );
@@ -352,7 +464,8 @@ serve(async (req) => {
         headers: { 
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache", 
-          ...corsHeaders 
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
         } 
       }
     );
@@ -368,7 +481,8 @@ serve(async (req) => {
         status: 500, 
         headers: { 
           "Content-Type": "application/json", 
-          ...corsHeaders 
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
         } 
       }
     );
