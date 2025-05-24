@@ -389,7 +389,7 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
     }
     
     // Otherwise try another extraction method - search for letters after operator codes
-    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)[^)]+\(/gs;
+    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T*)|\(/gs;
     const letterMatches = pdfBytes.match(letterSequencePattern);
     
     if (letterMatches && letterMatches.length > 10) {
