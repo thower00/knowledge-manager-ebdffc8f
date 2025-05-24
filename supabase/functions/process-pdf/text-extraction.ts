@@ -1,4 +1,3 @@
-
 // Helper function to check if data looks like a PDF
 export function isPdfData(data: string): boolean {
   return data.startsWith('%PDF-');
@@ -30,35 +29,243 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
   });
 }
 
-// Main text extraction function
+// Main text extraction function - completely rewritten for better content extraction
 function extractTextFromPdfBytes(pdfBytes: string): string {
-  let text = '';
+  let extractedText = '';
   
-  // Look for text objects in the PDF
-  const textMatches = pdfBytes.match(/\((.*?)\)\s*Tj/g);
-  if (textMatches) {
-    for (const match of textMatches) {
-      const content = match.match(/\((.*?)\)/)?.[1];
-      if (content) {
-        text += content + ' ';
+  console.log("Starting enhanced PDF text extraction");
+  
+  // Strategy 1: Look for actual text content in streams
+  const streamMatches = pdfBytes.match(/stream\s*([\s\S]*?)\s*endstream/g);
+  if (streamMatches) {
+    console.log(`Found ${streamMatches.length} content streams`);
+    
+    for (const streamMatch of streamMatches) {
+      const streamContent = streamMatch.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
+      
+      // Look for text drawing operations in the stream
+      const textOperations = extractTextFromStream(streamContent);
+      if (textOperations.length > 0) {
+        extractedText += textOperations + ' ';
       }
     }
   }
   
-  // Look for alternative text patterns
-  const altTextMatches = pdfBytes.match(/\[(.*?)\]\s*TJ/g);
-  if (altTextMatches) {
-    for (const match of altTextMatches) {
-      const content = match.match(/\[(.*?)\]/)?.[1];
-      if (content) {
-        // Remove escape characters and formatting
-        const cleanContent = content.replace(/\\[nrt]/g, ' ').replace(/\\\(/g, '(').replace(/\\\)/g, ')');
-        text += cleanContent + ' ';
+  // Strategy 2: Look for text in parentheses (Tj operators)
+  const tjMatches = pdfBytes.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)\s*Tj/g);
+  if (tjMatches) {
+    console.log(`Found ${tjMatches.length} Tj text operations`);
+    
+    for (const match of tjMatches) {
+      const textContent = match.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/)?.[1];
+      if (textContent) {
+        const cleanText = cleanTextContent(textContent);
+        if (cleanText.length > 0) {
+          extractedText += cleanText + ' ';
+        }
       }
+    }
+  }
+  
+  // Strategy 3: Look for text arrays (TJ operators)
+  const tjArrayMatches = pdfBytes.match(/\[((?:[^\[\]\\]|\\.|\\[0-7]{3})*)\]\s*TJ/g);
+  if (tjArrayMatches) {
+    console.log(`Found ${tjArrayMatches.length} TJ array operations`);
+    
+    for (const match of tjArrayMatches) {
+      const arrayContent = match.match(/\[((?:[^\[\]\\]|\\.|\\[0-7]{3})*)\]/)?.[1];
+      if (arrayContent) {
+        // Extract text from array elements
+        const textElements = arrayContent.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/g);
+        if (textElements) {
+          for (const element of textElements) {
+            const textContent = element.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/)?.[1];
+            if (textContent) {
+              const cleanText = cleanTextContent(textContent);
+              if (cleanText.length > 0) {
+                extractedText += cleanText + ' ';
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Strategy 4: Extract text from BT/ET blocks (text objects)
+  const textBlocks = pdfBytes.match(/BT\s*([\s\S]*?)\s*ET/g);
+  if (textBlocks) {
+    console.log(`Found ${textBlocks.length} text blocks`);
+    
+    for (const block of textBlocks) {
+      const blockContent = block.replace(/^BT\s*/, '').replace(/\s*ET$/, '');
+      const blockText = extractTextFromTextBlock(blockContent);
+      if (blockText.length > 0) {
+        extractedText += blockText + ' ';
+      }
+    }
+  }
+  
+  // If we still don't have meaningful text, try a more aggressive approach
+  if (extractedText.length < 50) {
+    console.log("Trying aggressive text extraction");
+    extractedText = aggressiveTextExtraction(pdfBytes);
+  }
+  
+  console.log(`Extracted text length: ${extractedText.length}`);
+  return extractedText.trim();
+}
+
+// Extract text from a stream content
+function extractTextFromStream(streamContent: string): string {
+  let text = '';
+  
+  // Remove common PDF filters and decode if possible
+  let decodedContent = streamContent;
+  
+  // Look for text operations in the decoded stream
+  const textMatches = decodedContent.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)\s*Tj/g);
+  if (textMatches) {
+    for (const match of textMatches) {
+      const textContent = match.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/)?.[1];
+      if (textContent) {
+        const cleanText = cleanTextContent(textContent);
+        if (cleanText.length > 0) {
+          text += cleanText + ' ';
+        }
+      }
+    }
+  }
+  
+  return text;
+}
+
+// Extract text from a text block (BT...ET)
+function extractTextFromTextBlock(blockContent: string): string {
+  let text = '';
+  
+  // Look for Tj operations
+  const tjMatches = blockContent.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)\s*Tj/g);
+  if (tjMatches) {
+    for (const match of tjMatches) {
+      const textContent = match.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/)?.[1];
+      if (textContent) {
+        const cleanText = cleanTextContent(textContent);
+        if (cleanText.length > 0) {
+          text += cleanText + ' ';
+        }
+      }
+    }
+  }
+  
+  // Look for TJ operations
+  const tjArrayMatches = blockContent.match(/\[((?:[^\[\]\\]|\\.|\\[0-7]{3})*)\]\s*TJ/g);
+  if (tjArrayMatches) {
+    for (const match of tjArrayMatches) {
+      const arrayContent = match.match(/\[((?:[^\[\]\\]|\\.|\\[0-7]{3})*)\]/)?.[1];
+      if (arrayContent) {
+        const textElements = arrayContent.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/g);
+        if (textElements) {
+          for (const element of textElements) {
+            const textContent = element.match(/\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/)?.[1];
+            if (textContent) {
+              const cleanText = cleanTextContent(textContent);
+              if (cleanText.length > 0) {
+                text += cleanText + ' ';
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return text;
+}
+
+// Clean and decode text content
+function cleanTextContent(text: string): string {
+  if (!text) return '';
+  
+  // Handle escape sequences
+  let cleaned = text
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\b/g, '\b')
+    .replace(/\\f/g, '\f')
+    .replace(/\\\(/g, '(')
+    .replace(/\\\)/g, ')')
+    .replace(/\\\\/g, '\\');
+    
+  // Handle octal escape sequences
+  cleaned = cleaned.replace(/\\([0-7]{1,3})/g, (match, octal) => {
+    const charCode = parseInt(octal, 8);
+    return charCode >= 32 && charCode <= 126 ? String.fromCharCode(charCode) : ' ';
+  });
+  
+  // Remove non-printable characters but keep basic whitespace
+  cleaned = cleaned.replace(/[^\x20-\x7E\r\n\t]/g, ' ');
+  
+  // Collapse multiple spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  // Only return if it looks like actual text
+  if (cleaned.length >= 2 && /[a-zA-Z]/.test(cleaned)) {
+    return cleaned;
+  }
+  
+  return '';
+}
+
+// Aggressive text extraction as last resort
+function aggressiveTextExtraction(pdfBytes: string): string {
+  console.log("Using aggressive text extraction");
+  
+  let text = '';
+  
+  // Look for any parentheses content that might be text
+  const allParentheses = pdfBytes.match(/\([^)]{2,}\)/g);
+  if (allParentheses) {
+    for (const match of allParentheses) {
+      const content = match.slice(1, -1); // Remove parentheses
+      const cleanText = cleanTextContent(content);
+      if (cleanText.length > 0 && isLikelyText(cleanText)) {
+        text += cleanText + ' ';
+      }
+    }
+  }
+  
+  // Look for metadata fields that might contain readable text
+  const titleMatch = pdfBytes.match(/\/Title\s*\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/);
+  if (titleMatch) {
+    const title = cleanTextContent(titleMatch[1]);
+    if (title.length > 0) {
+      text += `Title: ${title}\n`;
+    }
+  }
+  
+  const authorMatch = pdfBytes.match(/\/Author\s*\(((?:[^()\\]|\\.|\\[0-7]{3})*)\)/);
+  if (authorMatch) {
+    const author = cleanTextContent(authorMatch[1]);
+    if (author.length > 0) {
+      text += `Author: ${author}\n`;
     }
   }
   
   return text.trim();
+}
+
+// Check if text looks like actual readable content
+function isLikelyText(text: string): boolean {
+  if (!text || text.length < 2) return false;
+  
+  // Must contain at least some letters
+  const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+  const letterRatio = letterCount / text.length;
+  
+  // Should have reasonable letter ratio and not be too short
+  return letterRatio >= 0.5 && text.length >= 3;
 }
 
 // Ultra-aggressive text cleaning for binary-contaminated PDFs
