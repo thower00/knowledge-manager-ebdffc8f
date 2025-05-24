@@ -10,7 +10,7 @@ export function extractReadableText(pdfBytes: string): string {
   try {
     // Step 1: Look for actual text content in various PDF text operators
     const textOperators = [
-      // Text showing operators with actual content
+      // Text showing operators with actual content - Fixed regex patterns
       /\(((?:[^()\\]|\\.)*)\)\s*Tj/g,           // Simple text show
       /\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g,        // Array text show
       /\(((?:[^()\\]|\\.)*)\)\s*'/g,           // Single quote text show
@@ -63,7 +63,7 @@ export function extractReadableText(pdfBytes: string): string {
   }
 }
 
-// Decode PDF text content with proper escape handling
+// Decode PDF text content with proper escape handling - Fixed regex
 function decodeTextContent(text: string): string {
   try {
     return text
@@ -72,8 +72,8 @@ function decodeTextContent(text: string): string {
       .replace(/\\t/g, '\t')
       .replace(/\\b/g, '\b')
       .replace(/\\f/g, '\f')
-      .replace(/\\(/g, '(')
-      .replace(/\\)/g, ')')
+      .replace(/\\\(/g, '(')          // Fixed: escaped parentheses
+      .replace(/\\\)/g, ')')          // Fixed: escaped parentheses
       .replace(/\\\\/g, '\\')
       .replace(/\\(\d{3})/g, (_, octal) => {
         const charCode = parseInt(octal, 8);
@@ -274,7 +274,7 @@ export function extractTextByLines(pdfBytes: string): string {
     // Extract strings that might be text lines based on common PDF text encodings
     const linePatterns = [
       // Common PDF text encoding patterns
-      /\(([^\)]{5,})\)/g,  // Text in parentheses (common in PDF)
+      /\(([^)]{5,})\)/g,  // Text in parentheses (common in PDF)
       /BT\s*(.*?)\s*ET/gs, // Text between Begin Text and End Text markers
       /TJ\s*\[(.*?)\]/gs,  // Text array in TJ operators
       /Td\s*\((.*?)\)\s*Tj/gs, // Text with Td and Tj operators
@@ -320,7 +320,7 @@ export function extractTextByLines(pdfBytes: string): string {
         // Extract text parts from TJ arrays - these often contain actual text
         const tjContent = match[1];
         // Look for text in parentheses within TJ array
-        const textParts = [...tjContent.matchAll(/\(([^\)]*)\)/g)]
+        const textParts = [...tjContent.matchAll(/\(([^)]*)\)/g)]
           .map(m => m[1])
           .filter(text => text.length > 0);
           
@@ -389,7 +389,7 @@ export function extractTextFromTextObjects(pdfBytes: string): string {
     }
     
     // Otherwise try another extraction method - search for letters after operator codes
-    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)[^\)]+\(/gs;
+    const letterSequencePattern = /\)(Td|Tj|TJ|Tf|Tc|Tw|Ts|Tz|Tm|T\*)[^)]+\(/gs;
     const letterMatches = pdfBytes.match(letterSequencePattern);
     
     if (letterMatches && letterMatches.length > 10) {
