@@ -29,47 +29,132 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
   });
 }
 
-// Main text extraction function - completely rewritten for better content extraction
+// Main text extraction function - completely rewritten to focus on actual content
 function extractTextFromPdfBytes(pdfBytes: string): string {
-  console.log("Starting comprehensive PDF text extraction");
+  console.log("Starting focused PDF content extraction");
   
-  let allExtractedText = '';
-  const extractedChunks: string[] = [];
+  let extractedContent = '';
+  const contentChunks: string[] = [];
   
-  // Strategy 1: Extract all text from Tj operations (individual text strings)
-  console.log("Strategy 1: Extracting from Tj operations");
-  const tjMatches = pdfBytes.match(/\(((?:[^()\\]|\\.)*?)\)\s*Tj/g);
-  if (tjMatches) {
-    console.log(`Found ${tjMatches.length} Tj operations`);
-    for (const match of tjMatches) {
-      const textMatch = match.match(/\(((?:[^()\\]|\\.)*?)\)/);
+  // Strategy 1: Extract from content streams (this is where the actual text usually is)
+  console.log("Strategy 1: Extracting from content streams");
+  const contentStreams = extractContentStreams(pdfBytes);
+  if (contentStreams.length > 0) {
+    console.log(`Found ${contentStreams.length} content streams`);
+    for (const stream of contentStreams) {
+      const streamText = extractTextFromContentStream(stream);
+      if (streamText && streamText.length > 10) {
+        contentChunks.push(streamText);
+      }
+    }
+  }
+  
+  // Strategy 2: Look for text positioning commands with actual content
+  console.log("Strategy 2: Extracting positioned text");
+  const positionedText = extractPositionedText(pdfBytes);
+  if (positionedText && positionedText.length > 10) {
+    contentChunks.push(positionedText);
+  }
+  
+  // Strategy 3: Extract from decoded text objects
+  console.log("Strategy 3: Extracting from text objects");
+  const textObjects = extractTextObjects(pdfBytes);
+  if (textObjects.length > 0) {
+    contentChunks.push(...textObjects);
+  }
+  
+  // Strategy 4: Extract from BT...ET blocks with better filtering
+  console.log("Strategy 4: Extracting from text blocks with content filtering");
+  const textBlocks = extractFilteredTextBlocks(pdfBytes);
+  if (textBlocks.length > 0) {
+    contentChunks.push(...textBlocks);
+  }
+  
+  // Combine and clean the extracted content
+  console.log(`Found ${contentChunks.length} content chunks`);
+  
+  if (contentChunks.length === 0) {
+    console.log("No content found, trying fallback extraction");
+    return extractFallbackContent(pdfBytes);
+  }
+  
+  // Remove duplicates and filter out PDF artifacts
+  const uniqueContent = [...new Set(contentChunks)]
+    .filter(chunk => isActualContent(chunk))
+    .map(chunk => cleanTextContent(chunk))
+    .filter(chunk => chunk.length > 5);
+  
+  extractedContent = uniqueContent.join(' ');
+  
+  // Final cleanup
+  extractedContent = finalTextCleanup(extractedContent);
+  
+  console.log(`Final extracted content length: ${extractedContent.length}`);
+  return extractedContent;
+}
+
+// Extract content streams - where the actual document content usually resides
+function extractContentStreams(pdfBytes: string): string[] {
+  const streams: string[] = [];
+  
+  // Look for stream objects that contain content (not just font definitions)
+  const streamPattern = /(\d+\s+\d+\s+obj[\s\S]*?stream\s*\n)([\s\S]*?)(endstream)/g;
+  let match;
+  
+  while ((match = streamPattern.exec(pdfBytes)) !== null) {
+    const streamHeader = match[1];
+    const streamContent = match[2];
+    
+    // Skip font streams and other metadata streams
+    if (streamHeader.includes('/FontFile') || 
+        streamHeader.includes('/CIDFont') ||
+        streamHeader.includes('/CMap') ||
+        streamHeader.includes('/FontDescriptor')) {
+      continue;
+    }
+    
+    // Look for content streams (they usually have /Length and sometimes /Filter)
+    if (streamHeader.includes('/Length') && streamContent.length > 50) {
+      streams.push(streamContent);
+    }
+  }
+  
+  return streams;
+}
+
+// Extract text from a content stream
+function extractTextFromContentStream(streamContent: string): string {
+  const textParts: string[] = [];
+  
+  // Remove any compression artifacts and binary data
+  let cleanContent = streamContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]/g, ' ');
+  
+  // Look for text show operations in the stream
+  const tjOperations = cleanContent.match(/\(((?:[^()\\]|\\.)*?)\)\s*Tj/g);
+  if (tjOperations) {
+    for (const op of tjOperations) {
+      const textMatch = op.match(/\(((?:[^()\\]|\\.)*?)\)/);
       if (textMatch) {
         const decodedText = decodeTextString(textMatch[1]);
-        if (decodedText && decodedText.trim().length > 0) {
-          extractedChunks.push(decodedText);
+        if (decodedText && isActualContent(decodedText)) {
+          textParts.push(decodedText);
         }
       }
     }
   }
   
-  // Strategy 2: Extract from TJ operations (text arrays with positioning)
-  console.log("Strategy 2: Extracting from TJ operations");
-  const tjArrayMatches = pdfBytes.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]\s*TJ/g);
-  if (tjArrayMatches) {
-    console.log(`Found ${tjArrayMatches.length} TJ operations`);
-    for (const match of tjArrayMatches) {
-      const arrayContent = match.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]/);
-      if (arrayContent) {
-        // Extract all text strings from the array, ignoring numbers
-        const textElements = arrayContent[1].match(/\(((?:[^()\\]|\\.)*?)\)/g);
-        if (textElements) {
-          for (const element of textElements) {
-            const textMatch = element.match(/\(((?:[^()\\]|\\.)*?)\)/);
-            if (textMatch) {
-              const decodedText = decodeTextString(textMatch[1]);
-              if (decodedText && decodedText.trim().length > 0) {
-                extractedChunks.push(decodedText);
-              }
+  // Look for text array operations
+  const tjArrayOps = cleanContent.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]\s*TJ/g);
+  if (tjArrayOps) {
+    for (const op of tjArrayOps) {
+      const textElements = op.match(/\(((?:[^()\\]|\\.)*?)\)/g);
+      if (textElements) {
+        for (const element of textElements) {
+          const textMatch = element.match(/\(((?:[^()\\]|\\.)*?)\)/);
+          if (textMatch) {
+            const decodedText = decodeTextString(textMatch[1]);
+            if (decodedText && isActualContent(decodedText)) {
+              textParts.push(decodedText);
             }
           }
         }
@@ -77,77 +162,117 @@ function extractTextFromPdfBytes(pdfBytes: string): string {
     }
   }
   
-  // Strategy 3: Extract from text blocks (BT...ET)
-  console.log("Strategy 3: Extracting from text blocks");
+  return textParts.join(' ');
+}
+
+// Extract positioned text (text with positioning commands)
+function extractPositionedText(pdfBytes: string): string {
+  const textParts: string[] = [];
+  
+  // Look for text positioning followed by text show
+  const positionedTextPattern = /(\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+Td\s*\(((?:[^()\\]|\\.)*?)\)\s*Tj)/g;
+  let match;
+  
+  while ((match = positionedTextPattern.exec(pdfBytes)) !== null) {
+    const decodedText = decodeTextString(match[2]);
+    if (decodedText && isActualContent(decodedText)) {
+      textParts.push(decodedText);
+    }
+  }
+  
+  return textParts.join(' ');
+}
+
+// Extract text objects with better content filtering
+function extractTextObjects(pdfBytes: string): string[] {
+  const textParts: string[] = [];
+  
+  // Look for any string in parentheses that might be content
+  const stringPattern = /\(([^)]+)\)/g;
+  let match;
+  
+  const foundStrings = new Set<string>();
+  
+  while ((match = stringPattern.exec(pdfBytes)) !== null) {
+    const rawText = match[1];
+    const decodedText = decodeTextString(rawText);
+    
+    if (decodedText && 
+        decodedText.length > 2 && 
+        !foundStrings.has(decodedText) &&
+        isActualContent(decodedText)) {
+      foundStrings.add(decodedText);
+      textParts.push(decodedText);
+    }
+  }
+  
+  return textParts;
+}
+
+// Extract from text blocks with better filtering
+function extractFilteredTextBlocks(pdfBytes: string): string[] {
+  const textParts: string[] = [];
+  
   const textBlocks = pdfBytes.match(/BT\s*([\s\S]*?)\s*ET/g);
   if (textBlocks) {
-    console.log(`Found ${textBlocks.length} text blocks`);
     for (const block of textBlocks) {
       const blockContent = block.replace(/^BT\s*/, '').replace(/\s*ET$/, '');
-      const blockText = extractFromTextBlock(blockContent);
-      if (blockText && blockText.trim().length > 0) {
-        extractedChunks.push(blockText);
+      
+      // Extract text from this block
+      const blockText = extractTextFromTextBlock(blockContent);
+      if (blockText && isActualContent(blockText)) {
+        textParts.push(blockText);
       }
     }
   }
   
-  // Strategy 4: Extract from stream objects
-  console.log("Strategy 4: Extracting from stream objects");
-  const streamMatches = pdfBytes.match(/stream\s*([\s\S]*?)\s*endstream/g);
-  if (streamMatches) {
-    console.log(`Found ${streamMatches.length} streams`);
-    for (const stream of streamMatches) {
-      const streamContent = stream.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
-      const streamText = extractFromStream(streamContent);
-      if (streamText && streamText.trim().length > 0) {
-        extractedChunks.push(streamText);
-      }
-    }
-  }
+  return textParts;
+}
+
+// Extract text from a single text block
+function extractTextFromTextBlock(blockContent: string): string {
+  const textParts: string[] = [];
   
-  // Strategy 5: Look for any parentheses-enclosed text that might be content
-  console.log("Strategy 5: Extracting any remaining parentheses text");
-  const allParenthesesMatches = pdfBytes.match(/\([^)]{2,}\)/g);
-  if (allParenthesesMatches) {
-    const uniqueTexts = new Set();
-    for (const match of allParenthesesMatches) {
-      const content = match.slice(1, -1); // Remove parentheses
-      const decoded = decodeTextString(content);
-      if (decoded && decoded.trim().length > 1 && !uniqueTexts.has(decoded)) {
-        if (isLikelyContent(decoded)) {
-          uniqueTexts.add(decoded);
-          extractedChunks.push(decoded);
+  // Look for all text operations in this block
+  const tjOps = blockContent.match(/\(((?:[^()\\]|\\.)*?)\)\s*Tj/g);
+  if (tjOps) {
+    for (const op of tjOps) {
+      const textMatch = op.match(/\(((?:[^()\\]|\\.)*?)\)/);
+      if (textMatch) {
+        const decoded = decodeTextString(textMatch[1]);
+        if (decoded && decoded.trim().length > 0) {
+          textParts.push(decoded);
         }
       }
     }
   }
   
-  // Combine all extracted text chunks
-  console.log(`Extracted ${extractedChunks.length} text chunks`);
+  const tjArrayOps = blockContent.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]\s*TJ/g);
+  if (tjArrayOps) {
+    for (const op of tjArrayOps) {
+      const textElements = op.match(/\(((?:[^()\\]|\\.)*?)\)/g);
+      if (textElements) {
+        for (const element of textElements) {
+          const textMatch = element.match(/\(((?:[^()\\]|\\.)*?)\)/);
+          if (textMatch) {
+            const decoded = decodeTextString(textMatch[1]);
+            if (decoded && decoded.trim().length > 0) {
+              textParts.push(decoded);
+            }
+          }
+        }
+      }
+    }
+  }
   
-  // Remove duplicates and clean up
-  const uniqueChunks = [...new Set(extractedChunks)]
-    .filter(chunk => chunk && chunk.trim().length > 0)
-    .map(chunk => chunk.trim());
-  
-  // Sort chunks by length (longer chunks first, they're more likely to be content)
-  uniqueChunks.sort((a, b) => b.length - a.length);
-  
-  // Join chunks with appropriate spacing
-  allExtractedText = uniqueChunks.join(' ');
-  
-  // Clean up the final text
-  allExtractedText = cleanFinalText(allExtractedText);
-  
-  console.log(`Final extracted text length: ${allExtractedText.length}`);
-  return allExtractedText;
+  return textParts.join(' ');
 }
 
-// Decode text strings with proper handling of escape sequences
+// Decode text strings with proper handling
 function decodeTextString(text: string): string {
   if (!text) return '';
   
-  // Handle common escape sequences
+  // Handle escape sequences
   let decoded = text
     .replace(/\\n/g, '\n')
     .replace(/\\r/g, '\r')
@@ -158,7 +283,7 @@ function decodeTextString(text: string): string {
     .replace(/\\\)/g, ')')
     .replace(/\\\\/g, '\\');
   
-  // Handle octal escape sequences
+  // Handle octal sequences
   decoded = decoded.replace(/\\([0-7]{1,3})/g, (match, octal) => {
     const charCode = parseInt(octal, 8);
     if (charCode >= 32 && charCode <= 126) {
@@ -167,136 +292,97 @@ function decodeTextString(text: string): string {
     return ' ';
   });
   
-  // Handle hexadecimal sequences
-  decoded = decoded.replace(/<([0-9A-Fa-f]+)>/g, (match, hex) => {
-    let result = '';
-    for (let i = 0; i < hex.length; i += 2) {
-      const hexPair = hex.substr(i, 2);
-      const charCode = parseInt(hexPair, 16);
-      if (charCode >= 32 && charCode <= 126) {
-        result += String.fromCharCode(charCode);
-      } else {
-        result += ' ';
-      }
-    }
-    return result;
-  });
-  
   return decoded;
 }
 
-// Extract text from a text block with better positioning handling
-function extractFromTextBlock(blockContent: string): string {
-  const lines = blockContent.split(/\r?\n/);
-  const textParts: string[] = [];
-  
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    // Look for Tj operations
-    const tjMatch = trimmedLine.match(/\(((?:[^()\\]|\\.)*?)\)\s*Tj/);
-    if (tjMatch) {
-      const decoded = decodeTextString(tjMatch[1]);
-      if (decoded && decoded.trim().length > 0) {
-        textParts.push(decoded);
-      }
-    }
-    
-    // Look for TJ operations
-    const tjArrayMatch = trimmedLine.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]\s*TJ/);
-    if (tjArrayMatch) {
-      const textElements = tjArrayMatch[1].match(/\(((?:[^()\\]|\\.)*?)\)/g);
-      if (textElements) {
-        for (const element of textElements) {
-          const textMatch = element.match(/\(((?:[^()\\]|\\.)*?)\)/);
-          if (textMatch) {
-            const decoded = decodeTextString(textMatch[1]);
-            if (decoded && decoded.trim().length > 0) {
-              textParts.push(decoded);
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  return textParts.join(' ');
-}
-
-// Extract text from stream content
-function extractFromStream(streamContent: string): string {
-  // Remove non-printable characters but preserve text operations
-  let cleanStream = streamContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]/g, ' ');
-  
-  const textParts: string[] = [];
-  
-  // Look for text operations in the stream
-  const tjMatches = cleanStream.match(/\(((?:[^()\\]|\\.)*?)\)\s*Tj/g);
-  if (tjMatches) {
-    for (const match of tjMatches) {
-      const textMatch = match.match(/\(((?:[^()\\]|\\.)*?)\)/);
-      if (textMatch) {
-        const decoded = decodeTextString(textMatch[1]);
-        if (decoded && decoded.trim().length > 0) {
-          textParts.push(decoded);
-        }
-      }
-    }
-  }
-  
-  const tjArrayMatches = cleanStream.match(/\[((?:[^\[\]]|\[[^\]]*\])*?)\]\s*TJ/g);
-  if (tjArrayMatches) {
-    for (const match of tjArrayMatches) {
-      const textElements = match.match(/\(((?:[^()\\]|\\.)*?)\)/g);
-      if (textElements) {
-        for (const element of textElements) {
-          const textMatch = element.match(/\(((?:[^()\\]|\\.)*?)\)/);
-          if (textMatch) {
-            const decoded = decodeTextString(textMatch[1]);
-            if (decoded && decoded.trim().length > 0) {
-              textParts.push(decoded);
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  return textParts.join(' ');
-}
-
-// Check if text looks like actual content
-function isLikelyContent(text: string): boolean {
+// Check if text is actual document content (not PDF artifacts)
+function isActualContent(text: string): boolean {
   if (!text || text.length < 2) return false;
   
-  // Skip obvious metadata patterns
-  if (text.match(/^(Identity|Adobe|UCS|CIDFont|FontDescriptor|Type|Filter)$/)) return false;
+  // Filter out common PDF artifacts and commands
+  const pdfArtifacts = [
+    'endobj', 'stream', 'endstream', 'xref', 'trailer', 'startxref',
+    'CIDFont', 'FontDescriptor', 'BaseFont', 'Encoding', 'ToUnicode',
+    'CIDSystemInfo', 'Registry', 'Ordering', 'Supplement', 'CIDToGIDMap',
+    'FontFile', 'FontName', 'ItalicAngle', 'StemV', 'CapHeight', 'Ascent',
+    'Descent', 'FontBBox', 'Flags', 'Type', 'Subtype', 'Filter', 'Length',
+    'FlateDecode', 'Adobe', 'Identity', 'UCS', 'CMap', 'findresource',
+    'begincodespacerange', 'endcodespacerange', 'beginbfchar', 'endbfchar',
+    'begincmap', 'endcmap', 'CMapName', 'CMapType', 'currentdict', 'defineresource',
+    'ProcSet', 'CIDInit', 'dict', 'begin'
+  ];
+  
+  // Check if text is mostly a PDF artifact
+  const lowerText = text.toLowerCase();
+  for (const artifact of pdfArtifacts) {
+    if (lowerText === artifact.toLowerCase() || 
+        (text.length < 20 && lowerText.includes(artifact.toLowerCase()))) {
+      return false;
+    }
+  }
   
   // Must contain some letters
   const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
   const letterRatio = letterCount / text.length;
   
-  // Must not be mostly symbols
+  // Must not be mostly symbols or numbers
   const symbolCount = (text.match(/[^a-zA-Z0-9\s.,;:!?-]/g) || []).length;
   const symbolRatio = symbolCount / text.length;
   
-  return letterRatio >= 0.3 && symbolRatio < 0.5 && text.length >= 2;
+  return letterRatio >= 0.4 && symbolRatio < 0.6 && text.length >= 2;
 }
 
-// Clean up the final extracted text
-function cleanFinalText(text: string): string {
+// Clean text content
+function cleanTextContent(text: string): string {
   if (!text) return '';
   
   // Remove excessive whitespace
   let cleaned = text.replace(/\s+/g, ' ').trim();
   
-  // Remove common PDF artifacts
-  cleaned = cleaned.replace(/\b(Identity|Adobe|UCS|CIDFont|FontDescriptor|Type|Filter|FlateDecode)\b/g, '');
+  // Remove any remaining PDF artifacts
+  const artifactPattern = /\b(endobj|stream|endstream|xref|trailer|startxref|obj|CIDFont|FontDescriptor|BaseFont|Encoding|ToUnicode|Adobe|Identity|UCS|Filter|FlateDecode|Length|Type|Subtype)\b/gi;
+  cleaned = cleaned.replace(artifactPattern, '');
   
-  // Clean up remaining artifacts
+  // Clean up spacing again
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   
   return cleaned;
+}
+
+// Final text cleanup
+function finalTextCleanup(text: string): string {
+  if (!text) return '';
+  
+  // Remove any remaining artifacts and normalize spacing
+  let cleaned = text
+    .replace(/\s+/g, ' ')
+    .replace(/\b(endobj|stream|endstream|obj)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  return cleaned;
+}
+
+// Fallback content extraction for difficult PDFs
+function extractFallbackContent(pdfBytes: string): string {
+  console.log("Using fallback content extraction");
+  
+  // Try to find any human-readable text sequences
+  const readableTextPattern = /[A-Za-z][A-Za-z\s.,;:!?'-]{10,}/g;
+  const matches = pdfBytes.match(readableTextPattern);
+  
+  if (matches && matches.length > 0) {
+    const cleanMatches = matches
+      .filter(match => isActualContent(match))
+      .map(match => cleanTextContent(match))
+      .filter(match => match.length > 5);
+    
+    if (cleanMatches.length > 0) {
+      return cleanMatches.join(' ');
+    }
+  }
+  
+  return "Could not extract readable text from this PDF document. The PDF may be image-based, encrypted, or have an unsupported format.";
 }
 
 // Enhanced text cleaning for binary-contaminated PDFs
@@ -355,7 +441,7 @@ export function extractTextFromParentheses(text: string): string {
   
   const decoded = matches
     .map(match => decodeTextString(match.slice(1, -1)))
-    .filter(text => text && isLikelyContent(text));
+    .filter(text => text && isActualContent(text));
   
   return decoded.join(' ');
 }
