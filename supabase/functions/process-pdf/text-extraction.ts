@@ -1,4 +1,3 @@
-
 // PDF text extraction utility functions
 
 // Helper for detecting PDF format
@@ -6,106 +5,242 @@ export function isPdfData(bytes: string): boolean {
   return bytes.substring(0, 8).includes("%PDF");
 }
 
-// Extract text by looking for patterns of likely words
-export function extractTextPatterns(pdfBytes: string): string {
+// Enhanced text extraction that focuses on actual document content
+export function extractReadableText(pdfBytes: string): string {
   try {
-    // Look for text that follows patterns of English words and sentences
-    const textPatterns = [
-      // Words with 3+ letters followed by spaces or punctuation
-      /([A-Za-z]{3,}[\s.,;:!?]+){3,}/g,
-      
-      // Capitalized words (likely proper nouns or sentence starts)
-      /([A-Z][a-z]{2,}[\s.,;:!?]+){2,}/g,
-      
-      // Common sentence structures
-      /([A-Z][a-z]{1,}[\s][a-z]+[\s][a-z]+[\s.,;:!?])/g,
-      
-      // Simple word patterns (any alphabetic strings)
-      /[a-zA-Z]{4,}(?:\s+[a-zA-Z]{2,}){2,}/g
+    // Step 1: Look for actual text content in various PDF text operators
+    const textOperators = [
+      // Text showing operators with actual content
+      /\(((?:[^()\\]|\\.)*)\)\s*Tj/g,           // Simple text show
+      /\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g,        // Array text show
+      /\(((?:[^()\\]|\\.)*)\)\s*'/g,           // Single quote text show
+      /\(((?:[^()\\]|\\.)*)\)\s*"/g,           // Double quote text show
     ];
     
     let extractedText = "";
     
-    for (const pattern of textPatterns) {
-      const matches = pdfBytes.match(pattern);
+    for (const operator of textOperators) {
+      const matches = [...pdfBytes.matchAll(operator)];
       if (matches && matches.length > 0) {
-        // Join matches with spacing
-        const matchText = matches.join(" ").replace(/\s+/g, " ");
+        console.log(`Found ${matches.length} text elements with operator`);
         
-        // If we found significant text, use it
-        if (matchText.length > extractedText.length) {
-          extractedText = matchText;
+        for (const match of matches) {
+          let text = match[1];
+          if (text && text.length > 2) {
+            // Clean and decode the text
+            text = decodeTextContent(text);
+            if (isReadableText(text)) {
+              extractedText += text + " ";
+            }
+          }
         }
       }
     }
     
-    // If the pattern-based extraction found some text, use it
-    if (extractedText.length > 200) {
-      return extractedText;
+    // Step 2: If we got good readable text, return it
+    if (extractedText.length > 50 && hasEnoughWords(extractedText)) {
+      return cleanExtractedText(extractedText);
     }
     
-    // As a last resort, just grab any words with 3+ letters
-    const wordExtraction = pdfBytes.match(/[a-zA-Z]{3,}/g);
-    if (wordExtraction && wordExtraction.length > 20) {
-      return wordExtraction.join(" ");
+    // Step 3: Try to extract from content streams
+    const streamText = extractFromContentStreams(pdfBytes);
+    if (streamText && streamText.length > 50) {
+      return streamText;
     }
     
-    return extractedText;
+    // Step 4: Look for Unicode text patterns
+    const unicodeText = extractUnicodeText(pdfBytes);
+    if (unicodeText && unicodeText.length > 50) {
+      return unicodeText;
+    }
+    
+    // Step 5: Extract any readable word patterns as last resort
+    return extractWordPatterns(pdfBytes);
+    
   } catch (error) {
-    console.error("Error extracting text patterns:", error);
+    console.error("Error in enhanced text extraction:", error);
     return "";
   }
 }
 
-// Extract text from PDF streams
-export function extractTextFromStreams(pdfBytes: string): string {
+// Decode PDF text content with proper escape handling
+function decodeTextContent(text: string): string {
   try {
-    const textStreamPattern = /stream\s([\s\S]*?)\sendstream/g;
-    const textStreams = [...pdfBytes.matchAll(textStreamPattern)];
+    return text
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\b/g, '\b')
+      .replace(/\\f/g, '\f')
+      .replace(/\\(/g, '(')
+      .replace(/\\)/g, ')')
+      .replace(/\\\\/g, '\\')
+      .replace(/\\(\d{3})/g, (_, octal) => {
+        const charCode = parseInt(octal, 8);
+        return charCode > 31 && charCode < 127 ? String.fromCharCode(charCode) : '';
+      });
+  } catch (error) {
+    return text;
+  }
+}
+
+// Check if text looks like readable content
+function isReadableText(text: string): boolean {
+  if (!text || text.length < 2) return false;
+  
+  // Check for reasonable ratio of letters to total characters
+  const letters = text.match(/[a-zA-Z]/g);
+  const letterRatio = letters ? letters.length / text.length : 0;
+  
+  // Must have at least 50% letters and not be all uppercase/lowercase
+  return letterRatio > 0.5 && 
+         !/^[A-Z\s\d]*$/.test(text) && 
+         !/^[a-z\s\d]*$/.test(text) &&
+         !text.includes('findresource') &&
+         !text.includes('begincmap') &&
+         !text.includes('endcmap');
+}
+
+// Check if we have enough meaningful words
+function hasEnoughWords(text: string): boolean {
+  const words = text.split(/\s+/).filter(word => 
+    word.length >= 3 && /^[a-zA-Z]/.test(word)
+  );
+  return words.length >= 5;
+}
+
+// Extract text from PDF content streams with better filtering
+function extractFromContentStreams(pdfBytes: string): string {
+  try {
+    // Look for content streams that contain actual text
+    const streamPattern = /stream\s*([\s\S]*?)\s*endstream/g;
+    const streams = [...pdfBytes.matchAll(streamPattern)];
     
-    if (!textStreams || textStreams.length === 0) {
-      return "";
-    }
+    let bestText = "";
     
-    console.log(`Found ${textStreams.length} text streams`);
-    
-    // Take the longest streams as they likely contain the main text
-    const sortedStreams = textStreams
-      .map(match => match[1])
-      .filter(stream => stream.length > 50)
-      .sort((a, b) => b.length - a.length)
-      .slice(0, 10); // Take top 10 longest streams
-    
-    if (sortedStreams.length === 0) {
-      return "";
-    }
-    
-    let streamText = "";
-    
-    for (const stream of sortedStreams) {
-      // Look for text patterns in the stream
-      const potentialText = stream
-        .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    for (const [_, streamContent] of streams) {
+      // Skip streams that look like font definitions or images
+      if (streamContent.includes('findresource') || 
+          streamContent.includes('begincmap') ||
+          streamContent.includes('ImageI') ||
+          streamContent.includes('CCITTFax')) {
+        continue;
+      }
       
-      if (potentialText.length > 100 && 
-          (potentialText.split(' ').length > 20)) {
-        streamText += potentialText + "\n\n";
+      // Look for text content in this stream
+      const textInStream = extractTextFromStream(streamContent);
+      if (textInStream && textInStream.length > bestText.length) {
+        bestText = textInStream;
       }
     }
     
-    return streamText;
+    return bestText;
   } catch (error) {
-    console.error("Error extracting text from streams:", error);
+    console.error("Error extracting from content streams:", error);
     return "";
   }
 }
 
-// Enhanced method to extract text from BT/ET blocks and TJ commands
+// Extract text from a single content stream
+function extractTextFromStream(streamContent: string): string {
+  try {
+    // Look for text between BT and ET (Begin Text/End Text)
+    const btEtPattern = /BT\s*([\s\S]*?)\s*ET/g;
+    const textBlocks = [...streamContent.matchAll(btEtPattern)];
+    
+    let streamText = "";
+    
+    for (const [_, blockContent] of textBlocks) {
+      // Extract text from various text operators in this block
+      const textPatterns = [
+        /\(((?:[^()\\]|\\.)+)\)\s*Tj/g,
+        /\[((?:[^\[\]\\]|\\.)+)\]\s*TJ/g,
+        /\(((?:[^()\\]|\\.)+)\)\s*'/g,
+      ];
+      
+      for (const pattern of textPatterns) {
+        const matches = [...blockContent.matchAll(pattern)];
+        for (const match of matches) {
+          const text = decodeTextContent(match[1]);
+          if (isReadableText(text)) {
+            streamText += text + " ";
+          }
+        }
+      }
+    }
+    
+    return cleanExtractedText(streamText);
+  } catch (error) {
+    console.error("Error extracting text from stream:", error);
+    return "";
+  }
+}
+
+// Extract Unicode text patterns
+function extractUnicodeText(pdfBytes: string): string {
+  try {
+    // Look for Unicode strings (typically in parentheses)
+    const unicodePattern = /\(([^)]{10,})\)/g;
+    const matches = [...pdfBytes.matchAll(unicodePattern)];
+    
+    let unicodeText = "";
+    
+    for (const match of matches) {
+      const text = decodeTextContent(match[1]);
+      if (isReadableText(text) && text.length > 5) {
+        unicodeText += text + " ";
+      }
+    }
+    
+    return cleanExtractedText(unicodeText);
+  } catch (error) {
+    console.error("Error extracting Unicode text:", error);
+    return "";
+  }
+}
+
+// Extract readable word patterns as last resort
+function extractWordPatterns(pdfBytes: string): string {
+  try {
+    // Look for sequences that look like English words
+    const wordPattern = /\b[A-Za-z]{3,}(?:\s+[A-Za-z]{2,}){2,}\b/g;
+    const matches = pdfBytes.match(wordPattern);
+    
+    if (matches && matches.length > 5) {
+      return matches
+        .filter(match => !match.includes('findresource') && !match.includes('begincmap'))
+        .join(' ');
+    }
+    
+    return "";
+  } catch (error) {
+    console.error("Error extracting word patterns:", error);
+    return "";
+  }
+}
+
+// Clean and normalize extracted text
+function cleanExtractedText(text: string): string {
+  if (!text) return "";
+  
+  return text
+    .replace(/\s+/g, ' ')           // Normalize whitespace
+    .replace(/[^\x20-\x7E\n\r\t]/g, ' ')  // Remove non-printable chars
+    .replace(/\s+/g, ' ')           // Normalize again
+    .trim();
+}
+
+// Legacy functions for backward compatibility
+export function extractTextPatterns(pdfBytes: string): string {
+  return extractReadableText(pdfBytes);
+}
+
+export function extractTextFromStreams(pdfBytes: string): string {
+  return extractFromContentStreams(pdfBytes);
+}
+
 export function extractTextFromBTETBlocks(pdfBytes: string): string {
   try {
-    // Look for BT...ET blocks which contain text commands
     const btEtPattern = /BT\s*([\s\S]*?)\s*ET/g;
     const btEtBlocks = [...pdfBytes.matchAll(btEtPattern)];
     
@@ -119,55 +254,14 @@ export function extractTextFromBTETBlocks(pdfBytes: string): string {
     let extractedText = "";
     
     for (const [_, blockContent] of btEtBlocks) {
-      // Look for TJ commands with text arrays
-      const tjPattern = /TJ\s*\[(.*?)\]/g;
-      const tjMatches = [...blockContent.matchAll(tjPattern)];
-      
-      if (tjMatches && tjMatches.length > 0) {
-        for (const [_, tjContent] of tjMatches) {
-          // Extract text from parentheses in TJ arrays
-          const textInParens = [...tjContent.matchAll(/\(([^)]*)\)/g)];
-          if (textInParens && textInParens.length > 0) {
-            const textParts = textInParens.map(match => match[1]).join(' ');
-            if (textParts.length > 0) {
-              extractedText += textParts + " ";
-            }
-          }
-        }
-      }
-      
-      // Also look for simple Tj commands
-      const tjSimplePattern = /\(([^)]+)\)\s*Tj/g;
-      const tjSimpleMatches = [...blockContent.matchAll(tjSimplePattern)];
-      
-      if (tjSimpleMatches && tjSimpleMatches.length > 0) {
-        for (const [_, text] of tjSimpleMatches) {
-          extractedText += text + " ";
-        }
-      }
-      
-      // Look for "show text" commands
-      const showTextPattern = /\(([^)]+)\)\s*'/g;
-      const showTextMatches = [...blockContent.matchAll(showTextPattern)];
-      
-      if (showTextMatches && showTextMatches.length > 0) {
-        for (const [_, text] of showTextMatches) {
-          extractedText += text + " ";
-        }
+      // Use our enhanced extraction
+      const blockText = extractTextFromStream(blockContent);
+      if (blockText) {
+        extractedText += blockText + " ";
       }
     }
     
-    // Clean up the extracted text
-    extractedText = extractedText
-      .replace(/\\n/g, '\n')
-      .replace(/\\r/g, '')
-      .replace(/\\\\/g, '\\')
-      .replace(/\\t/g, '\t')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    console.log(`Extracted ${extractedText.length} characters from BT/ET blocks`);
-    return extractedText;
+    return cleanExtractedText(extractedText);
   } catch (error) {
     console.error("Error extracting text from BT/ET blocks:", error);
     return "";
@@ -458,85 +552,6 @@ export function cleanAndNormalizeText(text: string): string {
               .trim();
 }
 
-// NEW: Enhanced wrapper that tries all extraction methods with priority on BT/ET blocks
-async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
-  // Try each method in order of reliability and take the best result
-  const results = [];
-  
-  // Method 1: BT/ET blocks (highest priority for structured PDFs)
-  const btEtResult = extractTextFromBTETBlocks(pdfBytes);
-  if (btEtResult && btEtResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(btEtResult);
-    results.push({ text: cleaned, method: 'btEtBlocks', score: cleaned.length * 1.5 });
-  }
-  
-  // Method 2: Text Objects (usually most reliable for general PDFs)
-  const textObjectsResult = extractTextFromTextObjects(pdfBytes);
-  if (textObjectsResult && textObjectsResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(textObjectsResult);
-    results.push({ text: cleaned, method: 'textObjects', score: cleaned.length * 1.2 });
-  }
-  
-  // Method 3: Streams
-  const streamsResult = extractTextFromStreams(pdfBytes);
-  if (streamsResult && streamsResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(streamsResult);
-    results.push({ text: cleaned, method: 'streams', score: cleaned.length });
-  }
-  
-  // Method 4: Line-based extraction
-  const lineResult = extractTextByLines(pdfBytes);
-  if (lineResult && lineResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(lineResult);
-    results.push({ text: cleaned, method: 'lines', score: cleaned.length * 1.1 });
-  }
-  
-  // Method 5: Parentheses
-  const parenthesesResult = extractTextFromParentheses(pdfBytes);
-  if (parenthesesResult && parenthesesResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(parenthesesResult);
-    results.push({ text: cleaned, method: 'parentheses', score: cleaned.length });
-  }
-  
-  // Method 6: Pattern-based as last resort
-  const patternResult = extractTextPatterns(pdfBytes);
-  if (patternResult && patternResult.length > 100) {
-    const cleaned = cleanAndNormalizeText(patternResult);
-    results.push({ text: cleaned, method: 'patterns', score: cleaned.length * 0.9 });
-  }
-  
-  // If we have results, select the best one based on score
-  if (results.length > 0) {
-    // Sort by score (highest first)
-    results.sort((a, b) => b.score - a.score);
-    
-    // Log the winning method
-    console.log(`Best extraction method: ${results[0].method} with score ${results[0].score}`);
-    
-    // If the best method has very few actual words, try an ultra-aggressive approach
-    const bestResult = results[0].text;
-    const wordCount = bestResult.split(/\s+/).filter(word => /^[a-zA-Z]{3,}$/.test(word)).length;
-    
-    if (wordCount < 20) {
-      console.log("Best extraction has few meaningful words, trying ultra-aggressive approach");
-      
-      // Last resort - find any sequences of letters in the entire PDF
-      const letterSequences = pdfBytes.match(/[a-zA-Z]{4,}/g);
-      if (letterSequences && letterSequences.length > 20) {
-        const letterOnlyText = letterSequences.join(' ');
-        console.log(`Found ${letterSequences.length} letter sequences, total length: ${letterOnlyText.length}`);
-        return letterOnlyText;
-      }
-    }
-    
-    // Return the text from the best method
-    return results[0].text;
-  }
-  
-  // If nothing worked, return empty string
-  return "No text could be extracted. The document may be image-based or protected.";
-}
-
 // Function to check if the extracted text looks like binary data
 export function textContainsBinaryIndicators(text: string): boolean {
   if (!text || text.length < 10) return false;
@@ -566,4 +581,58 @@ export function textContainsBinaryIndicators(text: string): boolean {
   
   // Very low letter ratio suggests binary data
   return letterRatio < 0.2;
+}
+
+// NEW: Enhanced wrapper that tries all extraction methods with focus on readable content
+async function extractTextCombinedMethods(pdfBytes: string): Promise<string> {
+  // Method 1: Enhanced readable text extraction (highest priority)
+  const readableResult = extractReadableText(pdfBytes);
+  if (readableResult && readableResult.length > 100 && hasEnoughWords(readableResult)) {
+    console.log(`Enhanced extraction found readable text: ${readableResult.length} chars`);
+    return readableResult;
+  }
+  
+  // Method 2: BT/ET blocks with enhanced processing
+  const btEtResult = extractTextFromBTETBlocks(pdfBytes);
+  if (btEtResult && btEtResult.length > 100 && hasEnoughWords(btEtResult)) {
+    console.log(`Enhanced BT/ET extraction found readable text: ${btEtResult.length} chars`);
+    return btEtResult;
+  }
+  
+  // Method 3: Content streams
+  const streamsResult = extractFromContentStreams(pdfBytes);
+  if (streamsResult && streamsResult.length > 100) {
+    console.log(`Stream extraction found text: ${streamsResult.length} chars`);
+    return streamsResult;
+  }
+  
+  // Method 4: Unicode text
+  const unicodeResult = extractUnicodeText(pdfBytes);
+  if (unicodeResult && unicodeResult.length > 50) {
+    console.log(`Unicode extraction found text: ${unicodeResult.length} chars`);
+    return unicodeResult;
+  }
+  
+  // Method 5: Word patterns as last resort
+  const patternResult = extractWordPatterns(pdfBytes);
+  if (patternResult && patternResult.length > 50) {
+    console.log(`Pattern extraction found text: ${patternResult.length} chars`);
+    return patternResult;
+  }
+  
+  // If nothing worked, return a clear message
+  return "No readable text could be extracted. This PDF may contain only images, have complex formatting, or use unsupported fonts.";
+}
+
+// Re-export legacy functions for compatibility
+export function extractTextByLines(pdfBytes: string): string {
+  return extractReadableText(pdfBytes);
+}
+
+export function extractTextFromTextObjects(pdfBytes: string): string {
+  return extractFromContentStreams(pdfBytes);
+}
+
+export function extractTextFromParentheses(pdfBytes: string): string {
+  return extractUnicodeText(pdfBytes);
 }
