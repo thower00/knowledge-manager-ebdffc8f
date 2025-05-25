@@ -4,11 +4,7 @@ import {
   isPdfData,
   extractPdfMetadata,
   extractTextWithTimeout,
-  cleanAndNormalizeText,
-  extractTextByLineBreaks,
-  extractTextPatterns,
-  extractTextFromParentheses,
-  textContainsBinaryIndicators
+  cleanAndNormalizeText
 } from "./text-extraction.ts";
 
 // Define proper CORS headers
@@ -17,14 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
-
-// Helper function to check if text has enough readable words
-function hasEnoughWords(text: string): boolean {
-  const words = text.split(/\s+/).filter(word => 
-    word.length >= 3 && /^[a-zA-Z]/.test(word)
-  );
-  return words.length >= 5;
-}
 
 // Main function to extract text from PDF
 async function extractTextFromPdf(base64Data: string, options = {}) {
@@ -71,59 +59,21 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     const pageCount = metadata.pageCount;
     console.log(`PDF has ${pageCount} pages`);
     
-    // Extract text with timeout protection and aggressive strategies
+    // Extract text with focused approach
     let extractedText;
     try {
-      console.log("Starting comprehensive text extraction...");
+      console.log("Starting focused text extraction for actual readable content...");
       
-      // Use the main extraction function
       extractedText = await extractTextWithTimeout(pdfBytes, 30000);
       
-      if (!extractedText || extractedText.length < 50) {
-        console.log("Primary extraction yielded insufficient text, trying alternative methods");
-        
-        // Try pattern-based extraction
-        const patternText = extractTextPatterns(pdfBytes);
-        if (patternText && patternText.length > 100) {
-          console.log(`Pattern extraction found ${patternText.length} chars`);
-          extractedText = patternText;
-        } else {
-          // Try line-based extraction
-          const lineText = extractTextByLineBreaks(pdfBytes);
-          if (lineText && lineText.length > 100) {
-            console.log(`Line extraction found ${lineText.length} chars`);
-            extractedText = lineText;
-          } else {
-            // Try parentheses extraction
-            const parenText = extractTextFromParentheses(pdfBytes);
-            if (parenText && parenText.length > 50) {
-              console.log(`Parentheses extraction found ${parenText.length} chars`);
-              extractedText = parenText;
-            }
-          }
-        }
-      }
+      console.log(`Extracted text length: ${extractedText ? extractedText.length : 0} characters`);
       
-      // If we still don't have good text, it might be a scan or complex PDF
-      if (!extractedText || extractedText.length < 50) {
-        console.log("All extraction methods failed to find substantial text");
-        
-        // Last resort: look for any readable sequences
-        const readableSequences = pdfBytes.match(/[A-Za-z][A-Za-z\s.,;:!?\-'"]{10,}/g);
-        if (readableSequences && readableSequences.length > 0) {
-          const cleanSequences = readableSequences
-            .filter(seq => !/^(endobj|stream|endstream|CIDFont|FontDescriptor|BaseFont|Encoding|ToUnicode|Adobe|Identity|Filter|FlateDecode|Length|Type|Subtype)$/i.test(seq.trim()))
-            .map(seq => seq.trim())
-            .filter(seq => seq.length > 5);
-          
-          if (cleanSequences.length > 0) {
-            extractedText = cleanSequences.join(' ');
-            console.log(`Last resort extraction found ${extractedText.length} chars from ${cleanSequences.length} sequences`);
-          }
-        }
+      // Apply additional cleaning
+      if (extractedText && extractedText.length > 20) {
+        const cleanText = cleanAndNormalizeText(extractedText);
+        console.log(`After cleaning: ${cleanText.length} characters`);
+        extractedText = cleanText;
       }
-      
-      console.log(`Final extracted text length: ${extractedText ? extractedText.length : 0} characters`);
       
     } catch (error) {
       console.error("Text extraction error:", error);
@@ -142,33 +92,13 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
     // Format the extracted text
     let formattedText = "";
     
-    if (extractedText && extractedText.length > 0) {
-      // Apply final cleaning
-      const cleanText = cleanAndNormalizeText(extractedText);
+    if (extractedText && extractedText.length > 10) {
+      // Format as a single page if we have actual content
+      formattedText = `--- Page 1 ---\n${extractedText}\n\n`;
       
-      if (cleanText && cleanText.length > 20) {
-        // Split into pages if we have substantial content
-        if (cleanText.length > 1000) {
-          const textPerPage = Math.max(Math.floor(cleanText.length / maxPages), 100);
-          
-          for (let i = 1; i <= maxPages; i++) {
-            const startPos = (i - 1) * textPerPage;
-            const endPos = i === maxPages ? cleanText.length : i * textPerPage;
-            const pageText = cleanText.substring(startPos, endPos);
-            
-            formattedText += `--- Page ${i} ---\n${pageText}\n\n`;
-          }
-        } else {
-          // Short text, put it all on page 1
-          formattedText = `--- Page 1 ---\n${cleanText}\n\n`;
-        }
-        
-        // Add footer if we limited the pages
-        if (maxPages < pageCount) {
-          formattedText += `\n--- Only ${maxPages} of ${pageCount} pages were processed ---\n`;
-        }
-      } else {
-        formattedText = "The PDF contains very little readable text. This may be a scanned document or use complex formatting that requires OCR processing.";
+      // Add footer if we limited the pages
+      if (maxPages < pageCount && pageCount > 1) {
+        formattedText += `\n--- Document has ${pageCount} total pages ---\n`;
       }
     } else {
       formattedText = "No readable text could be extracted from this PDF. The document may be:\n- A scanned image (requires OCR)\n- Password protected\n- Corrupted\n- Using unsupported encoding\n- Entirely graphical content";
@@ -178,7 +108,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       text: formattedText,
       pages: [],
       totalPages: pageCount,
-      processedPages: maxPages,
+      processedPages: 1,
       success: true,
       available: true
     };
@@ -281,9 +211,9 @@ serve(async (req) => {
       );
     }
     
-    console.log("Received PDF processing request with comprehensive extraction enabled");
+    console.log("Received PDF processing request for focused text extraction");
 
-    // Process the PDF with improved extraction
+    // Process the PDF with focused extraction
     const result = await extractTextFromPdf(pdfBase64, options);
     
     // Return the extracted text
