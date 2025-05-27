@@ -72,6 +72,22 @@ function determineFileType(document: ProcessedDocument): string {
 }
 
 /**
+ * Safe base64 conversion for large files
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+  let result = '';
+  
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    result += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  
+  return btoa(result);
+}
+
+/**
  * Extract content from PDF document
  */
 async function extractPdfContent(document: ProcessedDocument): Promise<FileExtractionResult> {
@@ -86,7 +102,9 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
     
     const fileBlob = await fileResponse.blob();
     const arrayBuffer = await fileBlob.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    
+    // Use safe base64 conversion to avoid stack overflow
+    const base64Data = arrayBufferToBase64(arrayBuffer);
     
     // Call our PDF processing service
     const response = await fetch(`https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`, {
@@ -99,7 +117,8 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
         pdfBase64: base64Data,
         options: {
           maxPages: 0, // Extract all pages
-          streamMode: false
+          streamMode: false,
+          timeout: 30
         }
       })
     });
