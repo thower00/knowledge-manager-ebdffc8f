@@ -20,7 +20,20 @@ export const useExtractionHandlers = (
     }
   }, [onComplete]);
 
+  // Handle URL extraction (removed as per requirements)
+  const handleExtractFromUrl = useCallback(async () => {
+    console.log("URL extraction no longer supported");
+  }, []);
+
+  // Handle database extraction (wrapper for direct extraction)
+  const handleExtractFromDatabase = useCallback(async () => {
+    console.log("Database extraction handler called");
+    // This will be handled by the DatabaseDocumentExtractor component
+  }, []);
+
   return {
-    handleDirectExtraction
+    handleDirectExtraction,
+    handleExtractFromUrl,
+    handleExtractFromDatabase
   };
 };
