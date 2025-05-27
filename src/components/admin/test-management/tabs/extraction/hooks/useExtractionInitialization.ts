@@ -1,31 +1,26 @@
 
-import { useEffect } from "react";
-import { useServerExtractionProcess } from "./useServerExtractionProcess";
-import { useDocumentSelection } from "./useDocumentSelection";
+import { useState, useEffect } from "react";
 
-export const useExtractionInitialization = () => {
-  const extractionProcess = useServerExtractionProcess();
-  const documentSelection = useDocumentSelection();
+/**
+ * Hook for extraction initialization - simplified version
+ */
+export function useExtractionInitialization() {
+  const [proxyConnected, setProxyConnected] = useState<boolean>(true);
   
-  // Initialize services on mount
-  useEffect(() => {
-    extractionProcess.checkProxyConnection();
-    documentSelection.fetchDocuments();
-
-    // Clean up any timeout when component unmounts
-    return () => {
-      extractionProcess.clearExtractionTimeout();
-    };
-  }, []);
-  
-  // Handle refresh
+  // Simple refresh handler
   const handleRefresh = async () => {
-    await extractionProcess.checkProxyConnection();
-    await documentSelection.fetchDocuments();
+    console.log("Refreshing extraction state");
+    // No longer need to check proxy connections for file extraction
+    setProxyConnected(true);
   };
-  
+
+  useEffect(() => {
+    // Initialize as connected since we're using direct file extraction
+    setProxyConnected(true);
+  }, []);
+
   return {
-    proxyConnected: extractionProcess.proxyConnected,
+    proxyConnected,
     handleRefresh
   };
-};
+}
