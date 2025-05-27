@@ -1,5 +1,6 @@
 
 import { ProcessedDocument } from "@/types/document";
+import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
 
 export interface FileExtractionResult {
   success: boolean;
@@ -72,33 +73,6 @@ function determineFileType(document: ProcessedDocument): string {
 }
 
 /**
- * Convert Google Drive URL to direct download URL
- */
-function convertToDirectDownloadUrl(googleDriveUrl: string): string {
-  // Extract file ID from various Google Drive URL formats
-  let fileId: string | null = null;
-  
-  // Format: https://drive.google.com/file/d/FILE_ID/view
-  const viewMatch = googleDriveUrl.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
-  if (viewMatch) {
-    fileId = viewMatch[1];
-  }
-  
-  // Format: https://drive.google.com/open?id=FILE_ID
-  const openMatch = googleDriveUrl.match(/[?&]id=([a-zA-Z0-9-_]+)/);
-  if (openMatch) {
-    fileId = openMatch[1];
-  }
-  
-  if (!fileId) {
-    throw new Error("Could not extract file ID from Google Drive URL");
-  }
-  
-  // Return direct download URL
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
-}
-
-/**
  * Safe base64 conversion for large files
  */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -121,18 +95,9 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
   try {
     console.log(`Extracting PDF content from: ${document.title}`);
     
-    // Convert Google Drive URL to direct download URL
-    const directDownloadUrl = convertToDirectDownloadUrl(document.url!);
-    console.log(`Using direct download URL: ${directDownloadUrl}`);
-    
-    // Fetch the PDF file from the direct download URL
-    const fileResponse = await fetch(directDownloadUrl);
-    if (!fileResponse.ok) {
-      throw new Error(`Failed to fetch PDF file: ${fileResponse.statusText}`);
-    }
-    
-    const fileBlob = await fileResponse.blob();
-    const arrayBuffer = await fileBlob.arrayBuffer();
+    // Use the existing proxy service to fetch the document
+    console.log(`Fetching PDF through proxy service: ${document.url}`);
+    const arrayBuffer = await fetchDocumentViaProxy(document.url!, document.title);
     
     // Use safe base64 conversion to avoid stack overflow
     const base64Data = arrayBufferToBase64(arrayBuffer);
@@ -170,7 +135,7 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
       metadata: {
         fileType: 'pdf',
         pages: result.totalPages,
-        size: fileBlob.size
+        size: arrayBuffer.byteLength
       }
     };
   } catch (error) {
