@@ -29,42 +29,42 @@ export async function extractTextWithTimeout(pdfBytes: string, timeoutMs: number
   });
 }
 
-// Enhanced comprehensive text extraction
+// Enhanced comprehensive text extraction with better stream decoding
 function extractComprehensiveText(pdfBytes: string): string {
-  console.log("Starting comprehensive text extraction for complete document content");
+  console.log("Starting enhanced text extraction with stream decoding");
   
   let extractedTexts: string[] = [];
   
   try {
-    // Strategy 1: Extract from text streams with proper ordering
-    const streamText = extractFromTextStreams(pdfBytes);
-    if (streamText && streamText.length > 100) {
-      console.log(`Found ${streamText.length} chars from text streams`);
+    // Strategy 1: Extract from decoded streams
+    const streamText = extractFromDecodedStreams(pdfBytes);
+    if (streamText && streamText.length > 50) {
+      console.log(`Found ${streamText.length} chars from decoded streams`);
       extractedTexts.push(streamText);
     }
     
-    // Strategy 2: Extract from BT/ET text blocks with better parsing
-    const textBlockText = extractFromTextBlocks(pdfBytes);
-    if (textBlockText && textBlockText.length > 100) {
-      console.log(`Found ${textBlockText.length} chars from text blocks`);
-      extractedTexts.push(textBlockText);
+    // Strategy 2: Extract from text objects with better parsing
+    const textObjectText = extractFromTextObjects(pdfBytes);
+    if (textObjectText && textObjectText.length > 50) {
+      console.log(`Found ${textObjectText.length} chars from text objects`);
+      extractedTexts.push(textObjectText);
     }
     
-    // Strategy 3: Extract from content streams
-    const contentText = extractFromContentStreams(pdfBytes);
-    if (contentText && contentText.length > 100) {
-      console.log(`Found ${contentText.length} chars from content streams`);
-      extractedTexts.push(contentText);
+    // Strategy 3: Extract visible text content
+    const visibleText = extractVisibleTextContent(pdfBytes);
+    if (visibleText && visibleText.length > 50) {
+      console.log(`Found ${visibleText.length} chars from visible content`);
+      extractedTexts.push(visibleText);
     }
     
-    // Strategy 4: Look for actual words in string literals
-    const literalText = extractWordsFromLiterals(pdfBytes);
-    if (literalText && literalText.length > 100) {
-      console.log(`Found ${literalText.length} chars from string literals`);
-      extractedTexts.push(literalText);
+    // Strategy 4: Extract from font encoded text
+    const fontText = extractFromFontEncodedText(pdfBytes);
+    if (fontText && fontText.length > 50) {
+      console.log(`Found ${fontText.length} chars from font encoded text`);
+      extractedTexts.push(fontText);
     }
     
-    // Combine and clean the best result
+    // Find the best extraction result
     const bestText = findBestExtraction(extractedTexts);
     
     if (bestText && bestText.length > 50) {
@@ -72,13 +72,201 @@ function extractComprehensiveText(pdfBytes: string): string {
       return cleanExtractedText(bestText);
     }
     
-    console.log("No substantial text found, trying fallback extraction");
-    return extractFallbackText(pdfBytes);
+    console.log("No substantial readable text found, trying enhanced fallback");
+    return extractEnhancedFallbackText(pdfBytes);
     
   } catch (error) {
-    console.error("Error in comprehensive text extraction:", error);
+    console.error("Error in enhanced text extraction:", error);
     return "Error extracting text: " + error.message;
   }
+}
+
+// Extract text from decoded PDF streams
+function extractFromDecodedStreams(pdfBytes: string): string {
+  const textParts: string[] = [];
+  
+  // Look for stream objects
+  const streamPattern = /(\d+\s+\d+\s+obj[\s\S]*?stream\s*)([\s\S]*?)(\s*endstream)/g;
+  let match;
+  
+  while ((match = streamPattern.exec(pdfBytes)) !== null) {
+    const streamContent = match[2];
+    
+    // Check if this stream contains text operations
+    if (streamContent.includes('Tj') || streamContent.includes('TJ') || streamContent.includes('BT')) {
+      const decodedText = attemptStreamDecoding(streamContent);
+      if (decodedText && isReadableText(decodedText)) {
+        textParts.push(decodedText);
+      }
+    }
+  }
+  
+  return textParts.join(' ');
+}
+
+// Attempt to decode stream content
+function attemptStreamDecoding(streamContent: string): string {
+  try {
+    // If the content looks like it might be deflated/compressed, try basic decoding
+    if (streamContent.includes('FlateDecode') || streamContent.length > 100) {
+      // For now, extract any readable text patterns from the stream
+      return extractReadablePatterns(streamContent);
+    }
+    
+    // Extract text operations directly
+    return extractTextOperationsFromStream(streamContent);
+  } catch (error) {
+    console.error("Error decoding stream:", error);
+    return '';
+  }
+}
+
+// Extract readable patterns from potentially encoded content
+function extractReadablePatterns(content: string): string {
+  const readableWords: string[] = [];
+  
+  // Look for sequences of letters that might be words
+  const wordPattern = /[A-Za-z]{3,}/g;
+  let match;
+  
+  while ((match = wordPattern.exec(content)) !== null) {
+    const word = match[0];
+    // Filter out common PDF artifacts and keep real words
+    if (!isPdfArtifact(word) && isLikelyRealWord(word)) {
+      readableWords.push(word);
+    }
+  }
+  
+  return readableWords.join(' ');
+}
+
+// Check if a word is likely a PDF artifact
+function isPdfArtifact(word: string): boolean {
+  const artifacts = [
+    'FlateDecode', 'Stream', 'endstream', 'obj', 'endobj', 'xref', 'trailer',
+    'Type', 'Page', 'Pages', 'Font', 'FontDescriptor', 'Encoding', 'Width',
+    'Height', 'Length', 'Filter', 'Adobe', 'Identity', 'UCS', 'CIDFont'
+  ];
+  
+  return artifacts.some(artifact => word.includes(artifact));
+}
+
+// Check if a word is likely a real word
+function isLikelyRealWord(word: string): boolean {
+  // Must be reasonable length
+  if (word.length < 3 || word.length > 20) return false;
+  
+  // Should have vowels for most real words
+  const vowelCount = (word.match(/[aeiouAEIOU]/g) || []).length;
+  const hasVowels = vowelCount > 0;
+  
+  // Should not be all consonants or all uppercase random letters
+  const isAllCaps = word === word.toUpperCase();
+  const consonantRatio = (word.length - vowelCount) / word.length;
+  
+  return hasVowels && !(isAllCaps && consonantRatio > 0.8);
+}
+
+// Extract from text objects with enhanced parsing
+function extractFromTextObjects(pdfBytes: string): string {
+  const textParts: string[] = [];
+  
+  // Look for BT...ET blocks with better context
+  const textBlockPattern = /BT\s+([\s\S]*?)\s+ET/g;
+  let match;
+  
+  while ((match = textBlockPattern.exec(pdfBytes)) !== null) {
+    const textBlock = match[1];
+    const extractedText = parseTextBlock(textBlock);
+    if (extractedText && isReadableText(extractedText)) {
+      textParts.push(extractedText);
+    }
+  }
+  
+  return textParts.join(' ');
+}
+
+// Parse individual text blocks more intelligently
+function parseTextBlock(textBlock: string): string {
+  const textParts: string[] = [];
+  const lines = textBlock.split('\n');
+  
+  for (const line of lines) {
+    // Look for text operations
+    const tjMatch = line.match(/\(([^)]+)\)\s*Tj/);
+    if (tjMatch) {
+      const text = decodeTextString(tjMatch[1]);
+      if (text && isReadableText(text)) {
+        textParts.push(text);
+      }
+      continue;
+    }
+    
+    // Look for TJ array operations
+    const tjArrayMatch = line.match(/\[\s*([^\]]+)\s*\]\s*TJ/);
+    if (tjArrayMatch) {
+      const arrayContent = tjArrayMatch[1];
+      const strings = arrayContent.match(/\(([^)]+)\)/g);
+      if (strings) {
+        for (const str of strings) {
+          const cleanStr = str.replace(/[()]/g, '');
+          const decoded = decodeTextString(cleanStr);
+          if (decoded && isReadableText(decoded)) {
+            textParts.push(decoded);
+          }
+        }
+      }
+    }
+  }
+  
+  return textParts.join(' ');
+}
+
+// Extract visible text content using different approach
+function extractVisibleTextContent(pdfBytes: string): string {
+  const words: string[] = [];
+  
+  // Look for parenthetical strings that are likely visible text
+  const stringPattern = /\(([^)]{2,50})\)/g;
+  let match;
+  
+  while ((match = stringPattern.exec(pdfBytes)) !== null) {
+    const content = match[1];
+    const decoded = decodeTextString(content);
+    
+    if (decoded && isActualWord(decoded)) {
+      words.push(decoded);
+    }
+  }
+  
+  return words.join(' ');
+}
+
+// Extract from font-encoded text
+function extractFromFontEncodedText(pdfBytes: string): string {
+  const textParts: string[] = [];
+  
+  // Look for font definitions and associated text
+  const fontPattern = /\/Font\s*<<[\s\S]*?>>/g;
+  const textNearFonts: string[] = [];
+  
+  // Find text that appears near font definitions
+  let match;
+  while ((match = fontPattern.exec(pdfBytes)) !== null) {
+    const fontIndex = match.index;
+    
+    // Look for text in a reasonable range after font definition
+    const searchStart = fontIndex;
+    const searchEnd = Math.min(fontIndex + 2000, pdfBytes.length);
+    const contextText = pdfBytes.substring(searchStart, searchEnd);
+    
+    const contextWords = extractReadablePatterns(contextText);
+    if (contextWords.length > 20) {
+      textNearFonts.push(contextWords);
+    }
+  }
+  
+  return textNearFonts.join(' ');
 }
 
 // Extract text from PDF text streams
@@ -326,26 +514,34 @@ function cleanExtractedText(text: string): string {
 }
 
 // Fallback extraction for difficult PDFs
-function extractFallbackText(pdfBytes: string): string {
-  console.log("Using fallback text extraction");
+function extractEnhancedFallbackText(pdfBytes: string): string {
+  console.log("Using enhanced fallback text extraction");
   
-  // Look for any sequences that might be readable text
-  const wordPattern = /[A-Za-z]{3,}/g;
+  // Strategy 1: Extract all reasonable letter sequences
+  const wordPattern = /[A-Za-z]{3,15}/g;
   const potentialWords = pdfBytes.match(wordPattern) || [];
   
-  // Filter out PDF keywords and keep real words
-  const pdfKeywords = ['obj', 'endobj', 'stream', 'endstream', 'xref', 'trailer', 'Font', 'Type', 'Subtype', 'Length', 'Filter'];
-  const realWords = potentialWords.filter(word => 
-    !pdfKeywords.includes(word) && 
-    word.length >= 3 && 
-    /^[A-Za-z]+$/.test(word)
-  );
+  // Filter and clean words
+  const realWords = potentialWords
+    .filter(word => !isPdfArtifact(word))
+    .filter(word => isLikelyRealWord(word))
+    .slice(0, 200); // Limit to prevent too much output
   
-  if (realWords.length >= 10) {
-    return realWords.slice(0, 100).join(' ');
+  if (realWords.length >= 20) {
+    const extractedText = realWords.join(' ');
+    console.log(`Enhanced fallback extracted ${realWords.length} words`);
+    return extractedText;
   }
   
-  return "This PDF document uses advanced formatting that makes text extraction challenging. The document may contain primarily graphical content or use complex encoding.";
+  // Strategy 2: Look for actual readable content patterns
+  const sentencePattern = /[A-Z][a-z]{2,}\s+[a-z]{2,}[\s\w.,;:!?]{10,}[.!?]/g;
+  const sentences = pdfBytes.match(sentencePattern);
+  
+  if (sentences && sentences.length > 0) {
+    return sentences.join(' ');
+  }
+  
+  return "This PDF document uses complex encoding that makes text extraction difficult. The document may contain primarily graphical content, custom fonts, or advanced formatting that requires specialized PDF processing tools.";
 }
 
 // Enhanced text cleaning for binary-contaminated PDFs
