@@ -1,11 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { 
-  isPdfData,
-  extractPdfMetadata,
-  extractTextWithTimeout,
-  cleanAndNormalizeText
-} from "./text-extraction.ts";
+
+// Import PDF.js for proper PDF parsing
+import { getDocument, GlobalWorkerOptions } from "https://cdn.skypack.dev/pdfjs-dist@3.11.174";
+
+// Set up PDF.js worker (required for proper functioning)
+GlobalWorkerOptions.workerSrc = "https://cdn.skypack.dev/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
 // Define proper CORS headers
 const corsHeaders = {
@@ -14,7 +14,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Main function to extract text from PDF
+// Main function to extract text from PDF using PDF.js
 async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
@@ -30,11 +30,15 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Decode the base64 data
-    let pdfBytes;
+    // Convert base64 to Uint8Array for PDF.js
+    let pdfData;
     try {
-      pdfBytes = atob(base64Data);
-      console.log(`Successfully decoded base64 data, length: ${pdfBytes.length} bytes`);
+      const binaryString = atob(base64Data);
+      pdfData = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        pdfData[i] = binaryString.charCodeAt(i);
+      }
+      console.log(`Successfully decoded base64 data, length: ${pdfData.length} bytes`);
     } catch (decodeError) {
       console.error("Error decoding base64 data:", decodeError);
       return {
@@ -44,74 +48,82 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Check if this looks like a PDF
-    if (!isPdfData(pdfBytes)) {
-      console.warn("The data does not appear to be a PDF");
-      return {
-        text: "The provided data is not a valid PDF document",
-        success: false,
-        error: "Invalid PDF format"
-      };
-    }
-    
-    // Extract metadata
-    const metadata = extractPdfMetadata(pdfBytes);
-    const pageCount = metadata.pageCount;
-    console.log(`PDF has ${pageCount} pages`);
-    
-    // Extract text with focused approach
-    let extractedText;
+    // Load PDF document using PDF.js
+    let pdfDocument;
     try {
-      console.log("Starting focused text extraction for actual readable content...");
-      
-      extractedText = await extractTextWithTimeout(pdfBytes, 30000);
-      
-      console.log(`Extracted text length: ${extractedText ? extractedText.length : 0} characters`);
-      
-      // Apply additional cleaning
-      if (extractedText && extractedText.length > 20) {
-        const cleanText = cleanAndNormalizeText(extractedText);
-        console.log(`After cleaning: ${cleanText.length} characters`);
-        extractedText = cleanText;
-      }
-      
-    } catch (error) {
-      console.error("Text extraction error:", error);
+      pdfDocument = await getDocument({ data: pdfData }).promise;
+      console.log(`PDF loaded successfully, ${pdfDocument.numPages} pages`);
+    } catch (pdfError) {
+      console.error("Error loading PDF:", pdfError);
       return {
-        text: `Error extracting text: ${error.message || "Unknown error"}`,
+        text: "Error loading PDF: " + pdfError.message,
         success: false,
-        error: error.message,
-        totalPages: pageCount,
-        processedPages: 0
+        error: "PDF loading failed"
       };
     }
     
-    // Determine how many pages to process based on options
-    const maxPages = options?.maxPages ? Math.min(options.maxPages, pageCount) : pageCount;
+    const totalPages = pdfDocument.numPages;
+    const maxPages = options?.maxPages ? Math.min(options.maxPages, totalPages) : totalPages;
     
-    // Format the extracted text
-    let formattedText = "";
+    // Extract text from each page
+    const textParts = [];
+    let processedPages = 0;
     
-    if (extractedText && extractedText.length > 10) {
-      // Format as a single page if we have actual content
-      formattedText = `--- Page 1 ---\n${extractedText}\n\n`;
-      
-      // Add footer if we limited the pages
-      if (maxPages < pageCount && pageCount > 1) {
-        formattedText += `\n--- Document has ${pageCount} total pages ---\n`;
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      try {
+        console.log(`Processing page ${pageNum}/${maxPages}`);
+        
+        // Get the page
+        const page = await pdfDocument.getPage(pageNum);
+        
+        // Extract text content
+        const textContent = await page.getTextContent();
+        
+        // Combine text items into readable text
+        const pageText = textContent.items
+          .filter(item => item.str && item.str.trim().length > 0)
+          .map(item => item.str)
+          .join(' ')
+          .trim();
+        
+        if (pageText.length > 0) {
+          textParts.push(`--- Page ${pageNum} ---\n${pageText}\n`);
+          console.log(`Extracted ${pageText.length} characters from page ${pageNum}`);
+        } else {
+          console.log(`No text found on page ${pageNum}`);
+        }
+        
+        processedPages++;
+      } catch (pageError) {
+        console.error(`Error processing page ${pageNum}:`, pageError);
+        textParts.push(`--- Page ${pageNum} ---\nError extracting text from this page: ${pageError.message}\n`);
       }
-    } else {
-      formattedText = "No readable text could be extracted from this PDF. The document may be:\n- A scanned image (requires OCR)\n- Password protected\n- Corrupted\n- Using unsupported encoding\n- Entirely graphical content";
     }
+    
+    // Combine all text
+    let extractedText = textParts.join('\n');
+    
+    // Add footer if we limited the pages
+    if (maxPages < totalPages) {
+      extractedText += `\n--- Document has ${totalPages} total pages, showing first ${maxPages} ---\n`;
+    }
+    
+    // Check if we actually extracted meaningful text
+    if (!extractedText || extractedText.length < 50) {
+      extractedText = "No readable text could be extracted from this PDF. The document may be:\n- A scanned image (requires OCR)\n- Password protected\n- Corrupted\n- Using unsupported encoding\n- Entirely graphical content";
+    }
+    
+    console.log(`Total extracted text length: ${extractedText.length} characters`);
     
     return {
-      text: formattedText,
+      text: extractedText,
       pages: [],
-      totalPages: pageCount,
-      processedPages: 1,
+      totalPages: totalPages,
+      processedPages: processedPages,
       success: true,
       available: true
     };
+    
   } catch (error) {
     console.error("Error extracting text:", error);
     return {
@@ -211,9 +223,9 @@ serve(async (req) => {
       );
     }
     
-    console.log("Received PDF processing request for focused text extraction");
+    console.log("Received PDF processing request with PDF.js extraction");
 
-    // Process the PDF with focused extraction
+    // Process the PDF with PDF.js
     const result = await extractTextFromPdf(pdfBase64, options);
     
     // Return the extracted text

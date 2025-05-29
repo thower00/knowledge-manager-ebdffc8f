@@ -1,81 +1,42 @@
+
 /**
- * Enhanced text cleaning function to ensure we get readable text, not binary
- * Uses multiple strategies to clean text and prevent binary data display
+ * Enhanced text cleaning function for PDF.js extracted text
+ * Focuses on cleaning properly extracted text rather than fixing extraction issues
  */
 export function cleanAndNormalizeText(text: string): string {
   if (!text || text.length === 0) return "";
   
-  console.log("Running enhanced text cleaning for readability...");
-  
-  // Keep original text for comparison
-  const originalText = text;
+  console.log("Cleaning PDF.js extracted text for better readability...");
   
   try {
-    // Basic cleaning first - Remove most problematic characters
+    // Since we now use PDF.js, the text should already be properly extracted
+    // We just need to clean up formatting and spacing issues
+    
     let cleanedText = text
-      .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ') // Remove control chars
-      .replace(/\uFFFD/g, ' ')                                // Replace replacement char
+      // Normalize whitespace but preserve paragraph breaks
+      .replace(/[ \t]+/g, ' ')                               // Multiple spaces/tabs to single space
+      .replace(/\n\s*\n\s*\n/g, '\n\n')                     // Multiple line breaks to double
+      .replace(/([.!?])\s*\n\s*([A-Z])/g, '$1\n\n$2')       // Add paragraph breaks after sentences
       .trim();
     
-    // If this basic cleaning yields good results, use it
-    if (containsReadableText(cleanedText) && cleanedText.length > 300) {
-      console.log("Basic cleaning produced readable text");
+    // If the text looks properly formatted, return it
+    if (cleanedText.length > 100 && /[a-zA-Z]{3,}/.test(cleanedText)) {
+      console.log("Text appears to be properly extracted and formatted");
       return cleanedText;
     }
     
-    // More aggressive approach - keep only ASCII and basic punctuation
-    cleanedText = text
-      .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF]/g, ' ')     // Keep only ASCII and Latin-1
-      .replace(/\s+/g, ' ')                                 // Collapse whitespace
-      .trim();
-      
-    if (containsReadableText(cleanedText) && cleanedText.length > 200) {
-      console.log("Aggressive cleaning produced readable text");
-      return cleanedText;
+    // If text is very short or seems problematic, provide a helpful message
+    if (cleanedText.length < 50) {
+      console.log("Extracted text is very short, might be an issue with the PDF");
+      return cleanedText.length > 0 ? cleanedText : 
+        "Very little text was extracted. The PDF may contain mostly images or have accessibility issues.";
     }
     
-    // Extract words with letters if previous methods didn't work well
-    const words = originalText.split(/\s+/)
-      .filter(word => /[a-zA-Z]{2,}/.test(word) && word.length >= 2)
-      .join(' ');
-      
-    if (words.length > 200) {
-      console.log("Word extraction produced readable text");
-      return words;
-    }
+    return cleanedText;
     
-    // Page pattern extraction (look for "--- Page X ---" patterns)
-    const pagePatterns = originalText.match(/--- Page \d+ ---[\s\S]*?(?=--- Page \d+ ---|$)/g);
-    if (pagePatterns && pagePatterns.length > 0) {
-      const cleanedPages = pagePatterns
-        .map(page => {
-          const pageTitle = page.match(/--- Page \d+ ---/) || ["Page"];
-          const cleanContent = page
-            .replace(/--- Page \d+ ---/, '')
-            .replace(/[^\x20-\x7E\r\n\t]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          return `${pageTitle[0]}\n${cleanContent}`;
-        })
-        .join('\n\n');
-      
-      if (cleanedPages.length > 200) {
-        console.log("Page pattern extraction produced readable text");
-        return cleanedPages;
-      }
-    }
-    
-    // Last resort - extra aggressive cleaning
-    const ultraClean = originalText
-      .replace(/[^a-zA-Z0-9\s.,;:!?()\[\]{}'"$%&*+\-=<>|/\\]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    return ultraClean.length > 100 ? ultraClean : 
-      "Could not extract readable text from this document. The document may contain only images or be protected.";
   } catch (error) {
     console.error("Error during text cleaning:", error);
-    return "Error cleaning text. The document may contain content that cannot be properly displayed.";
+    return text; // Return original text if cleaning fails
   }
 }
 
@@ -91,26 +52,49 @@ function containsReadableText(text: string): boolean {
 }
 
 /**
- * Alternative text extraction strategies for challenging PDFs
+ * Simple text validation for PDF.js extracted content
  */
-export function extractTextAlternatives(text: string): string[] {
-  const results = [];
-  
-  // Strategy 1: Extract text between quotes
-  const quotedText = text.match(/"([^"]+)"/g);
-  if (quotedText && quotedText.length > 5) {
-    results.push(quotedText.join(' ')
-      .replace(/"/g, '')
-      .replace(/\s+/g, ' ')
-      .trim());
+export function validateExtractedText(text: string): { isValid: boolean; message?: string } {
+  if (!text || text.trim().length === 0) {
+    return { isValid: false, message: "No text was extracted from the PDF" };
   }
   
-  // Strategy 2: Focus on alphabetic characters in clusters
-  const alphaPattern = /[a-zA-Z]{3,}[a-zA-Z\s.,;:!?]{10,}/g;
-  const alphaMatches = text.match(alphaPattern);
-  if (alphaMatches && alphaMatches.length > 0) {
-    results.push(alphaMatches.join(' ').trim());
+  if (text.length < 20) {
+    return { isValid: false, message: "Very little text was extracted - PDF may be image-based" };
   }
   
-  return results;
+  // Check for proper word structure
+  const words = text.split(/\s+/).filter(word => /[a-zA-Z]{2,}/.test(word));
+  if (words.length < 5) {
+    return { isValid: false, message: "Extracted text doesn't contain enough readable words" };
+  }
+  
+  return { isValid: true };
+}
+
+/**
+ * Format extracted text with proper structure
+ */
+export function formatExtractedText(text: string, metadata?: any): string {
+  let formatted = text;
+  
+  // Add metadata header if provided
+  if (metadata) {
+    let header = '';
+    if (metadata.fileType) {
+      header += `Document Type: ${metadata.fileType.toUpperCase()}\n`;
+    }
+    if (metadata.pages) {
+      header += `Pages: ${metadata.pages}\n`;
+    }
+    if (metadata.size) {
+      header += `Size: ${(metadata.size / 1024).toFixed(1)} KB\n`;
+    }
+    if (header) {
+      header += '\n--- Extracted Text ---\n\n';
+      formatted = header + formatted;
+    }
+  }
+  
+  return formatted;
 }

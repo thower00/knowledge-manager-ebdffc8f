@@ -1,6 +1,7 @@
 
 import { ProcessedDocument } from "@/types/document";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
+import { cleanAndNormalizeText, validateExtractedText, formatExtractedText } from "@/components/admin/document-extraction/services/textCleaningService";
 
 export interface FileExtractionResult {
   success: boolean;
@@ -89,11 +90,11 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * Extract content from PDF document
+ * Extract content from PDF document using improved PDF.js service
  */
 async function extractPdfContent(document: ProcessedDocument): Promise<FileExtractionResult> {
   try {
-    console.log(`Extracting PDF content from: ${document.title}`);
+    console.log(`Extracting PDF content with PDF.js from: ${document.title}`);
     
     // Use the existing proxy service to fetch the document
     console.log(`Fetching PDF through proxy service: ${document.url}`);
@@ -102,7 +103,7 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
     // Use safe base64 conversion to avoid stack overflow
     const base64Data = arrayBufferToBase64(arrayBuffer);
     
-    // Call our PDF processing service
+    // Call our improved PDF processing service with PDF.js
     const response = await fetch(`https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`, {
       method: 'POST',
       headers: {
@@ -129,9 +130,21 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
       throw new Error(result.error || "PDF processing failed");
     }
     
+    // Validate and clean the extracted text
+    let extractedText = result.text || "";
+    const validation = validateExtractedText(extractedText);
+    
+    if (!validation.isValid) {
+      console.warn(`Text validation failed: ${validation.message}`);
+      extractedText = validation.message || "Could not extract readable text from this PDF.";
+    } else {
+      // Clean and format the properly extracted text
+      extractedText = cleanAndNormalizeText(extractedText);
+    }
+    
     return {
       success: true,
-      text: result.text || "",
+      text: extractedText,
       metadata: {
         fileType: 'pdf',
         pages: result.totalPages,
@@ -182,28 +195,8 @@ export function convertToText(extractionResult: FileExtractionResult): string {
     return extractionResult.error || "No text could be extracted";
   }
   
-  // Clean up the extracted text
-  let cleanText = extractionResult.text
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .replace(/^\s+|\s+$/g, '') // Trim
-    .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable characters except newlines/tabs
-    .replace(/\s+/g, ' ') // Final whitespace cleanup
-    .trim();
+  // Format the extracted text with metadata
+  const formattedText = formatExtractedText(extractionResult.text, extractionResult.metadata);
   
-  // Add metadata header if available
-  if (extractionResult.metadata) {
-    const metadata = extractionResult.metadata;
-    let header = `Document Type: ${metadata.fileType.toUpperCase()}\n`;
-    if (metadata.pages) {
-      header += `Pages: ${metadata.pages}\n`;
-    }
-    if (metadata.size) {
-      header += `Size: ${(metadata.size / 1024).toFixed(1)} KB\n`;
-    }
-    header += '\n--- Extracted Text ---\n\n';
-    
-    cleanText = header + cleanText;
-  }
-  
-  return cleanText;
+  return formattedText;
 }
