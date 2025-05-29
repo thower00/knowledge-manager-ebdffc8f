@@ -114,13 +114,13 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       }
     }
     
-    // Clean up the extracted text
+    // Clean up the extracted text - FIXED REGEX
     extractedText = extractedText
       .replace(/\\n/g, '\n')
       .replace(/\\r/g, '\r')
       .replace(/\\t/g, '\t')
-      .replace(/\\(/g, '(')
-      .replace(/\\)/g, ')')
+      .replace(/\\\(/g, '(')  // Fixed: properly escaped parentheses
+      .replace(/\\\)/g, ')')  // Fixed: properly escaped parentheses
       .replace(/\\\\/g, '\\')
       .replace(/\s+/g, ' ')
       .trim();
