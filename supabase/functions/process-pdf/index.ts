@@ -1,12 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-// Import PDF.js for proper PDF parsing
-import { getDocument, GlobalWorkerOptions } from "https://cdn.skypack.dev/pdfjs-dist@3.11.174";
-
-// Set up PDF.js worker (required for proper functioning)
-GlobalWorkerOptions.workerSrc = "https://cdn.skypack.dev/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-
 // Define proper CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
 };
 
-// Main function to extract text from PDF using PDF.js
+// Simple PDF text extraction function without external dependencies
 async function extractTextFromPdf(base64Data: string, options = {}) {
   try {
     // For checking availability, we return a success message without processing
@@ -30,7 +24,7 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Convert base64 to Uint8Array for PDF.js
+    // Convert base64 to Uint8Array
     let pdfData;
     try {
       const binaryString = atob(base64Data);
@@ -48,78 +42,101 @@ async function extractTextFromPdf(base64Data: string, options = {}) {
       };
     }
     
-    // Load PDF document using PDF.js
-    let pdfDocument;
-    try {
-      pdfDocument = await getDocument({ data: pdfData }).promise;
-      console.log(`PDF loaded successfully, ${pdfDocument.numPages} pages`);
-    } catch (pdfError) {
-      console.error("Error loading PDF:", pdfError);
+    // Convert to string for text extraction
+    const pdfString = new TextDecoder('latin1').decode(pdfData);
+    
+    // Check if it's a valid PDF
+    if (!pdfString.startsWith('%PDF-')) {
       return {
-        text: "Error loading PDF: " + pdfError.message,
+        text: "Invalid PDF format",
         success: false,
-        error: "PDF loading failed"
+        error: "Not a valid PDF file"
       };
     }
     
-    const totalPages = pdfDocument.numPages;
-    const maxPages = options?.maxPages ? Math.min(options.maxPages, totalPages) : totalPages;
+    console.log("Valid PDF detected, extracting text...");
     
-    // Extract text from each page
-    const textParts = [];
-    let processedPages = 0;
+    // Extract text using improved regex patterns
+    let extractedText = "";
     
-    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
-      try {
-        console.log(`Processing page ${pageNum}/${maxPages}`);
-        
-        // Get the page
-        const page = await pdfDocument.getPage(pageNum);
-        
-        // Extract text content
-        const textContent = await page.getTextContent();
-        
-        // Combine text items into readable text
-        const pageText = textContent.items
-          .filter(item => item.str && item.str.trim().length > 0)
-          .map(item => item.str)
-          .join(' ')
-          .trim();
-        
-        if (pageText.length > 0) {
-          textParts.push(`--- Page ${pageNum} ---\n${pageText}\n`);
-          console.log(`Extracted ${pageText.length} characters from page ${pageNum}`);
-        } else {
-          console.log(`No text found on page ${pageNum}`);
+    // Method 1: Extract from BT/ET blocks (text objects)
+    const textObjectRegex = /BT\s+(.*?)\s+ET/gs;
+    const textObjects = pdfString.match(textObjectRegex) || [];
+    
+    for (const textObj of textObjects) {
+      // Extract text from parentheses and angle brackets
+      const textInParens = textObj.match(/\((.*?)\)/g) || [];
+      const textInAngles = textObj.match(/<(.*?)>/g) || [];
+      
+      for (const match of textInParens) {
+        const text = match.slice(1, -1); // Remove parentheses
+        if (text.length > 0 && !text.match(/^[\x00-\x1F\x7F-\xFF]+$/)) {
+          extractedText += text + " ";
         }
-        
-        processedPages++;
-      } catch (pageError) {
-        console.error(`Error processing page ${pageNum}:`, pageError);
-        textParts.push(`--- Page ${pageNum} ---\nError extracting text from this page: ${pageError.message}\n`);
+      }
+      
+      for (const match of textInAngles) {
+        const text = match.slice(1, -1); // Remove angle brackets
+        // Convert hex to text if it looks like hex
+        if (text.match(/^[0-9A-Fa-f]+$/)) {
+          try {
+            const hexText = text.replace(/../g, (hex) => String.fromCharCode(parseInt(hex, 16)));
+            if (hexText.match(/[a-zA-Z]/)) {
+              extractedText += hexText + " ";
+            }
+          } catch (e) {
+            // Ignore conversion errors
+          }
+        }
       }
     }
     
-    // Combine all text
-    let extractedText = textParts.join('\n');
-    
-    // Add footer if we limited the pages
-    if (maxPages < totalPages) {
-      extractedText += `\n--- Document has ${totalPages} total pages, showing first ${maxPages} ---\n`;
+    // Method 2: Extract from Tj operators
+    const tjRegex = /\((.*?)\)\s*Tj/g;
+    let match;
+    while ((match = tjRegex.exec(pdfString)) !== null) {
+      const text = match[1];
+      if (text && text.length > 0 && !text.match(/^[\x00-\x1F\x7F-\xFF]+$/)) {
+        extractedText += text + " ";
+      }
     }
+    
+    // Method 3: Extract from TJ arrays
+    const tjArrayRegex = /\[(.*?)\]\s*TJ/g;
+    while ((match = tjArrayRegex.exec(pdfString)) !== null) {
+      const arrayContent = match[1];
+      const textMatches = arrayContent.match(/\((.*?)\)/g) || [];
+      for (const textMatch of textMatches) {
+        const text = textMatch.slice(1, -1);
+        if (text && text.length > 0 && !text.match(/^[\x00-\x1F\x7F-\xFF]+$/)) {
+          extractedText += text + " ";
+        }
+      }
+    }
+    
+    // Clean up the extracted text
+    extractedText = extractedText
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\(/g, '(')
+      .replace(/\\)/g, ')')
+      .replace(/\\\\/g, '\\')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    console.log(`Extracted text length: ${extractedText.length} characters`);
     
     // Check if we actually extracted meaningful text
-    if (!extractedText || extractedText.length < 50) {
+    if (!extractedText || extractedText.length < 10) {
       extractedText = "No readable text could be extracted from this PDF. The document may be:\n- A scanned image (requires OCR)\n- Password protected\n- Corrupted\n- Using unsupported encoding\n- Entirely graphical content";
     }
-    
-    console.log(`Total extracted text length: ${extractedText.length} characters`);
     
     return {
       text: extractedText,
       pages: [],
-      totalPages: totalPages,
-      processedPages: processedPages,
+      totalPages: 1,
+      processedPages: 1,
       success: true,
       available: true
     };
@@ -223,9 +240,9 @@ serve(async (req) => {
       );
     }
     
-    console.log("Received PDF processing request with PDF.js extraction");
+    console.log("Received PDF processing request with improved regex extraction");
 
-    // Process the PDF with PDF.js
+    // Process the PDF with our improved extraction
     const result = await extractTextFromPdf(pdfBase64, options);
     
     // Return the extracted text
