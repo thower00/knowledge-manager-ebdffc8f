@@ -32,7 +32,6 @@ export async function extractTextFromPdfBuffer(
     // Load the PDF document with enhanced configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
-      // Disable worker-dependent features if needed
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
@@ -51,7 +50,6 @@ export async function extractTextFromPdfBuffer(
       try {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent({
-          normalizeWhitespace: true,
           disableCombineTextItems: false
         });
         

@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 let workerInitialized = false;
 
 /**
- * Initialize the PDF.js worker using bundled approach
+ * Initialize the PDF.js worker using local worker file
  * @returns Promise resolving to true if initialization succeeds
  */
 export async function initPdfWorker(): Promise<boolean> {
@@ -16,42 +16,26 @@ export async function initPdfWorker(): Promise<boolean> {
   console.log("PDF.js version:", pdfjsLib.version);
   
   try {
-    // Use the bundled worker from the pdfjs-dist package
-    // This avoids external CDN dependencies
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.js');
+    // Use the local worker file from public directory
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
     
-    // Set up the worker using the imported module
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `data:application/javascript;base64,${btoa(`
-      // Import the PDF.js worker
-      importScripts('${new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href}');
-    `)}`;
-    
-    console.log("PDF worker initialized with bundled approach");
+    console.log("PDF worker initialized with local worker file");
     workerInitialized = true;
     return true;
     
   } catch (error) {
-    console.warn("Bundled worker failed, trying alternative approach:", error);
+    console.warn("Local worker failed, trying fallback approach:", error);
     
     try {
-      // Fallback: Use a simpler worker setup without external dependencies
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `data:application/javascript;base64,${btoa(`
-        // Minimal PDF.js worker implementation
-        self.addEventListener('message', function(e) {
-          // Basic worker response
-          self.postMessage({ 
-            type: 'ready',
-            data: e.data 
-          });
-        });
-      `)}`;
+      // Fallback: Use jsdelivr CDN
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
       
-      console.log("PDF worker initialized with minimal fallback");
+      console.log("PDF worker initialized with CDN fallback");
       workerInitialized = true;
       return true;
       
     } catch (fallbackError) {
-      console.error("All worker initialization methods failed:", fallbackError);
+      console.error("CDN worker failed, using main thread:", fallbackError);
       
       // Final attempt: disable worker entirely and use main thread
       try {
