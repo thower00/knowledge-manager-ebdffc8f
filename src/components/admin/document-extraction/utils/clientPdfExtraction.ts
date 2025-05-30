@@ -1,4 +1,3 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
 import { initPdfWorker } from './pdfWorkerInit';
@@ -49,9 +48,7 @@ export async function extractTextFromPdfBuffer(
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
         const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent({
-          disableCombineTextItems: false
-        });
+        const textContent = await page.getTextContent();
         
         // Combine text items from the page with better spacing
         const pageText = textContent.items
