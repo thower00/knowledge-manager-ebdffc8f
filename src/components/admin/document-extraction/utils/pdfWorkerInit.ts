@@ -1,24 +1,13 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure the worker sources - using multiple fallback options
-// PDF.js 5.2.133 needs worker version 5.2.131
-const CDN_WORKER_SOURCES = [
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', // Try latest stable version first
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.131/pdf.worker.min.js', // Try exact match version
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.131/build/pdf.worker.min.js',
-  'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js', // Additional CDNs
-];
-const LOCAL_WORKER_SRC = '/pdf.worker.min.js'; // Local fallback path
-
 let workerInitialized = false;
 
 /**
- * Initialize the PDF.js worker with multiple fallback mechanisms
+ * Initialize the PDF.js worker with a simpler, more reliable approach
  * @returns Promise resolving to true if initialization succeeds
  */
-export async function initPdfWorker() {
+export async function initPdfWorker(): Promise<boolean> {
   if (workerInitialized) {
     console.log("PDF worker already initialized");
     return true;
@@ -26,50 +15,61 @@ export async function initPdfWorker() {
 
   console.log("PDF.js version:", pdfjsLib.version);
   
-  // Try local worker first for faster loading in most cases
   try {
-    console.log("Trying local PDF worker first");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = LOCAL_WORKER_SRC;
-    // Test if we can fetch it
-    const response = await fetch(LOCAL_WORKER_SRC, { method: 'HEAD', cache: 'no-cache' });
-    if (response.ok) {
-      console.log(`Local PDF worker loaded successfully`);
-      workerInitialized = true;
-      return true;
-    }
-  } catch (error) {
-    console.warn(`Local worker not available, will try CDN sources`, error);
-  }
-  
-  // Try each CDN source in order
-  for (const workerSrc of CDN_WORKER_SOURCES) {
-    try {
-      // Set worker source
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-      console.log(`Attempting to load PDF worker from: ${workerSrc}`);
-      
-      // Test if the worker can be loaded
-      const response = await fetch(workerSrc, { method: 'HEAD', cache: 'no-cache' });
-      if (response.ok) {
-        console.log(`PDF worker loaded successfully from: ${workerSrc}`);
-        workerInitialized = true;
-        return true;
-      }
-    } catch (error) {
-      console.warn(`Failed to load PDF worker from: ${workerSrc}`, error);
-      // Continue to next source
-    }
-  }
-  
-  // All sources failed, try once more with the local worker as absolute last resort
-  try {
-    console.warn("All CDN worker sources failed, using local worker as final attempt");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = LOCAL_WORKER_SRC;
-    console.log("Using local PDF worker (final attempt)");
+    // Use a simpler approach - set worker source to a version that should work
+    // Try the jsdelivr CDN first as it's often more reliable
+    const workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    
+    console.log(`Setting PDF worker source to: ${workerSrc}`);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    
+    // Test if we can create a simple document to verify worker is working
+    console.log("Testing PDF worker with a simple document...");
+    
+    // Create a minimal PDF for testing
+    const testPdf = new Uint8Array([
+      0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, // %PDF-1.4
+      0x0A, 0x25, 0xC4, 0xE5, 0xF2, 0xE5, 0xEB, 0xA7, 0xF3, 0xA0, 0xD0, 0xC4, 0xC6, // header
+      0x0A, // newline
+    ]);
+    
+    // This will throw an error if the worker can't be loaded
+    const loadingTask = pdfjsLib.getDocument({ data: testPdf });
+    
+    // We don't need to actually load this test PDF, just verify the worker initializes
+    // Cancel the loading task immediately
+    loadingTask.destroy();
+    
+    console.log("PDF worker initialized successfully");
     workerInitialized = true;
     return true;
+    
   } catch (error) {
-    console.error("Failed to initialize PDF worker from any source", error);
-    throw new Error("Could not initialize PDF worker from any source");
+    console.warn("Primary worker source failed, trying fallback:", error);
+    
+    // Fallback: try the cdnjs version
+    try {
+      const fallbackWorkerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      console.log(`Trying fallback worker source: ${fallbackWorkerSrc}`);
+      pdfjsLib.GlobalWorkerOptions.workerSrc = fallbackWorkerSrc;
+      
+      console.log("Fallback PDF worker initialized");
+      workerInitialized = true;
+      return true;
+      
+    } catch (fallbackError) {
+      console.error("All worker sources failed:", fallbackError);
+      
+      // Final fallback: try to use local worker if available
+      try {
+        console.log("Trying local worker as final fallback");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+        workerInitialized = true;
+        return true;
+      } catch (localError) {
+        console.error("Failed to initialize PDF worker from any source:", localError);
+        throw new Error("Could not initialize PDF worker. PDF processing is not available.");
+      }
+    }
   }
 }

@@ -1,9 +1,7 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { initPdfWorker } from './pdfWorkerInit';
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -21,6 +19,9 @@ export async function extractTextFromPdfBuffer(
 ): Promise<PdfExtractionResult> {
   try {
     console.log('Starting client-side PDF.js extraction...');
+    
+    // Initialize PDF worker first
+    await initPdfWorker();
     
     // Load the PDF document
     const loadingTask = pdfjsLib.getDocument({
@@ -105,6 +106,9 @@ export async function extractTextFromPdfUrl(
 ): Promise<PdfExtractionResult> {
   try {
     console.log('Fetching PDF from URL:', url);
+    
+    // Initialize PDF worker first
+    await initPdfWorker();
     
     // Fetch the PDF as array buffer
     const response = await fetch(url);
