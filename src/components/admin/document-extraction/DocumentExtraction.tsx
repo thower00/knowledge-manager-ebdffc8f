@@ -9,32 +9,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info, RefreshCw, Loader2 } from "lucide-react";
-import { useDocumentExtraction } from "./hooks/useDocumentExtraction";
+import { useProcessedDocumentsFetch } from "./hooks/useProcessedDocumentsFetch";
+import { useProxyConnectionStatus } from "./hooks/useProxyConnectionStatus";
+import { useClientPdfExtraction } from "./hooks/useClientPdfExtraction";
 
 export function DocumentExtraction() {
+  const { data: documents, isLoading } = useProcessedDocumentsFetch();
+  const { connectionStatus, connectionError, checkConnection } = useProxyConnectionStatus();
   const {
-    documents,
-    isLoading,
-    selectedDocumentId,
-    setSelectedDocumentId,
     extractTextFromDocument,
     isExtracting,
     extractionProgress,
     extractedText,
     error,
-    retryExtraction,
-    connectionStatus,
-    connectionError,
-    checkConnection
-  } = useDocumentExtraction();
+    resetExtraction
+  } = useClientPdfExtraction();
+  
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
+  const [selectedDocument, setSelectedDocument] = useState<ProcessedDocument | null>(null);
   
   // Derived state based on connection status
   const isCheckingConnection = connectionStatus === "checking";
   const isProxyAvailable = connectionStatus === "connected";
 
   // Effects to handle document selection
-  const [selectedDocument, setSelectedDocument] = useState<ProcessedDocument | null>(null);
-  
   useEffect(() => {
     if (selectedDocumentId && documents) {
       const doc = documents.find((doc) => doc.id === selectedDocumentId);
@@ -45,8 +43,11 @@ export function DocumentExtraction() {
   }, [selectedDocumentId, documents]);
 
   // Function to handle extraction button click
-  const handleExtract = () => {
-    extractTextFromDocument(selectedDocumentId);
+  const handleExtract = async () => {
+    if (selectedDocument) {
+      resetExtraction();
+      await extractTextFromDocument(selectedDocument);
+    }
   };
   
   // Function to manually check connection
@@ -70,7 +71,7 @@ export function DocumentExtraction() {
             isCheckingConnection={isCheckingConnection}
           />
           
-          {/* Connection status indicator - Always visible */}
+          {/* Connection status indicator */}
           <div className="mt-4 flex items-center space-x-2">
             <span className={`h-2 w-2 rounded-full ${
               connectionStatus === 'connected' ? 'bg-green-500' : 
@@ -98,7 +99,6 @@ export function DocumentExtraction() {
                 </Tooltip>
               </TooltipProvider>
             )}
-            {/* Always show the check connection button */}
             <Button 
               variant="outline" 
               size="sm" 
@@ -119,6 +119,14 @@ export function DocumentExtraction() {
               )}
             </Button>
           </div>
+          
+          {/* PDF.js Status Indicator */}
+          <div className="mt-2 flex items-center space-x-2">
+            <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+            <span className="text-sm text-muted-foreground">
+              PDF Processing: Client-side PDF.js (Enhanced)
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -133,7 +141,7 @@ export function DocumentExtraction() {
       {error && (
         <ExtractionError 
           error={error} 
-          onRetry={retryExtraction}
+          onRetry={handleExtract}
           documentTitle={selectedDocument?.title}
         />
       )}

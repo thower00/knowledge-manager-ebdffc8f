@@ -1,6 +1,7 @@
 
 import { ProcessedDocument } from "@/types/document";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
+import { extractTextFromPdfBuffer } from "@/components/admin/document-extraction/utils/clientPdfExtraction";
 import { cleanAndNormalizeText, validateExtractedText, formatExtractedText } from "@/components/admin/document-extraction/services/textCleaningService";
 
 export interface FileExtractionResult {
@@ -15,11 +16,11 @@ export interface FileExtractionResult {
 }
 
 /**
- * Extract content from a document file (PDF or Word) via Google Drive URL
+ * Extract content from a document file using client-side PDF.js
  */
 export async function extractFileContent(document: ProcessedDocument): Promise<FileExtractionResult> {
   try {
-    console.log(`Starting file content extraction for: ${document.title}`);
+    console.log(`Starting client-side PDF extraction for: ${document.title}`);
     
     if (!document.url) {
       throw new Error("Document URL is required for content extraction");
@@ -30,7 +31,7 @@ export async function extractFileContent(document: ProcessedDocument): Promise<F
     
     switch (fileType) {
       case 'pdf':
-        return await extractPdfContent(document);
+        return await extractPdfContentWithPdfJs(document);
       case 'word':
         return await extractWordContent(document);
       default:
@@ -74,60 +75,21 @@ function determineFileType(document: ProcessedDocument): string {
 }
 
 /**
- * Safe base64 conversion for large files
+ * Extract content from PDF document using client-side PDF.js
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
-  let result = '';
-  
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    result += String.fromCharCode.apply(null, Array.from(chunk));
-  }
-  
-  return btoa(result);
-}
-
-/**
- * Extract content from PDF document using improved PDF.js service
- */
-async function extractPdfContent(document: ProcessedDocument): Promise<FileExtractionResult> {
+async function extractPdfContentWithPdfJs(document: ProcessedDocument): Promise<FileExtractionResult> {
   try {
-    console.log(`Extracting PDF content with PDF.js from: ${document.title}`);
+    console.log(`Extracting PDF content with client-side PDF.js from: ${document.title}`);
     
-    // Use the existing proxy service to fetch the document
+    // Fetch the document via proxy service
     console.log(`Fetching PDF through proxy service: ${document.url}`);
     const arrayBuffer = await fetchDocumentViaProxy(document.url!, document.title);
     
-    // Use safe base64 conversion to avoid stack overflow
-    const base64Data = arrayBufferToBase64(arrayBuffer);
-    
-    // Call our improved PDF processing service with PDF.js
-    const response = await fetch(`https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0`
-      },
-      body: JSON.stringify({
-        pdfBase64: base64Data,
-        options: {
-          maxPages: 0, // Extract all pages
-          streamMode: false,
-          timeout: 30
-        }
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`PDF processing failed: ${response.statusText}`);
-    }
-    
-    const result = await response.json();
+    // Extract text using client-side PDF.js
+    const result = await extractTextFromPdfBuffer(arrayBuffer);
     
     if (!result.success) {
-      throw new Error(result.error || "PDF processing failed");
+      throw new Error(result.error || "PDF.js extraction failed");
     }
     
     // Validate and clean the extracted text
@@ -152,11 +114,11 @@ async function extractPdfContent(document: ProcessedDocument): Promise<FileExtra
       }
     };
   } catch (error) {
-    console.error("PDF extraction error:", error);
+    console.error("PDF.js extraction error:", error);
     return {
       success: false,
       text: "",
-      error: error instanceof Error ? error.message : "PDF extraction failed"
+      error: error instanceof Error ? error.message : "PDF.js extraction failed"
     };
   }
 }
@@ -169,7 +131,6 @@ async function extractWordContent(document: ProcessedDocument): Promise<FileExtr
     console.log(`Extracting Word content from: ${document.title}`);
     
     // For now, return a placeholder for Word document extraction
-    // This would need to be implemented with a proper Word processing service
     return {
       success: true,
       text: `Word document extraction is not yet implemented for: ${document.title}\n\nThis is where the extracted text from the Word document would appear.`,
