@@ -1,3 +1,4 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
 import { initPdfWorker } from './pdfWorkerInit';
@@ -53,7 +54,11 @@ export async function extractTextFromPdfBuffer(
         // Combine text items from the page with better spacing
         const pageText = textContent.items
           .map((item: any) => {
-            if (item.str) {
+            // Handle different types of text items
+            if (typeof item === 'string') {
+              return item;
+            }
+            if (item && typeof item === 'object' && item.str) {
               return item.str;
             }
             return '';
