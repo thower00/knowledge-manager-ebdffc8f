@@ -40,13 +40,20 @@ export async function extractTextFromPdfBuffer(
     // Extract text from each page
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
+        console.log(`Processing page ${pageNum}/${totalPages}`);
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
-        // Extract text from page
+        // Extract text items and join them
         const pageText = textContent.items
-          .filter((item: any) => item.str && item.str.trim())
-          .map((item: any) => item.str)
+          .map((item: any) => {
+            // Handle both string items and objects with str property
+            if (typeof item === 'string') {
+              return item;
+            }
+            return item.str || '';
+          })
+          .filter(text => text.trim().length > 0)
           .join(' ');
         
         if (pageText.trim()) {

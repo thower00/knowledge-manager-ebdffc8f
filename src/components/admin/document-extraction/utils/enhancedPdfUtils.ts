@@ -2,7 +2,7 @@
 import { extractTextFromPdfUrl } from './clientPdfExtraction';
 
 /**
- * Enhanced PDF text extraction using client-side PDF.js
+ * Enhanced PDF text extraction using client-side PDF.js with timeout handling
  */
 export async function extractPdfText(
   documentUrl: string,
@@ -12,7 +12,18 @@ export async function extractPdfText(
   try {
     console.log(`Starting client-side PDF extraction for: ${documentTitle}`);
     
-    const result = await extractTextFromPdfUrl(documentUrl, onProgress);
+    // Create a timeout promise that rejects after 60 seconds
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('PDF extraction timed out after 60 seconds'));
+      }, 60000);
+    });
+    
+    // Race between extraction and timeout
+    const result = await Promise.race([
+      extractTextFromPdfUrl(documentUrl, onProgress),
+      timeoutPromise
+    ]);
     
     if (!result.success) {
       throw new Error(result.error || 'PDF extraction failed');
