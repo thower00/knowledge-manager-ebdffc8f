@@ -13,63 +13,104 @@ export interface PdfExtractionResult {
 }
 
 /**
- * Extract text from PDF using client-side PDF.js with aggressive timeout handling
+ * Extract text from PDF using client-side PDF.js with comprehensive debugging
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
-  console.log('Starting PDF.js extraction with buffer size:', arrayBuffer.byteLength);
+  console.log('=== PDF.js Extraction Debug Start ===');
+  console.log('PDF.js version:', pdfjsLib.version);
+  console.log('Worker source:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+  console.log('Buffer size:', arrayBuffer.byteLength, 'bytes');
+  
+  // Validate buffer
+  if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+    console.error('Invalid or empty ArrayBuffer');
+    return {
+      success: false,
+      text: '',
+      totalPages: 0,
+      error: 'Invalid or empty PDF data'
+    };
+  }
+
+  // Check if it looks like a PDF
+  const uint8Array = new Uint8Array(arrayBuffer.slice(0, 10));
+  const header = String.fromCharCode.apply(null, Array.from(uint8Array));
+  console.log('File header:', header);
+  
+  if (!header.startsWith('%PDF-')) {
+    console.error('File does not appear to be a PDF. Header:', header);
+    return {
+      success: false,
+      text: '',
+      totalPages: 0,
+      error: 'File does not appear to be a valid PDF document'
+    };
+  }
   
   try {
     if (onProgress) onProgress(10);
     
-    // Create loading task with strict timeout
+    console.log('Creating PDF loading task...');
+    
+    // Create loading task with minimal configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       disableAutoFetch: true,
-      disableStream: true
+      disableStream: true,
+      verbosity: 0 // Reduce verbosity
     });
     
-    // Load PDF with 15 second timeout
+    console.log('Loading task created, waiting for PDF...');
+    
+    // Load PDF with shorter timeout for debugging
     const pdf = await Promise.race([
       loadingTask.promise,
       new Promise<never>((_, reject) => {
         setTimeout(() => {
-          console.error('PDF loading timeout after 15 seconds');
-          reject(new Error('PDF loading timed out after 15 seconds'));
-        }, 15000);
+          console.error('PDF loading timeout after 10 seconds');
+          loadingTask.destroy(); // Clean up the loading task
+          reject(new Error('PDF loading timed out after 10 seconds'));
+        }, 10000);
       })
     ]);
     
-    console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
+    console.log(`PDF loaded successfully! Pages: ${pdf.numPages}`);
     if (onProgress) onProgress(30);
     
     let extractedText = '';
-    const totalPages = Math.min(pdf.numPages, 50); // Limit to 50 pages max
+    const totalPages = Math.min(pdf.numPages, 10); // Limit to 10 pages for debugging
+    
+    console.log(`Processing ${totalPages} pages...`);
     
     // Process pages with individual timeouts
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
-        console.log(`Processing page ${pageNum}/${totalPages}`);
+        console.log(`Getting page ${pageNum}...`);
         
-        // Get page with 5 second timeout
+        // Get page with shorter timeout
         const page = await Promise.race([
           pdf.getPage(pageNum),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Page ${pageNum} loading timeout`)), 5000);
+            setTimeout(() => reject(new Error(`Page ${pageNum} loading timeout`)), 3000);
           })
         ]);
         
-        // Get text content with 5 second timeout
+        console.log(`Page ${pageNum} loaded, getting text content...`);
+        
+        // Get text content with shorter timeout
         const textContent = await Promise.race([
           page.getTextContent(),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Page ${pageNum} text extraction timeout`)), 5000);
+            setTimeout(() => reject(new Error(`Page ${pageNum} text extraction timeout`)), 3000);
           })
         ]);
+        
+        console.log(`Page ${pageNum} text content retrieved, items:`, textContent.items.length);
         
         // Extract text from items
         const pageText = textContent.items
@@ -77,6 +118,8 @@ export async function extractTextFromPdfBuffer(
           .map((item: any) => item.str)
           .join(' ')
           .trim();
+        
+        console.log(`Page ${pageNum} extracted ${pageText.length} characters`);
         
         if (pageText) {
           extractedText += pageText + '\n\n';
@@ -91,24 +134,31 @@ export async function extractTextFromPdfBuffer(
           onProgress(progress);
         }
         
-        console.log(`Page ${pageNum} processed, extracted ${pageText.length} characters`);
-        
-        // Break early if we have enough content
-        if (extractedText.length > 50000) {
-          console.log('Extracted enough content, stopping early');
+        // Early exit if we have some content for debugging
+        if (extractedText.length > 1000) {
+          console.log('Got enough content for debugging, stopping early');
           break;
         }
         
       } catch (pageError) {
-        console.warn(`Error on page ${pageNum}:`, pageError);
+        console.error(`Error on page ${pageNum}:`, pageError);
         // Continue with other pages
       }
     }
     
+    console.log('Cleaning up PDF...');
+    
     // Clean up PDF
-    await pdf.destroy();
+    try {
+      await pdf.destroy();
+      console.log('PDF cleanup completed');
+    } catch (cleanupError) {
+      console.warn('PDF cleanup error:', cleanupError);
+    }
     
     if (onProgress) onProgress(95);
+    
+    console.log(`Total extracted text length: ${extractedText.length}`);
     
     // Validate extracted text
     if (!extractedText.trim()) {
@@ -125,6 +175,7 @@ export async function extractTextFromPdfBuffer(
     
     if (onProgress) onProgress(100);
     
+    console.log('=== PDF.js Extraction Debug Success ===');
     console.log(`Successfully extracted ${cleanedText.length} characters from ${totalPages} pages`);
     
     return {
@@ -134,7 +185,9 @@ export async function extractTextFromPdfBuffer(
     };
     
   } catch (error) {
+    console.error('=== PDF.js Extraction Debug Error ===');
     console.error('PDF.js extraction error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     return {
       success: false,
@@ -153,24 +206,30 @@ export async function extractTextFromPdfUrl(
   onProgress?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
   try {
+    console.log('=== URL Fetch Debug Start ===');
     console.log('Fetching PDF from URL:', url);
     
     if (onProgress) onProgress(5);
     
-    // Fetch with 10 second timeout
+    // Fetch with shorter timeout for debugging
     const response = await Promise.race([
       fetch(url),
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('PDF fetch timed out')), 10000);
+        setTimeout(() => reject(new Error('PDF fetch timed out after 8 seconds')), 8000);
       })
     ]);
+    
+    console.log('Fetch response status:', response.status);
+    console.log('Fetch response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
     }
     
+    console.log('Converting to ArrayBuffer...');
     const arrayBuffer = await response.arrayBuffer();
     console.log(`PDF downloaded, size: ${arrayBuffer.byteLength} bytes`);
+    console.log('=== URL Fetch Debug Success ===');
     
     if (onProgress) onProgress(15);
     
@@ -181,7 +240,9 @@ export async function extractTextFromPdfUrl(
     });
     
   } catch (error) {
+    console.error('=== URL Fetch Debug Error ===');
     console.error('Error fetching or processing PDF:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return {
       success: false,
       text: '',
