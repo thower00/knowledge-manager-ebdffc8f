@@ -1,7 +1,9 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
-import { initPdfWorker } from './pdfWorkerInit';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -11,59 +13,40 @@ export interface PdfExtractionResult {
 }
 
 /**
- * Extract text from PDF using client-side PDF.js with enhanced error handling
+ * Extract text from PDF using client-side PDF.js - simplified and reliable approach
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
   try {
-    console.log('Starting client-side PDF.js extraction...');
+    console.log('Starting PDF.js extraction...');
     
-    // Initialize PDF worker first
-    const workerReady = await initPdfWorker();
-    if (!workerReady) {
-      throw new Error("PDF worker initialization failed");
-    }
-    
-    // Set progress to 10% after worker init
     if (onProgress) onProgress(10);
     
-    // Load the PDF document with enhanced configuration
-    const loadingTask = pdfjsLib.getDocument({
+    // Load the PDF document
+    const pdf = await pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
-      useSystemFonts: true,
-    });
+    }).promise;
     
-    const pdf = await loadingTask.promise;
     console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
-    
     if (onProgress) onProgress(20);
     
     let extractedText = '';
     const totalPages = pdf.numPages;
     
-    // Extract text from each page with better error handling
+    // Extract text from each page
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
-        // Combine text items from the page with better spacing
+        // Extract text from page
         const pageText = textContent.items
-          .map((item: any) => {
-            // Handle different types of text items
-            if (typeof item === 'string') {
-              return item;
-            }
-            if (item && typeof item === 'object' && item.str) {
-              return item.str;
-            }
-            return '';
-          })
-          .filter(str => str.trim().length > 0)
+          .filter((item: any) => item.str && item.str.trim())
+          .map((item: any) => item.str)
           .join(' ');
         
         if (pageText.trim()) {
@@ -79,14 +62,11 @@ export async function extractTextFromPdfBuffer(
         console.log(`Extracted ${pageText.length} characters from page ${pageNum}`);
       } catch (pageError) {
         console.warn(`Error extracting text from page ${pageNum}:`, pageError);
-        // Continue with other pages instead of failing entirely
-        if (extractedText.length === 0) {
-          extractedText += `[Error reading page ${pageNum}]\n\n`;
-        }
+        extractedText += `[Error reading page ${pageNum}]\n\n`;
       }
     }
     
-    // Clean up the PDF document
+    // Clean up
     await pdf.destroy();
     
     if (onProgress) onProgress(95);
@@ -95,19 +75,7 @@ export async function extractTextFromPdfBuffer(
     const cleanedText = cleanAndNormalizeText(extractedText);
     const validation = validateExtractedText(cleanedText);
     
-    if (!validation.isValid) {
-      console.warn('Text validation failed:', validation.message);
-      // Return partial text instead of failing completely
-      if (cleanedText.length > 0) {
-        console.log('Returning partial text despite validation failure');
-        return {
-          success: true,
-          text: cleanedText,
-          totalPages,
-          error: `Warning: ${validation.message}`
-        };
-      }
-      
+    if (!validation.isValid && cleanedText.length === 0) {
       return {
         success: false,
         text: '',
@@ -129,15 +97,10 @@ export async function extractTextFromPdfBuffer(
   } catch (error) {
     console.error('PDF.js extraction error:', error);
     
-    // Provide more specific error messages
     let errorMessage = 'Failed to extract text from PDF';
     if (error instanceof Error) {
-      if (error.message.includes('worker')) {
-        errorMessage = 'PDF worker initialization failed. Please try refreshing the page.';
-      } else if (error.message.includes('Invalid PDF')) {
+      if (error.message.includes('Invalid PDF')) {
         errorMessage = 'The file does not appear to be a valid PDF document.';
-      } else if (error.message.includes('fetch')) {
-        errorMessage = 'Network error while processing PDF. Please check your connection.';
       } else {
         errorMessage = error.message;
       }
@@ -153,7 +116,7 @@ export async function extractTextFromPdfBuffer(
 }
 
 /**
- * Extract text from PDF URL using client-side PDF.js
+ * Extract text from PDF URL - fetch and process client-side
  */
 export async function extractTextFromPdfUrl(
   url: string,
@@ -162,15 +125,9 @@ export async function extractTextFromPdfUrl(
   try {
     console.log('Fetching PDF from URL:', url);
     
-    // Initialize PDF worker first
-    const workerReady = await initPdfWorker();
-    if (!workerReady) {
-      throw new Error("PDF worker initialization failed");
-    }
-    
     if (onProgress) onProgress(5);
     
-    // Fetch the PDF as array buffer
+    // Fetch the PDF
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch PDF: ${response.statusText}`);
@@ -183,7 +140,6 @@ export async function extractTextFromPdfUrl(
     
     // Extract text using PDF.js
     return await extractTextFromPdfBuffer(arrayBuffer, (pdfProgress) => {
-      // Map PDF extraction progress to our 15-100% range
       const mappedProgress = 15 + Math.floor((pdfProgress / 100) * 85);
       if (onProgress) onProgress(mappedProgress);
     });
