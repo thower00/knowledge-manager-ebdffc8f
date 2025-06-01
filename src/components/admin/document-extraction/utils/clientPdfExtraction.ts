@@ -2,7 +2,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
 
-// Set up PDF.js worker with fallback
+// Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 export interface PdfExtractionResult {
@@ -13,20 +13,15 @@ export interface PdfExtractionResult {
 }
 
 /**
- * Extract text from PDF using client-side PDF.js with comprehensive debugging
+ * Extract text from PDF using client-side PDF.js - simplified approach
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
-  console.log('=== PDF.js Extraction Debug Start ===');
-  console.log('PDF.js version:', pdfjsLib.version);
-  console.log('Worker source:', pdfjsLib.GlobalWorkerOptions.workerSrc);
-  console.log('Buffer size:', arrayBuffer.byteLength, 'bytes');
+  console.log('Starting PDF extraction with buffer size:', arrayBuffer.byteLength);
   
-  // Validate buffer
   if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-    console.error('Invalid or empty ArrayBuffer');
     return {
       success: false,
       text: '',
@@ -35,91 +30,40 @@ export async function extractTextFromPdfBuffer(
     };
   }
 
-  // Check if it looks like a PDF
-  const uint8Array = new Uint8Array(arrayBuffer.slice(0, 10));
-  const header = String.fromCharCode.apply(null, Array.from(uint8Array));
-  console.log('File header:', header);
-  
-  if (!header.startsWith('%PDF-')) {
-    console.error('File does not appear to be a PDF. Header:', header);
-    return {
-      success: false,
-      text: '',
-      totalPages: 0,
-      error: 'File does not appear to be a valid PDF document'
-    };
-  }
-  
   try {
     if (onProgress) onProgress(10);
     
-    console.log('Creating PDF loading task...');
-    
-    // Create loading task with minimal configuration
+    // Create loading task with minimal, reliable configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
-      disableAutoFetch: true,
-      disableStream: true,
-      verbosity: 0 // Reduce verbosity
+      disableAutoFetch: false,
+      disableStream: false
     });
     
-    console.log('Loading task created, waiting for PDF...');
-    
-    // Load PDF with shorter timeout for debugging
-    const pdf = await Promise.race([
-      loadingTask.promise,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          console.error('PDF loading timeout after 10 seconds');
-          loadingTask.destroy(); // Clean up the loading task
-          reject(new Error('PDF loading timed out after 10 seconds'));
-        }, 10000);
-      })
-    ]);
-    
+    console.log('Loading PDF document...');
+    const pdf = await loadingTask.promise;
     console.log(`PDF loaded successfully! Pages: ${pdf.numPages}`);
+    
     if (onProgress) onProgress(30);
     
     let extractedText = '';
-    const totalPages = Math.min(pdf.numPages, 10); // Limit to 10 pages for debugging
+    const totalPages = pdf.numPages;
     
-    console.log(`Processing ${totalPages} pages...`);
-    
-    // Process pages with individual timeouts
+    // Process all pages
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
-        console.log(`Getting page ${pageNum}...`);
+        console.log(`Processing page ${pageNum}...`);
         
-        // Get page with shorter timeout
-        const page = await Promise.race([
-          pdf.getPage(pageNum),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Page ${pageNum} loading timeout`)), 3000);
-          })
-        ]);
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
         
-        console.log(`Page ${pageNum} loaded, getting text content...`);
-        
-        // Get text content with shorter timeout
-        const textContent = await Promise.race([
-          page.getTextContent(),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Page ${pageNum} text extraction timeout`)), 3000);
-          })
-        ]);
-        
-        console.log(`Page ${pageNum} text content retrieved, items:`, textContent.items.length);
-        
-        // Extract text from items
         const pageText = textContent.items
           .filter((item: any) => item && typeof item.str === 'string')
           .map((item: any) => item.str)
           .join(' ')
           .trim();
-        
-        console.log(`Page ${pageNum} extracted ${pageText.length} characters`);
         
         if (pageText) {
           extractedText += pageText + '\n\n';
@@ -134,31 +78,16 @@ export async function extractTextFromPdfBuffer(
           onProgress(progress);
         }
         
-        // Early exit if we have some content for debugging
-        if (extractedText.length > 1000) {
-          console.log('Got enough content for debugging, stopping early');
-          break;
-        }
-        
       } catch (pageError) {
         console.error(`Error on page ${pageNum}:`, pageError);
         // Continue with other pages
       }
     }
     
-    console.log('Cleaning up PDF...');
-    
     // Clean up PDF
-    try {
-      await pdf.destroy();
-      console.log('PDF cleanup completed');
-    } catch (cleanupError) {
-      console.warn('PDF cleanup error:', cleanupError);
-    }
+    await pdf.destroy();
     
     if (onProgress) onProgress(95);
-    
-    console.log(`Total extracted text length: ${extractedText.length}`);
     
     // Validate extracted text
     if (!extractedText.trim()) {
@@ -175,7 +104,6 @@ export async function extractTextFromPdfBuffer(
     
     if (onProgress) onProgress(100);
     
-    console.log('=== PDF.js Extraction Debug Success ===');
     console.log(`Successfully extracted ${cleanedText.length} characters from ${totalPages} pages`);
     
     return {
@@ -185,9 +113,7 @@ export async function extractTextFromPdfBuffer(
     };
     
   } catch (error) {
-    console.error('=== PDF.js Extraction Debug Error ===');
     console.error('PDF.js extraction error:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     return {
       success: false,
@@ -199,37 +125,25 @@ export async function extractTextFromPdfBuffer(
 }
 
 /**
- * Extract text from PDF URL - fetch and process with timeout
+ * Extract text from PDF URL - fetch and process
  */
 export async function extractTextFromPdfUrl(
   url: string,
   onProgress?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
   try {
-    console.log('=== URL Fetch Debug Start ===');
     console.log('Fetching PDF from URL:', url);
     
     if (onProgress) onProgress(5);
     
-    // Fetch with shorter timeout for debugging
-    const response = await Promise.race([
-      fetch(url),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('PDF fetch timed out after 8 seconds')), 8000);
-      })
-    ]);
-    
-    console.log('Fetch response status:', response.status);
-    console.log('Fetch response headers:', Object.fromEntries(response.headers.entries()));
+    const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
     }
     
-    console.log('Converting to ArrayBuffer...');
     const arrayBuffer = await response.arrayBuffer();
     console.log(`PDF downloaded, size: ${arrayBuffer.byteLength} bytes`);
-    console.log('=== URL Fetch Debug Success ===');
     
     if (onProgress) onProgress(15);
     
@@ -240,9 +154,7 @@ export async function extractTextFromPdfUrl(
     });
     
   } catch (error) {
-    console.error('=== URL Fetch Debug Error ===');
     console.error('Error fetching or processing PDF:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return {
       success: false,
       text: '',
