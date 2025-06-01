@@ -2,8 +2,13 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+// Set up PDF.js worker with better fallback
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+} catch (error) {
+  console.warn('Local worker failed, using CDN:', error);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -13,7 +18,7 @@ export interface PdfExtractionResult {
 }
 
 /**
- * Extract text from PDF using client-side PDF.js - simplified approach
+ * Extract text from PDF using client-side PDF.js - robust approach
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
@@ -30,35 +35,64 @@ export async function extractTextFromPdfBuffer(
     };
   }
 
+  // Validate that this looks like PDF data
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const header = String.fromCharCode(...uint8Array.slice(0, 4));
+  if (header !== '%PDF') {
+    console.error('Invalid PDF header:', header);
+    return {
+      success: false,
+      text: '',
+      totalPages: 0,
+      error: 'File does not appear to be a valid PDF'
+    };
+  }
+
   try {
     if (onProgress) onProgress(10);
     
-    // Create loading task with minimal, reliable configuration
+    console.log('Creating PDF loading task...');
+    
+    // Use very simple configuration to avoid worker issues
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
+      // Disable worker entirely to avoid initialization issues
       useWorkerFetch: false,
       isEvalSupported: false,
-      disableAutoFetch: false,
-      disableStream: false
+      // Force synchronous loading
+      disableAutoFetch: true,
+      disableStream: true,
+      // Increase verbosity for debugging
+      verbosity: 1
     });
     
-    console.log('Loading PDF document...');
-    const pdf = await loadingTask.promise;
-    console.log(`PDF loaded successfully! Pages: ${pdf.numPages}`);
+    console.log('Loading task created, waiting for PDF...');
+    
+    // Add a race condition with manual timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('PDF loading timeout')), 8000);
+    });
+    
+    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
+    console.log(`PDF loaded! Pages: ${pdf.numPages}`);
     
     if (onProgress) onProgress(30);
     
     let extractedText = '';
-    const totalPages = pdf.numPages;
+    const totalPages = Math.min(pdf.numPages, 20); // Limit to 20 pages max
     
-    // Process all pages
+    // Process pages sequentially to avoid memory issues
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
-        console.log(`Processing page ${pageNum}...`);
+        console.log(`Loading page ${pageNum}...`);
         
         const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
+        console.log(`Page ${pageNum} loaded, extracting text...`);
         
+        const textContent = await page.getTextContent();
+        console.log(`Page ${pageNum} text content items:`, textContent.items.length);
+        
+        // Extract text from page
         const pageText = textContent.items
           .filter((item: any) => item && typeof item.str === 'string')
           .map((item: any) => item.str)
@@ -67,9 +101,10 @@ export async function extractTextFromPdfBuffer(
         
         if (pageText) {
           extractedText += pageText + '\n\n';
+          console.log(`Page ${pageNum} extracted ${pageText.length} characters`);
         }
         
-        // Clean up page
+        // Clean up page resources
         page.cleanup();
         
         // Update progress
@@ -84,7 +119,7 @@ export async function extractTextFromPdfBuffer(
       }
     }
     
-    // Clean up PDF
+    // Clean up PDF resources
     await pdf.destroy();
     
     if (onProgress) onProgress(95);

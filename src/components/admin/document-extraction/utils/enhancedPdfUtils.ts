@@ -2,7 +2,7 @@
 import { extractTextFromPdfUrl } from './clientPdfExtraction';
 
 /**
- * Enhanced PDF text extraction - simplified and focused on working
+ * Enhanced PDF text extraction - focused on reliability
  */
 export async function extractPdfText(
   documentUrl: string,
