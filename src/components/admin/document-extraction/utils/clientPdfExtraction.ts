@@ -1,8 +1,7 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText } from '../services/textCleaningService';
-
-// Set up PDF.js worker with correct version to match library
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+import { initPdfWorker } from './pdfWorkerInit';
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -30,6 +29,12 @@ export async function extractTextFromPdfBuffer(
   }
 
   try {
+    // Initialize the PDF worker before processing
+    const workerInitialized = await initPdfWorker();
+    if (!workerInitialized) {
+      throw new Error('Failed to initialize PDF worker');
+    }
+
     if (onProgress) onProgress(10);
     
     console.log('Creating PDF document...');
