@@ -1,9 +1,8 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { cleanAndNormalizeText } from '../services/textCleaningService';
 
-// Set up PDF.js worker with simple fallback
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Set up PDF.js worker with correct version to match library
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
 
 export interface PdfExtractionResult {
   success: boolean;
