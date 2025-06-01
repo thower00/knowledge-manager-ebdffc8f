@@ -1,14 +1,9 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { cleanAndNormalizeText, validateExtractedText } from '../services/textCleaningService';
+import { cleanAndNormalizeText } from '../services/textCleaningService';
 
-// Set up PDF.js worker with better fallback
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-} catch (error) {
-  console.warn('Local worker failed, using CDN:', error);
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
+// Set up PDF.js worker with simple fallback
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -18,7 +13,7 @@ export interface PdfExtractionResult {
 }
 
 /**
- * Extract text from PDF using client-side PDF.js - robust approach
+ * Extract text from PDF using client-side PDF.js - simplified approach
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
@@ -35,62 +30,30 @@ export async function extractTextFromPdfBuffer(
     };
   }
 
-  // Validate that this looks like PDF data
-  const uint8Array = new Uint8Array(arrayBuffer);
-  const header = String.fromCharCode(...uint8Array.slice(0, 4));
-  if (header !== '%PDF') {
-    console.error('Invalid PDF header:', header);
-    return {
-      success: false,
-      text: '',
-      totalPages: 0,
-      error: 'File does not appear to be a valid PDF'
-    };
-  }
-
   try {
     if (onProgress) onProgress(10);
     
-    console.log('Creating PDF loading task...');
+    console.log('Creating PDF document...');
     
-    // Use very simple configuration to avoid worker issues
-    const loadingTask = pdfjsLib.getDocument({
-      data: arrayBuffer,
-      // Disable worker entirely to avoid initialization issues
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      // Force synchronous loading
-      disableAutoFetch: true,
-      disableStream: true,
-      // Increase verbosity for debugging
-      verbosity: 1
-    });
+    // Use the simplest possible PDF.js configuration
+    const pdf = await pdfjsLib.getDocument({
+      data: arrayBuffer
+    }).promise;
     
-    console.log('Loading task created, waiting for PDF...');
-    
-    // Add a race condition with manual timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('PDF loading timeout')), 8000);
-    });
-    
-    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as pdfjsLib.PDFDocumentProxy;
     console.log(`PDF loaded! Pages: ${pdf.numPages}`);
     
     if (onProgress) onProgress(30);
     
     let extractedText = '';
-    const totalPages = Math.min(pdf.numPages, 20); // Limit to 20 pages max
+    const totalPages = Math.min(pdf.numPages, 10); // Limit to 10 pages for speed
     
-    // Process pages sequentially to avoid memory issues
+    // Process pages one by one
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
-        console.log(`Loading page ${pageNum}...`);
+        console.log(`Processing page ${pageNum}...`);
         
         const page = await pdf.getPage(pageNum);
-        console.log(`Page ${pageNum} loaded, extracting text...`);
-        
         const textContent = await page.getTextContent();
-        console.log(`Page ${pageNum} text content items:`, textContent.items.length);
         
         // Extract text from page
         const pageText = textContent.items
@@ -104,9 +67,6 @@ export async function extractTextFromPdfBuffer(
           console.log(`Page ${pageNum} extracted ${pageText.length} characters`);
         }
         
-        // Clean up page resources
-        page.cleanup();
-        
         // Update progress
         if (onProgress) {
           const progress = 30 + Math.round((pageNum / totalPages) * 60);
@@ -118,9 +78,6 @@ export async function extractTextFromPdfBuffer(
         // Continue with other pages
       }
     }
-    
-    // Clean up PDF resources
-    await pdf.destroy();
     
     if (onProgress) onProgress(95);
     
