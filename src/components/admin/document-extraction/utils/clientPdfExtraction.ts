@@ -69,11 +69,11 @@ export async function extractTextFromPdfBuffer(
     console.log('Loading task created, waiting for PDF...');
     
     // Add a race condition with manual timeout
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('PDF loading timeout')), 8000);
     });
     
-    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
+    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as pdfjsLib.PDFDocumentProxy;
     console.log(`PDF loaded! Pages: ${pdf.numPages}`);
     
     if (onProgress) onProgress(30);
