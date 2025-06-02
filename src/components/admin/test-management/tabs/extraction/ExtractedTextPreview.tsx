@@ -1,60 +1,127 @@
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Eye, EyeOff, Copy, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ExtractedTextPreviewProps {
   extractionText: string;
   showExtractedText: boolean;
   setShowExtractedText: (show: boolean) => void;
+  sourceInfo?: string;
 }
 
-export const ExtractedTextPreview = ({
-  extractionText,
-  showExtractedText,
+export function ExtractedTextPreview({ 
+  extractionText, 
+  showExtractedText, 
   setShowExtractedText,
-}: ExtractedTextPreviewProps) => {
-  // Ensure there's actual content to display
-  const hasContent = extractionText && extractionText.trim().length > 0;
-  
-  // Debug the content we're receiving
-  console.log("ExtractedTextPreview received text:", {
-    length: extractionText?.length || 0,
-    sample: extractionText?.substring(0, 100),
-    hasContent
-  });
-  
-  if (!hasContent) return null;
-  
+  sourceInfo 
+}: ExtractedTextPreviewProps) {
+  const { toast } = useToast();
+
+  const handleCopyText = async () => {
+    try {
+      await navigator.clipboard.writeText(extractionText);
+      toast({
+        title: "Copied to clipboard",
+        description: "Extracted text has been copied to your clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy text to clipboard",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownloadText = () => {
+    const blob = new Blob([extractionText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extracted-text-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Download started",
+      description: "Extracted text file is being downloaded",
+    });
+  };
+
+  if (!extractionText) return null;
+
   return (
-    <div className="mt-4 p-4 border rounded-md bg-gray-50">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-md font-medium">Extracted Text Preview</h3>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => setShowExtractedText(!showExtractedText)}
-          className="h-8 px-2"
-        >
-          {showExtractedText ? (
-            <>
-              <X className="h-4 w-4 mr-1" /> Hide
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4 mr-1" /> Show
-            </>
-          )}
-        </Button>
-      </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              Extracted Text Results
+              {sourceInfo && (
+                <Badge variant="outline" className="text-xs">
+                  {sourceInfo}
+                </Badge>
+              )}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {extractionText.length.toLocaleString()} characters extracted
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyText}
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadText}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExtractedText(!showExtractedText)}
+            >
+              {showExtractedText ? (
+                <>
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  Hide
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4 mr-1" />
+                  Show
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
       
       {showExtractedText && (
-        <ScrollArea className="h-96">
-          <pre className="whitespace-pre-wrap font-mono text-sm p-3 border rounded bg-white">
-            {extractionText}
-          </pre>
-        </ScrollArea>
+        <CardContent>
+          <div className="bg-muted p-4 rounded-md max-h-96 overflow-auto">
+            <pre className="whitespace-pre-wrap font-mono text-sm">
+              {extractionText}
+            </pre>
+          </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
-};
+}
