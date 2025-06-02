@@ -78,6 +78,14 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     }
   }, [handleFileSelect]);
 
+  // Handle click on upload area
+  const handleUploadAreaClick = useCallback(() => {
+    const fileInput = document.getElementById('pdf-file-input') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  }, []);
+
   // Extract text from selected PDF
   const handleExtractText = useCallback(async () => {
     if (!selectedFile) return;
@@ -149,7 +157,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
         <CardContent className="space-y-4">
           {/* File Upload Area */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
               isDragOver 
                 ? 'border-primary bg-primary/5' 
                 : 'border-muted-foreground/25 hover:border-muted-foreground/50'
@@ -157,6 +165,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={handleUploadAreaClick}
           >
             {selectedFile ? (
               <div className="flex items-center justify-center gap-2 text-green-600">
@@ -176,11 +185,13 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
               </div>
             )}
             
+            {/* Hidden file input */}
             <input
+              id="pdf-file-input"
               type="file"
               accept=".pdf"
               onChange={handleFileInputChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              className="hidden"
             />
           </div>
 
