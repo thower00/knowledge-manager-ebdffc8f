@@ -28,26 +28,63 @@ export async function extractTextFromPdfSimple(
   try {
     if (onProgress) onProgress(10);
     
-    // Try to set up worker properly, fall back to no worker if needed
+    // Try multiple worker approaches in order of preference
+    let workerConfigured = false;
+    
+    // Approach 1: Try local worker file first
     try {
-      // Try using a CDN worker first
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      console.log(`Attempting to use CDN worker for PDF.js version ${pdfjsLib.version}`);
-    } catch (workerError) {
-      console.warn('CDN worker setup failed, disabling worker:', workerError);
-      // Disable worker entirely if CDN fails
-      pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      console.log('Attempting to use local worker file');
+      workerConfigured = true;
+    } catch (localError) {
+      console.warn('Local worker failed:', localError);
+    }
+    
+    // Approach 2: Try jsDelivr CDN if local failed
+    if (!workerConfigured) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+        console.log('Attempting to use jsDelivr CDN worker');
+        workerConfigured = true;
+      } catch (jsDelivrError) {
+        console.warn('jsDelivr CDN worker failed:', jsDelivrError);
+      }
+    }
+    
+    // Approach 3: Try unpkg CDN if jsDelivr failed
+    if (!workerConfigured) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+        console.log('Attempting to use unpkg CDN worker');
+        workerConfigured = true;
+      } catch (unpkgError) {
+        console.warn('unpkg CDN worker failed:', unpkgError);
+      }
+    }
+    
+    // Approach 4: Disable worker entirely and use main thread
+    if (!workerConfigured) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
+        console.log('All worker sources failed, disabling worker (will use main thread)');
+        workerConfigured = true;
+      } catch (mainThreadError) {
+        console.error('Failed to disable worker:', mainThreadError);
+        throw new Error('Could not configure PDF.js worker');
+      }
     }
     
     console.log('Loading PDF document...');
     
-    // Create PDF document with options that work without worker if needed
+    // Create PDF document with robust configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0 // Reduce console noise
+      verbosity: 0, // Reduce console noise
+      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/cmaps/',
+      cMapPacked: true
     });
     
     const pdf = await loadingTask.promise;
@@ -121,17 +158,6 @@ export async function extractTextFromPdfSimple(
     
   } catch (error) {
     console.error('Simple PDF extraction error:', error);
-    
-    // If worker error, try one more time with worker disabled
-    if (error instanceof Error && error.message.includes('worker')) {
-      console.log('Worker error detected, trying without worker...');
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
-        return await extractTextFromPdfSimple(arrayBuffer, onProgress);
-      } catch (fallbackError) {
-        console.error('Fallback extraction also failed:', fallbackError);
-      }
-    }
     
     return {
       success: false,
