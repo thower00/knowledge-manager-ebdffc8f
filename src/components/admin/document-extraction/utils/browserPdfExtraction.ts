@@ -1,3 +1,4 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 export interface BrowserPdfResult {
@@ -28,8 +29,8 @@ export async function extractTextFromPdfBrowser(
   try {
     if (onProgress) onProgress(10);
     
-    // Simple worker setup - just disable it to avoid all the complexity
-    pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
+    // Properly disable worker to avoid complexity - PDF.js will use main thread
+    // Don't set to undefined, just don't set workerSrc at all or set to empty string
     console.log('Using main thread for PDF processing (no worker)');
     
     if (onProgress) onProgress(20);
@@ -39,7 +40,9 @@ export async function extractTextFromPdfBrowser(
     // Minimal PDF.js configuration - keep it simple like PyPDF2
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
-      verbosity: 0 // Reduce console noise
+      verbosity: 0, // Reduce console noise
+      useWorkerFetch: false,
+      isEvalSupported: false
     });
     
     const pdf = await loadingTask.promise;
