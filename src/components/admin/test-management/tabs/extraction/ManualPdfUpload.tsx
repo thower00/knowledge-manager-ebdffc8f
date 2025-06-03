@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { extractTextFromPdfSimple } from "@/components/admin/document-extraction/utils/simplePdfExtraction";
+import { extractTextFromPdfBrowser } from "@/components/admin/document-extraction/utils/browserPdfExtraction";
 
 interface ManualPdfUploadProps {
   onExtract?: (extractedText: string, fileName: string) => void;
@@ -78,15 +78,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     }
   }, [handleFileSelect]);
 
-  // Handle click on upload area
-  const handleUploadAreaClick = useCallback(() => {
-    const fileInput = document.getElementById('pdf-file-input') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
-    }
-  }, []);
-
-  // Extract text from selected PDF
+  // Extract text from selected PDF using the simple browser approach
   const handleExtractText = useCallback(async () => {
     if (!selectedFile) return;
 
@@ -99,8 +91,8 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using our simplified PDF extraction
-      const result = await extractTextFromPdfSimple(arrayBuffer, (progress) => {
+      // Extract text using our simplified browser-based extraction
+      const result = await extractTextFromPdfBrowser(arrayBuffer, (progress) => {
         setExtractionProgress(progress);
       });
 
@@ -118,7 +110,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
 
       toast({
         title: "Extraction completed",
-        description: `Successfully extracted text from "${selectedFile.name}"`,
+        description: `Successfully extracted text from "${selectedFile.name}" (${result.pages} pages)`,
       });
 
     } catch (error) {
@@ -165,7 +157,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={handleUploadAreaClick}
+            onClick={() => document.getElementById('pdf-file-input')?.click()}
           >
             {selectedFile ? (
               <div className="flex items-center justify-center gap-2 text-green-600">
@@ -191,7 +183,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
               type="file"
               accept=".pdf"
               onChange={handleFileInputChange}
-              className="hidden"
+              style={{ display: 'none' }}
             />
           </div>
 
