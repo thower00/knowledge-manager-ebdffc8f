@@ -11,8 +11,7 @@ export interface BrowserPdfResult {
 }
 
 /**
- * Simple browser-based PDF text extraction inspired by PyPDF2 approach
- * This mirrors the straightforward pattern: read PDF -> extract text page by page -> concatenate
+ * Simple browser-based PDF text extraction with reliable worker configuration
  */
 export async function extractTextFromPdfBrowser(
   arrayBuffer: ArrayBuffer,
@@ -31,39 +30,23 @@ export async function extractTextFromPdfBrowser(
   try {
     if (onProgress) onProgress(10);
     
-    // Try multiple approaches to configure PDF.js worker
-    let workerConfigured = false;
-    
-    // Approach 1: Try using the local worker file from public directory
-    try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      console.log('Attempting to use local worker file');
-      workerConfigured = true;
-    } catch (localError) {
-      console.warn('Local worker failed:', localError);
-    }
-    
-    // Approach 2: Try CDN fallback
-    if (!workerConfigured) {
+    // Simple, reliable worker configuration
+    // Try local worker first, then CDN, then disable worker
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
-        console.log('Attempting to use CDN worker');
-        workerConfigured = true;
-      } catch (cdnError) {
-        console.warn('CDN worker failed:', cdnError);
-      }
-    }
-    
-    // Approach 3: Final fallback - disable worker entirely
-    if (!workerConfigured) {
-      try {
-        // Set workerSrc to a data URL that returns an empty response
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'data:application/javascript;base64,';
-        console.log('Using data URL fallback to disable worker');
-        workerConfigured = true;
-      } catch (dataUrlError) {
-        console.warn('Data URL worker failed:', dataUrlError);
-        throw new Error('Could not configure PDF.js worker');
+        // Try local worker file
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+        console.log('Using local PDF worker');
+      } catch {
+        try {
+          // Fallback to CDN
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+          console.log('Using CDN PDF worker');
+        } catch {
+          // Final fallback: disable worker completely
+          pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+          console.log('PDF worker disabled, using main thread');
+        }
       }
     }
     
@@ -71,15 +54,22 @@ export async function extractTextFromPdfBrowser(
     
     console.log('Loading PDF document...');
     
-    // Minimal PDF.js configuration - keep it simple like PyPDF2
+    // Load PDF with simple configuration and timeout
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
-      verbosity: 0, // Reduce console noise
+      verbosity: 0,
       useWorkerFetch: false,
       isEvalSupported: false
     });
     
-    const pdf = await loadingTask.promise;
+    // Add a timeout to prevent infinite hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('PDF loading timed out after 30 seconds'));
+      }, 30000);
+    });
+    
+    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
     console.log(`📄 PDF loaded! Pages: ${pdf.numPages}`);
     
     if (onProgress) onProgress(30);
@@ -87,13 +77,28 @@ export async function extractTextFromPdfBrowser(
     let allText = '';
     const totalPages = pdf.numPages;
     
-    // Extract text page by page (like your PyPDF2 approach)
+    // Extract text page by page with timeout for each page
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
         console.log(`📑 Processing page ${pageNum}...`);
         
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
+        const pagePromise = pdf.getPage(pageNum);
+        const pageTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Page ${pageNum} loading timed out`));
+          }, 10000);
+        });
+        
+        const page = await Promise.race([pagePromise, pageTimeoutPromise]);
+        
+        const textContentPromise = page.getTextContent();
+        const textTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Page ${pageNum} text extraction timed out`));
+          }, 10000);
+        });
+        
+        const textContent = await Promise.race([textContentPromise, textTimeoutPromise]);
         
         // Extract text from this page
         const pageText = textContent.items
@@ -104,7 +109,7 @@ export async function extractTextFromPdfBrowser(
         
         if (pageText) {
           console.log(`📑 Page ${pageNum} contains ${pageText.length} characters`);
-          allText += pageText + '\n'; // Add newline between pages
+          allText += pageText + '\n';
         }
         
         // Update progress
@@ -115,15 +120,15 @@ export async function extractTextFromPdfBrowser(
         
       } catch (pageError) {
         console.warn(`Error on page ${pageNum}:`, pageError);
-        // Continue with other pages (graceful degradation)
+        // Continue with other pages
       }
     }
     
     if (onProgress) onProgress(90);
     
-    // Clean up the text (basic normalization)
+    // Clean up the text
     allText = allText
-      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/\s+/g, ' ')
       .trim();
     
     if (!allText) {
