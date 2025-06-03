@@ -1,4 +1,5 @@
 
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 export interface BrowserPdfResult {
@@ -29,8 +30,8 @@ export async function extractTextFromPdfBrowser(
   try {
     if (onProgress) onProgress(10);
     
-    // Properly disable worker to avoid complexity - PDF.js will use main thread
-    // Don't set to undefined, just don't set workerSrc at all or set to empty string
+    // Properly disable worker by setting empty string - PDF.js will use main thread
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     console.log('Using main thread for PDF processing (no worker)');
     
     if (onProgress) onProgress(20);
