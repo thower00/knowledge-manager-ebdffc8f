@@ -1,5 +1,6 @@
 
 
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 export interface BrowserPdfResult {
@@ -30,9 +31,41 @@ export async function extractTextFromPdfBrowser(
   try {
     if (onProgress) onProgress(10);
     
-    // Properly disable worker by setting empty string - PDF.js will use main thread
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    console.log('Using main thread for PDF processing (no worker)');
+    // Try multiple approaches to configure PDF.js worker
+    let workerConfigured = false;
+    
+    // Approach 1: Try using the local worker file from public directory
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      console.log('Attempting to use local worker file');
+      workerConfigured = true;
+    } catch (localError) {
+      console.warn('Local worker failed:', localError);
+    }
+    
+    // Approach 2: Try CDN fallback
+    if (!workerConfigured) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+        console.log('Attempting to use CDN worker');
+        workerConfigured = true;
+      } catch (cdnError) {
+        console.warn('CDN worker failed:', cdnError);
+      }
+    }
+    
+    // Approach 3: Final fallback - disable worker entirely
+    if (!workerConfigured) {
+      try {
+        // Set workerSrc to a data URL that returns an empty response
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'data:application/javascript;base64,';
+        console.log('Using data URL fallback to disable worker');
+        workerConfigured = true;
+      } catch (dataUrlError) {
+        console.warn('Data URL worker failed:', dataUrlError);
+        throw new Error('Could not configure PDF.js worker');
+      }
+    }
     
     if (onProgress) onProgress(20);
     
