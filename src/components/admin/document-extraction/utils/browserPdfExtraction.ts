@@ -30,10 +30,9 @@ export async function extractTextFromPdfBrowser(
     // Set progress to starting
     if (onProgress) onProgress(5);
     
-    // Configure PDF.js worker - use a simpler approach
+    // Configure PDF.js worker with proper settings
     console.log('⚙️ Configuring PDF.js worker...');
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      // Try to use the worker from public folder, fallback to CDN if needed
       pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
       console.log('📝 PDF worker set to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
     }
@@ -42,13 +41,15 @@ export async function extractTextFromPdfBrowser(
     
     console.log('📄 Loading PDF document...');
     
-    // Load the PDF with minimal configuration
+    // FIXED: Use minimal configuration that won't cause hanging
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
-      useSystemFonts: true,
-      standardFontDataUrl: undefined, // Don't load extra fonts
-      cMapUrl: undefined, // Don't load extra character maps
-      verbosity: 0 // Minimal logging
+      // Don't set these to undefined - either omit them or set proper values
+      verbosity: 0,
+      // Disable problematic features that can cause hanging
+      disableFontFace: true,
+      disableRange: true,
+      disableStream: true
     });
     
     console.log('⏳ Waiting for PDF to load...');
@@ -58,11 +59,11 @@ export async function extractTextFromPdfBrowser(
     if (onProgress) onProgress(30);
     
     let allText = '';
-    const totalPages = Math.min(pdf.numPages, 100); // Limit to 100 pages max
+    const totalPages = Math.min(pdf.numPages, 10); // Start with just 10 pages for testing
     
     console.log(`📖 Processing ${totalPages} pages...`);
     
-    // Process each page sequentially
+    // Process pages one by one
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       console.log(`📑 Processing page ${pageNum}/${totalPages}...`);
       
@@ -71,20 +72,16 @@ export async function extractTextFromPdfBrowser(
         console.log(`📄 Got page ${pageNum}, extracting text...`);
         
         const textContent = await page.getTextContent();
-        console.log(`📝 Got text content for page ${pageNum}, items:`, textContent.items.length);
+        console.log(`📝 Text content items for page ${pageNum}:`, textContent.items.length);
         
-        // Extract text from this page
+        // Extract text more carefully
         const pageText = textContent.items
-          .map((item: any) => {
-            if (item && typeof item.str === 'string' && item.str.trim()) {
-              return item.str;
-            }
-            return '';
-          })
+          .filter((item: any) => item && item.str && typeof item.str === 'string')
+          .map((item: any) => item.str.trim())
           .filter(text => text.length > 0)
           .join(' ');
         
-        if (pageText.trim()) {
+        if (pageText) {
           allText += pageText + '\n\n';
           console.log(`✅ Page ${pageNum}: extracted ${pageText.length} characters`);
         } else {
@@ -99,13 +96,13 @@ export async function extractTextFromPdfBrowser(
         
       } catch (pageError) {
         console.error(`❌ Error processing page ${pageNum}:`, pageError);
-        // Continue with other pages
+        // Continue with other pages instead of failing completely
       }
     }
     
     if (onProgress) onProgress(95);
     
-    // Clean up the extracted text
+    // Clean up text
     allText = allText.trim();
     
     console.log(`📊 Extraction complete: ${allText.length} characters from ${totalPages} pages`);
@@ -136,11 +133,7 @@ export async function extractTextFromPdfBrowser(
     let errorMessage = 'PDF extraction failed';
     if (error instanceof Error) {
       errorMessage = error.message;
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('Error details:', error.name, error.message);
     }
     
     return {
