@@ -15,9 +15,10 @@ export async function extractTextFromPdfBrowser(
   arrayBuffer: ArrayBuffer,
   onProgress?: (progress: number) => void
 ): Promise<BrowserPdfResult> {
-  console.log('Starting browser PDF extraction, buffer size:', arrayBuffer.byteLength);
+  console.log('🔍 Starting PDF extraction, buffer size:', arrayBuffer.byteLength);
   
   if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+    console.error('❌ Invalid or empty PDF data');
     return {
       success: false,
       text: '',
@@ -26,68 +27,91 @@ export async function extractTextFromPdfBrowser(
   }
 
   try {
+    // Set progress to starting
+    if (onProgress) onProgress(5);
+    
+    // Configure PDF.js worker - use a simpler approach
+    console.log('⚙️ Configuring PDF.js worker...');
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      // Try to use the worker from public folder, fallback to CDN if needed
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      console.log('📝 PDF worker set to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+    }
+    
     if (onProgress) onProgress(10);
     
-    // Simple worker setup - use local worker if available, otherwise disable worker
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      console.log('PDF worker configured');
-    }
+    console.log('📄 Loading PDF document...');
     
-    if (onProgress) onProgress(20);
-    
-    console.log('Loading PDF document...');
-    
-    // Simple PDF loading configuration
+    // Load the PDF with minimal configuration
     const loadingTask = pdfjsLib.getDocument({
-      data: arrayBuffer
+      data: arrayBuffer,
+      useSystemFonts: true,
+      standardFontDataUrl: undefined, // Don't load extra fonts
+      cMapUrl: undefined, // Don't load extra character maps
+      verbosity: 0 // Minimal logging
     });
     
+    console.log('⏳ Waiting for PDF to load...');
     const pdf = await loadingTask.promise;
-    console.log(`PDF loaded successfully! Pages: ${pdf.numPages}`);
+    console.log('✅ PDF loaded successfully! Pages:', pdf.numPages);
     
-    if (onProgress) onProgress(40);
+    if (onProgress) onProgress(30);
     
     let allText = '';
-    const totalPages = pdf.numPages;
+    const totalPages = Math.min(pdf.numPages, 100); // Limit to 100 pages max
     
-    // Process each page
+    console.log(`📖 Processing ${totalPages} pages...`);
+    
+    // Process each page sequentially
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      console.log(`Processing page ${pageNum}...`);
+      console.log(`📑 Processing page ${pageNum}/${totalPages}...`);
       
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      // Extract text from page
-      const pageText = textContent.items
-        .map((item: any) => {
-          // Safely extract text, handling different item types
-          if (item && typeof item.str === 'string') {
-            return item.str;
-          }
-          return '';
-        })
-        .filter(text => text.length > 0) // Remove empty strings
-        .join(' ');
-      
-      if (pageText.trim()) {
-        allText += pageText + '\n\n';
-        console.log(`Page ${pageNum}: extracted ${pageText.length} characters`);
-      }
-      
-      // Update progress
-      if (onProgress) {
-        const progress = 40 + Math.round((pageNum / totalPages) * 50);
-        onProgress(progress);
+      try {
+        const page = await pdf.getPage(pageNum);
+        console.log(`📄 Got page ${pageNum}, extracting text...`);
+        
+        const textContent = await page.getTextContent();
+        console.log(`📝 Got text content for page ${pageNum}, items:`, textContent.items.length);
+        
+        // Extract text from this page
+        const pageText = textContent.items
+          .map((item: any) => {
+            if (item && typeof item.str === 'string' && item.str.trim()) {
+              return item.str;
+            }
+            return '';
+          })
+          .filter(text => text.length > 0)
+          .join(' ');
+        
+        if (pageText.trim()) {
+          allText += pageText + '\n\n';
+          console.log(`✅ Page ${pageNum}: extracted ${pageText.length} characters`);
+        } else {
+          console.log(`⚠️ Page ${pageNum}: no text found`);
+        }
+        
+        // Update progress
+        if (onProgress) {
+          const progress = 30 + Math.round((pageNum / totalPages) * 60);
+          onProgress(progress);
+        }
+        
+      } catch (pageError) {
+        console.error(`❌ Error processing page ${pageNum}:`, pageError);
+        // Continue with other pages
       }
     }
     
-    if (onProgress) onProgress(90);
+    if (onProgress) onProgress(95);
     
-    // Clean up text
+    // Clean up the extracted text
     allText = allText.trim();
     
+    console.log(`📊 Extraction complete: ${allText.length} characters from ${totalPages} pages`);
+    
     if (!allText) {
+      console.warn('⚠️ No text extracted from PDF');
       return {
         success: false,
         text: '',
@@ -98,7 +122,7 @@ export async function extractTextFromPdfBrowser(
     
     if (onProgress) onProgress(100);
     
-    console.log(`Successfully extracted ${allText.length} characters from ${totalPages} pages`);
+    console.log('🎉 PDF extraction successful!');
     
     return {
       success: true,
@@ -107,18 +131,16 @@ export async function extractTextFromPdfBrowser(
     };
     
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    console.error('💥 PDF extraction failed:', error);
     
     let errorMessage = 'PDF extraction failed';
     if (error instanceof Error) {
       errorMessage = error.message;
-      
-      // Provide more specific error messages
-      if (error.message.includes('Invalid PDF')) {
-        errorMessage = 'Invalid PDF file - the file may be corrupted';
-      } else if (error.message.includes('worker')) {
-        errorMessage = 'PDF worker error - try refreshing the page';
-      }
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
     }
     
     return {
