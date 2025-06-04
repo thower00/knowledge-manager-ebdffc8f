@@ -9,7 +9,7 @@ export interface BrowserPdfResult {
 }
 
 /**
- * Simple browser-based PDF text extraction with reliable worker configuration
+ * Simple, reliable browser-based PDF text extraction
  */
 export async function extractTextFromPdfBrowser(
   arrayBuffer: ArrayBuffer,
@@ -28,146 +28,103 @@ export async function extractTextFromPdfBrowser(
   try {
     if (onProgress) onProgress(10);
     
-    // Simple, reliable worker configuration
+    // Simple worker setup - use local worker if available, otherwise disable worker
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      try {
-        // Try local worker file first
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-        console.log('Using local PDF worker');
-      } catch {
-        try {
-          // Fallback to CDN
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
-          console.log('Using CDN PDF worker');
-        } catch {
-          // Final fallback: disable worker completely with empty string
-          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-          console.log('PDF worker disabled, using main thread');
-        }
-      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      console.log('PDF worker configured');
     }
     
     if (onProgress) onProgress(20);
     
     console.log('Loading PDF document...');
     
-    // Load PDF with simple configuration and extended timeout
+    // Simple PDF loading configuration
     const loadingTask = pdfjsLib.getDocument({
-      data: arrayBuffer,
-      verbosity: 0,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      // Disable some features that might cause issues
-      disableFontFace: true,
-      disableRange: true,
-      disableStream: true
+      data: arrayBuffer
     });
     
-    // Extend timeout to 60 seconds for PDF loading
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('PDF loading timed out after 60 seconds'));
-      }, 60000);
-    });
+    const pdf = await loadingTask.promise;
+    console.log(`PDF loaded successfully! Pages: ${pdf.numPages}`);
     
-    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
-    console.log(`📄 PDF loaded! Pages: ${pdf.numPages}`);
-    
-    if (onProgress) onProgress(30);
+    if (onProgress) onProgress(40);
     
     let allText = '';
     const totalPages = pdf.numPages;
     
-    // Limit pages for very large documents to prevent timeouts
-    const maxPages = Math.min(totalPages, 50); // Process max 50 pages
-    console.log(`Processing ${maxPages} of ${totalPages} pages`);
-    
-    // Extract text page by page with timeout for each page
-    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
-      try {
-        console.log(`📑 Processing page ${pageNum}...`);
-        
-        // Extended timeout per page (20 seconds)
-        const pagePromise = pdf.getPage(pageNum);
-        const pageTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error(`Page ${pageNum} loading timed out`));
-          }, 20000);
-        });
-        
-        const page = await Promise.race([pagePromise, pageTimeoutPromise]);
-        
-        const textContentPromise = page.getTextContent();
-        const textTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error(`Page ${pageNum} text extraction timed out`));
-          }, 15000);
-        });
-        
-        const textContent = await Promise.race([textContentPromise, textTimeoutPromise]);
-        
-        // Extract text from this page
-        const pageText = textContent.items
-          .filter((item: any) => item && typeof item.str === 'string')
-          .map((item: any) => item.str)
-          .join(' ')
-          .trim();
-        
-        if (pageText) {
-          console.log(`📑 Page ${pageNum} contains ${pageText.length} characters`);
-          allText += pageText + '\n';
-        }
-        
-        // Update progress
-        if (onProgress) {
-          const progress = 30 + Math.round((pageNum / maxPages) * 60);
-          onProgress(progress);
-        }
-        
-      } catch (pageError) {
-        console.warn(`Error on page ${pageNum}:`, pageError);
-        // Continue with other pages instead of failing completely
-        if (pageNum <= 3) {
-          // If we can't process the first few pages, something is seriously wrong
-          throw pageError;
-        }
+    // Process each page
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      console.log(`Processing page ${pageNum}...`);
+      
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      // Extract text from page
+      const pageText = textContent.items
+        .map((item: any) => {
+          // Safely extract text, handling different item types
+          if (item && typeof item.str === 'string') {
+            return item.str;
+          }
+          return '';
+        })
+        .filter(text => text.length > 0) // Remove empty strings
+        .join(' ');
+      
+      if (pageText.trim()) {
+        allText += pageText + '\n\n';
+        console.log(`Page ${pageNum}: extracted ${pageText.length} characters`);
+      }
+      
+      // Update progress
+      if (onProgress) {
+        const progress = 40 + Math.round((pageNum / totalPages) * 50);
+        onProgress(progress);
       }
     }
     
     if (onProgress) onProgress(90);
     
-    // Clean up the text
-    allText = allText
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Clean up text
+    allText = allText.trim();
     
     if (!allText) {
       return {
         success: false,
         text: '',
-        error: 'No text could be extracted from the PDF',
-        pages: maxPages
+        error: 'No text found in PDF - document may be image-based or empty',
+        pages: totalPages
       };
     }
     
     if (onProgress) onProgress(100);
     
-    console.log(`📝 Total extracted text: ${allText.length} characters`);
-    console.log(`✅ Successfully processed ${maxPages} pages${maxPages < totalPages ? ` (limited from ${totalPages} total pages)` : ''}`);
+    console.log(`Successfully extracted ${allText.length} characters from ${totalPages} pages`);
     
     return {
       success: true,
       text: allText,
-      pages: maxPages
+      pages: totalPages
     };
     
   } catch (error) {
-    console.error('Browser PDF extraction error:', error);
+    console.error('PDF extraction error:', error);
+    
+    let errorMessage = 'PDF extraction failed';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // Provide more specific error messages
+      if (error.message.includes('Invalid PDF')) {
+        errorMessage = 'Invalid PDF file - the file may be corrupted';
+      } else if (error.message.includes('worker')) {
+        errorMessage = 'PDF worker error - try refreshing the page';
+      }
+    }
     
     return {
       success: false,
       text: '',
-      error: error instanceof Error ? error.message : 'PDF extraction failed'
+      error: errorMessage
     };
   }
 }
