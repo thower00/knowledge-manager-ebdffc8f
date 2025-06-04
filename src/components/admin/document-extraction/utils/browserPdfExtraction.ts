@@ -1,6 +1,4 @@
 
-
-
 import * as pdfjsLib from 'pdfjs-dist';
 
 export interface BrowserPdfResult {
@@ -43,8 +41,8 @@ export async function extractTextFromPdfBrowser(
           pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
           console.log('Using CDN PDF worker');
         } catch {
-          // Final fallback: disable worker completely
-          pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+          // Final fallback: disable worker completely with empty string
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
           console.log('PDF worker disabled, using main thread');
         }
       }
