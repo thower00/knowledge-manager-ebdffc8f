@@ -29,10 +29,9 @@ export async function extractTextFromPdfBrowser(
     if (onProgress) onProgress(10);
     
     // Simple, reliable worker configuration
-    // Try local worker first, then CDN, then disable worker
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       try {
-        // Try local worker file
+        // Try local worker file first
         pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
         console.log('Using local PDF worker');
       } catch {
@@ -52,19 +51,23 @@ export async function extractTextFromPdfBrowser(
     
     console.log('Loading PDF document...');
     
-    // Load PDF with simple configuration and timeout
+    // Load PDF with simple configuration and extended timeout
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       verbosity: 0,
       useWorkerFetch: false,
-      isEvalSupported: false
+      isEvalSupported: false,
+      // Disable some features that might cause issues
+      disableFontFace: true,
+      disableRange: true,
+      disableStream: true
     });
     
-    // Add a timeout to prevent infinite hanging
+    // Extend timeout to 60 seconds for PDF loading
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(new Error('PDF loading timed out after 30 seconds'));
-      }, 30000);
+        reject(new Error('PDF loading timed out after 60 seconds'));
+      }, 60000);
     });
     
     const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
@@ -75,16 +78,21 @@ export async function extractTextFromPdfBrowser(
     let allText = '';
     const totalPages = pdf.numPages;
     
+    // Limit pages for very large documents to prevent timeouts
+    const maxPages = Math.min(totalPages, 50); // Process max 50 pages
+    console.log(`Processing ${maxPages} of ${totalPages} pages`);
+    
     // Extract text page by page with timeout for each page
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       try {
         console.log(`📑 Processing page ${pageNum}...`);
         
+        // Extended timeout per page (20 seconds)
         const pagePromise = pdf.getPage(pageNum);
         const pageTimeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error(`Page ${pageNum} loading timed out`));
-          }, 10000);
+          }, 20000);
         });
         
         const page = await Promise.race([pagePromise, pageTimeoutPromise]);
@@ -93,7 +101,7 @@ export async function extractTextFromPdfBrowser(
         const textTimeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error(`Page ${pageNum} text extraction timed out`));
-          }, 10000);
+          }, 15000);
         });
         
         const textContent = await Promise.race([textContentPromise, textTimeoutPromise]);
@@ -112,13 +120,17 @@ export async function extractTextFromPdfBrowser(
         
         // Update progress
         if (onProgress) {
-          const progress = 30 + Math.round((pageNum / totalPages) * 60);
+          const progress = 30 + Math.round((pageNum / maxPages) * 60);
           onProgress(progress);
         }
         
       } catch (pageError) {
         console.warn(`Error on page ${pageNum}:`, pageError);
-        // Continue with other pages
+        // Continue with other pages instead of failing completely
+        if (pageNum <= 3) {
+          // If we can't process the first few pages, something is seriously wrong
+          throw pageError;
+        }
       }
     }
     
@@ -134,19 +146,19 @@ export async function extractTextFromPdfBrowser(
         success: false,
         text: '',
         error: 'No text could be extracted from the PDF',
-        pages: totalPages
+        pages: maxPages
       };
     }
     
     if (onProgress) onProgress(100);
     
     console.log(`📝 Total extracted text: ${allText.length} characters`);
-    console.log(`✅ Successfully processed ${totalPages} pages`);
+    console.log(`✅ Successfully processed ${maxPages} pages${maxPages < totalPages ? ` (limited from ${totalPages} total pages)` : ''}`);
     
     return {
       success: true,
       text: allText,
-      pages: totalPages
+      pages: maxPages
     };
     
   } catch (error) {
