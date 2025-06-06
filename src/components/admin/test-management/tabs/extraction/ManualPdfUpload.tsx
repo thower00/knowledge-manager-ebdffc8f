@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { extractTextFromPdfBrowser } from "@/components/admin/document-extraction/utils/browserPdfExtraction";
+import { extractTextFromPdfSimple } from "@/components/admin/document-extraction/utils/simplePdfExtraction";
 
 interface ManualPdfUploadProps {
   onExtract?: (extractedText: string, fileName: string) => void;
@@ -78,7 +78,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     }
   }, [handleFileSelect]);
 
-  // Extract text from selected PDF using the simple browser approach
+  // Extract text from selected PDF using the reliable simple approach
   const handleExtractText = useCallback(async () => {
     if (!selectedFile) return;
 
@@ -88,11 +88,13 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     setExtractionProgress(0);
 
     try {
+      console.log('Starting simple PDF extraction for:', selectedFile.name);
+      
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using our simplified browser-based extraction
-      const result = await extractTextFromPdfBrowser(arrayBuffer, (progress) => {
+      // Extract text using the more reliable simple extraction method
+      const result = await extractTextFromPdfSimple(arrayBuffer, (progress) => {
         setExtractionProgress(progress);
       });
 
