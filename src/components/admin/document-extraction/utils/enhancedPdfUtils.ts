@@ -1,6 +1,5 @@
 
-import { extractTextFromPdfBuffer } from './clientPdfExtraction';
-import { extractTextFromPdfSimple } from './simplePdfExtraction';
+import { extractPdfTextSimplified } from './simplifiedPdfExtraction';
 import { fetchDocumentViaProxy } from '../services/documentFetchService';
 
 /**
@@ -22,8 +21,8 @@ export async function extractPdfText(
     
     if (onProgress) onProgress(20);
     
-    // Use the robust client extraction method
-    const result = await extractTextFromPdfBuffer(arrayBuffer, (progress) => {
+    // Use the simplified extraction method
+    const result = await extractPdfTextSimplified(arrayBuffer, (progress) => {
       // Map progress to 20-100% range
       const mappedProgress = 20 + Math.floor((progress / 100) * 80);
       if (onProgress) onProgress(mappedProgress);
