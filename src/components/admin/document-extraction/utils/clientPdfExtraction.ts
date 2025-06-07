@@ -1,161 +1,133 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { cleanAndNormalizeText } from '../services/textCleaningService';
 import { initPdfWorker } from './pdfWorkerInit';
 
 export interface PdfExtractionResult {
   success: boolean;
   text: string;
-  totalPages: number;
   error?: string;
+  totalPages?: number;
 }
 
 /**
- * Extract text from PDF using client-side PDF.js - simplified approach
+ * Extract text from PDF buffer using PDF.js with robust error handling
  */
 export async function extractTextFromPdfBuffer(
   arrayBuffer: ArrayBuffer,
-  onProgress?: (progress: number) => void
+  progressCallback?: (progress: number) => void
 ): Promise<PdfExtractionResult> {
-  console.log('Starting PDF extraction with buffer size:', arrayBuffer.byteLength);
-  
-  if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-    return {
-      success: false,
-      text: '',
-      totalPages: 0,
-      error: 'Invalid or empty PDF data'
-    };
-  }
-
   try {
-    // Initialize the PDF worker before processing
-    const workerInitialized = await initPdfWorker();
-    if (!workerInitialized) {
-      throw new Error('Failed to initialize PDF worker');
+    console.log('Starting PDF extraction with buffer size:', arrayBuffer.byteLength);
+    
+    // Initialize progress
+    if (progressCallback) progressCallback(10);
+    
+    // Initialize the PDF worker
+    console.log('Initializing PDF worker...');
+    await initPdfWorker();
+    if (progressCallback) progressCallback(20);
+    
+    // Validate PDF data
+    const uint8Array = new Uint8Array(arrayBuffer);
+    if (uint8Array.length < 4 || 
+        uint8Array[0] !== 0x25 || uint8Array[1] !== 0x50 || 
+        uint8Array[2] !== 0x44 || uint8Array[3] !== 0x46) {
+      throw new Error('Invalid PDF file format');
     }
-
-    if (onProgress) onProgress(10);
     
     console.log('Creating PDF document...');
+    if (progressCallback) progressCallback(30);
     
-    // Use the simplest possible PDF.js configuration
-    const pdf = await pdfjsLib.getDocument({
-      data: arrayBuffer
-    }).promise;
+    // Load the PDF document with timeout
+    const loadingTask = pdfjsLib.getDocument({
+      data: arrayBuffer,
+      disableFontFace: true,
+      useSystemFonts: true,
+    });
     
-    console.log(`PDF loaded! Pages: ${pdf.numPages}`);
+    // Add timeout for document loading
+    const pdf = await Promise.race([
+      loadingTask.promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('PDF loading timeout')), 30000);
+      })
+    ]);
     
-    if (onProgress) onProgress(30);
+    console.log(`PDF loaded successfully with ${pdf.numPages} pages`);
+    if (progressCallback) progressCallback(40);
     
-    let extractedText = '';
-    const totalPages = Math.min(pdf.numPages, 10); // Limit to 10 pages for speed
+    let fullText = '';
+    const totalPages = pdf.numPages;
     
-    // Process pages one by one
+    // Extract text from each page
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       try {
-        console.log(`Processing page ${pageNum}...`);
+        console.log(`Processing page ${pageNum}/${totalPages}`);
         
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
-        // Extract text from page
+        // Join text items
         const pageText = textContent.items
-          .filter((item: any) => item && typeof item.str === 'string')
           .map((item: any) => item.str)
-          .join(' ')
-          .trim();
+          .join(' ');
         
-        if (pageText) {
-          extractedText += pageText + '\n\n';
-          console.log(`Page ${pageNum} extracted ${pageText.length} characters`);
+        if (pageText.trim()) {
+          fullText += `--- Page ${pageNum} ---\n${pageText}\n\n`;
         }
+        
+        // Clean up page resources
+        page.cleanup();
         
         // Update progress
-        if (onProgress) {
-          const progress = 30 + Math.round((pageNum / totalPages) * 60);
-          onProgress(progress);
-        }
+        const progress = 40 + Math.floor((pageNum / totalPages) * 55);
+        if (progressCallback) progressCallback(progress);
         
       } catch (pageError) {
-        console.error(`Error on page ${pageNum}:`, pageError);
-        // Continue with other pages
+        console.warn(`Error processing page ${pageNum}:`, pageError);
+        fullText += `--- Page ${pageNum} - Error extracting text ---\n\n`;
       }
     }
     
-    if (onProgress) onProgress(95);
+    // Clean up PDF resources
+    pdf.destroy();
     
-    // Validate extracted text
-    if (!extractedText.trim()) {
+    if (progressCallback) progressCallback(100);
+    
+    if (!fullText.trim()) {
       return {
         success: false,
         text: '',
-        totalPages,
-        error: 'No text could be extracted from the PDF'
+        error: 'No text could be extracted from the PDF. It may be a scanned document or image-based PDF.'
       };
     }
     
-    // Clean the text
-    const cleanedText = cleanAndNormalizeText(extractedText);
-    
-    if (onProgress) onProgress(100);
-    
-    console.log(`Successfully extracted ${cleanedText.length} characters from ${totalPages} pages`);
-    
     return {
       success: true,
-      text: cleanedText,
-      totalPages
+      text: fullText.trim(),
+      totalPages: totalPages
     };
     
   } catch (error) {
     console.error('PDF.js extraction error:', error);
     
-    return {
-      success: false,
-      text: '',
-      totalPages: 0,
-      error: error instanceof Error ? error.message : 'PDF extraction failed'
-    };
-  }
-}
-
-/**
- * Extract text from PDF URL - fetch and process
- */
-export async function extractTextFromPdfUrl(
-  url: string,
-  onProgress?: (progress: number) => void
-): Promise<PdfExtractionResult> {
-  try {
-    console.log('Fetching PDF from URL:', url);
-    
-    if (onProgress) onProgress(5);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+    let errorMessage = 'PDF extraction failed';
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid PDF')) {
+        errorMessage = 'The file is not a valid PDF document';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'PDF processing timed out - the file may be too large or complex';
+      } else if (error.message.includes('worker')) {
+        errorMessage = 'PDF worker initialization failed - please check your internet connection';
+      } else {
+        errorMessage = error.message;
+      }
     }
     
-    const arrayBuffer = await response.arrayBuffer();
-    console.log(`PDF downloaded, size: ${arrayBuffer.byteLength} bytes`);
-    
-    if (onProgress) onProgress(15);
-    
-    // Extract text
-    return await extractTextFromPdfBuffer(arrayBuffer, (pdfProgress) => {
-      const mappedProgress = 15 + Math.floor((pdfProgress / 100) * 85);
-      if (onProgress) onProgress(mappedProgress);
-    });
-    
-  } catch (error) {
-    console.error('Error fetching or processing PDF:', error);
     return {
       success: false,
       text: '',
-      totalPages: 0,
-      error: error instanceof Error ? error.message : 'Failed to process PDF from URL'
+      error: errorMessage
     };
   }
 }

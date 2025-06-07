@@ -78,7 +78,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     }
   }, [handleFileSelect]);
 
-  // Extract text from selected PDF using the reliable client extraction method
+  // Extract text from selected PDF
   const handleExtractText = useCallback(async () => {
     if (!selectedFile) return;
 
@@ -93,7 +93,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using the proven client extraction method
+      // Extract text using the robust client extraction method
       const result = await extractTextFromPdfBuffer(arrayBuffer, (progress) => {
         setExtractionProgress(progress);
       });
@@ -179,7 +179,6 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
               </div>
             )}
             
-            {/* Hidden file input */}
             <input
               id="pdf-file-input"
               type="file"
