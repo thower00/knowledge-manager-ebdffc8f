@@ -6,10 +6,10 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { extractPdfTextSimplified, chunkText } from "./utils/simplifiedPdfExtraction";
+import { extractPdfTextSimplified } from "./utils/simplifiedPdfExtraction";
 
 interface SimplifiedPdfUploadProps {
-  onExtract?: (extractedText: string, chunks: any[], fileName: string) => void;
+  onExtract?: (extractedText: string, fileName: string) => void;
 }
 
 export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
@@ -17,7 +17,6 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
   const [isExtracting, setIsExtracting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedText, setExtractedText] = useState<string>("");
-  const [chunks, setChunks] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -34,7 +33,6 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
 
     setSelectedFile(file);
     setExtractedText("");
-    setChunks([]);
     setError(null);
     setProgress(0);
   }, []);
@@ -61,20 +59,16 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
         throw new Error(result.error || 'PDF extraction failed');
       }
 
-      // Create chunks (mirroring Python logic)
-      const textChunks = chunkText(result.text);
-      
       setExtractedText(result.text);
-      setChunks(textChunks);
       
       // Call callback if provided
       if (onExtract) {
-        onExtract(result.text, textChunks, selectedFile.name);
+        onExtract(result.text, selectedFile.name);
       }
 
       toast({
         title: "Extraction completed",
-        description: `Successfully extracted text and created ${textChunks.length} chunks from "${selectedFile.name}"`,
+        description: `Successfully extracted text from "${selectedFile.name}"`,
       });
 
     } catch (error) {
@@ -94,7 +88,6 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
   const handleReset = useCallback(() => {
     setSelectedFile(null);
     setExtractedText("");
-    setChunks([]);
     setError(null);
     setProgress(0);
   }, []);
@@ -205,7 +198,7 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                Successfully extracted {extractedText.length} characters and created {chunks.length} chunks
+                Successfully extracted {extractedText.length} characters
               </AlertDescription>
             </Alert>
           )}
@@ -226,22 +219,6 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
                   {extractedText.substring(0, 1000)}
                   {extractedText.length > 1000 && '...'}
                 </pre>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="font-medium mb-2">Chunks ({chunks.length} total)</h4>
-              <div className="space-y-2 max-h-32 overflow-auto">
-                {chunks.slice(0, 3).map((chunk, index) => (
-                  <div key={chunk.id} className="bg-muted p-2 rounded text-sm">
-                    <span className="font-medium">Chunk {index + 1}:</span> {chunk.text.substring(0, 100)}...
-                  </div>
-                ))}
-                {chunks.length > 3 && (
-                  <p className="text-sm text-muted-foreground">
-                    And {chunks.length - 3} more chunks...
-                  </p>
-                )}
               </div>
             </div>
           </CardContent>

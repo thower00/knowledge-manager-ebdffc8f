@@ -42,9 +42,7 @@ export async function extractPdfTextSimplified(
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0,
-      // Disable worker entirely
-      disableWorker: true
+      verbosity: 0
     });
     
     const pdf = await loadingTask.promise;
@@ -119,32 +117,4 @@ export async function extractPdfTextSimplified(
       error: error instanceof Error ? error.message : 'PDF extraction failed'
     };
   }
-}
-
-/**
- * Chunk text into segments (mirroring Python chunking logic)
- * chunk_size = 1500, chunk_overlap = 200
- */
-export function chunkText(text: string, chunkSize: number = 1500, chunkOverlap: number = 200) {
-  const chunks: { id: string; text: string; metadata: { source: string } }[] = [];
-  
-  let start = 0;
-  while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
-    const chunkText = text.slice(start, end).trim();
-    
-    if (chunkText) {
-      chunks.push({
-        id: crypto.randomUUID(),
-        text: chunkText,
-        metadata: {
-          source: 'uploaded_pdf'
-        }
-      });
-    }
-    
-    start += chunkSize - chunkOverlap;
-  }
-  
-  return chunks;
 }
