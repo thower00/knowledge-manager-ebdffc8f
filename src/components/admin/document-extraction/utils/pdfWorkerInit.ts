@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 let workerInitialized = false;
 
 /**
- * Initialize the PDF.js worker using local worker file
+ * Initialize the PDF.js worker using CDN sources directly
  * @returns Promise resolving to true if initialization succeeds
  */
 export async function initPdfWorker(): Promise<boolean> {
@@ -16,26 +16,26 @@ export async function initPdfWorker(): Promise<boolean> {
   console.log("PDF.js version:", pdfjsLib.version);
   
   try {
-    // Use the local worker file from public directory
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+    // Use CDN directly - no local worker file needed
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
     
-    console.log("PDF worker initialized with local worker file");
+    console.log("PDF worker initialized with CDN worker");
     workerInitialized = true;
     return true;
     
   } catch (error) {
-    console.warn("Local worker failed, trying fallback approach:", error);
+    console.warn("Primary CDN failed, trying fallback:", error);
     
     try {
-      // Fallback: Use jsdelivr CDN
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
+      // Fallback: Use unpkg CDN
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.2.133/build/pdf.worker.min.js';
       
-      console.log("PDF worker initialized with CDN fallback");
+      console.log("PDF worker initialized with fallback CDN");
       workerInitialized = true;
       return true;
       
     } catch (fallbackError) {
-      console.error("CDN worker failed, using main thread:", fallbackError);
+      console.error("Both CDN sources failed, disabling worker:", fallbackError);
       
       // Final attempt: disable worker entirely and use main thread
       try {
