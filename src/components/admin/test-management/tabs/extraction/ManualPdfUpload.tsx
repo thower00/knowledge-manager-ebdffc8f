@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { extractTextFromPdfSimple } from "@/components/admin/document-extraction/utils/simplePdfExtraction";
+import { extractTextFromPdfBuffer } from "@/components/admin/document-extraction/utils/clientPdfExtraction";
 
 interface ManualPdfUploadProps {
   onExtract?: (extractedText: string, fileName: string) => void;
@@ -78,7 +78,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     }
   }, [handleFileSelect]);
 
-  // Extract text from selected PDF using the reliable simple approach
+  // Extract text from selected PDF using the reliable client extraction method
   const handleExtractText = useCallback(async () => {
     if (!selectedFile) return;
 
@@ -88,13 +88,13 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
     setExtractionProgress(0);
 
     try {
-      console.log('Starting simple PDF extraction for:', selectedFile.name);
+      console.log('Starting client PDF extraction for:', selectedFile.name);
       
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using the more reliable simple extraction method
-      const result = await extractTextFromPdfSimple(arrayBuffer, (progress) => {
+      // Extract text using the proven client extraction method
+      const result = await extractTextFromPdfBuffer(arrayBuffer, (progress) => {
         setExtractionProgress(progress);
       });
 
@@ -112,7 +112,7 @@ export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
 
       toast({
         title: "Extraction completed",
-        description: `Successfully extracted text from "${selectedFile.name}" (${result.pages} pages)`,
+        description: `Successfully extracted text from "${selectedFile.name}" (${result.totalPages} pages)`,
       });
 
     } catch (error) {
