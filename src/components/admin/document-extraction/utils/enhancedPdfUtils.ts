@@ -1,5 +1,5 @@
 
-import { extractTextFromPdfUrl } from './clientPdfExtraction';
+import { extractTextFromPdfBuffer } from './clientPdfExtraction';
 import { extractTextFromPdfSimple } from './simplePdfExtraction';
 import { fetchDocumentViaProxy } from '../services/documentFetchService';
 
@@ -22,8 +22,8 @@ export async function extractPdfText(
     
     if (onProgress) onProgress(20);
     
-    // Use simplified extraction
-    const result = await extractTextFromPdfSimple(arrayBuffer, (progress) => {
+    // Use the robust client extraction method
+    const result = await extractTextFromPdfBuffer(arrayBuffer, (progress) => {
       // Map progress to 20-100% range
       const mappedProgress = 20 + Math.floor((progress / 100) * 80);
       if (onProgress) onProgress(mappedProgress);
@@ -33,7 +33,7 @@ export async function extractPdfText(
       throw new Error(result.error || 'PDF extraction failed');
     }
     
-    console.log(`Successfully extracted ${result.text.length} characters from ${result.pages} pages`);
+    console.log(`Successfully extracted ${result.text.length} characters from ${result.totalPages} pages`);
     return result.text;
     
   } catch (error) {
