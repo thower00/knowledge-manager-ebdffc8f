@@ -48,23 +48,13 @@ export async function initPdfWorker(): Promise<boolean> {
   // If all CDNs fail, disable worker entirely and use main thread mode
   console.warn("All CDN sources failed, configuring for main thread mode");
   try {
-    // The correct way to disable worker in PDF.js is to set workerSrc to false
-    pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+    // The correct way to disable worker in PDF.js is to set workerSrc to empty string
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     console.log("PDF.js configured to run on main thread (worker disabled)");
     workerInitialized = true;
     return true;
   } catch (mainThreadError) {
     console.error("Failed to configure PDF.js for main thread mode:", mainThreadError);
-    
-    // Last resort - try setting to empty string
-    try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-      console.log("PDF.js fallback: empty worker source");
-      workerInitialized = true;
-      return true;
-    } catch (finalError) {
-      console.error("All PDF.js initialization methods failed:", finalError);
-      throw new Error("Could not initialize PDF processing. The browser may not support PDF.js in this environment.");
-    }
+    throw new Error("Could not initialize PDF processing. The browser may not support PDF.js in this environment.");
   }
 }
