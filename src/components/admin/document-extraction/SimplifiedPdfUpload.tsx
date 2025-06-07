@@ -99,6 +99,18 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
     setProgress(0);
   }, []);
 
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  }, [handleFileSelect]);
+
+  const triggerFileSelect = useCallback(() => {
+    const fileInput = document.getElementById('pdf-upload') as HTMLInputElement;
+    fileInput?.click();
+  }, []);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -110,8 +122,11 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* File Upload */}
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+          {/* File Upload Area */}
+          <div 
+            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center cursor-pointer hover:border-muted-foreground/50 transition-colors"
+            onClick={triggerFileSelect}
+          >
             {selectedFile ? (
               <div className="flex items-center justify-center gap-2 text-green-600">
                 <File className="h-6 w-6" />
@@ -133,11 +148,10 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
             <input
               type="file"
               accept=".pdf"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              onChange={handleFileInputChange}
               className="hidden"
               id="pdf-upload"
             />
-            <label htmlFor="pdf-upload" className="cursor-pointer absolute inset-0"></label>
           </div>
 
           {/* Action Buttons */}
