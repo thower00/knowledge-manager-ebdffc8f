@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 let workerInitialized = false;
 
 /**
- * Initialize the PDF.js worker using reliable CDN sources
+ * Initialize the PDF.js worker using version-matched CDN sources
  * @returns Promise resolving to true if initialization succeeds
  */
 export async function initPdfWorker(): Promise<boolean> {
@@ -15,12 +15,17 @@ export async function initPdfWorker(): Promise<boolean> {
 
   console.log("PDF.js version:", pdfjsLib.version);
   
-  // Try the most reliable CDN first
+  // Use exact version matching to avoid API/Worker version mismatches
+  const pdfJsVersion = pdfjsLib.version || '5.2.133';
+  
+  // Try CDN URLs that match the exact PDF.js version
   const workerUrls = [
-    // Known working CDN with version-agnostic URL
-    'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js`,
+    `https://unpkg.com/pdfjs-dist@${pdfJsVersion}/build/pdf.worker.min.js`,
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfJsVersion}/build/pdf.worker.min.js`,
+    // Fallback to known working URLs for version 5.2.133
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.133/pdf.worker.min.js',
+    'https://unpkg.com/pdfjs-dist@5.2.133/build/pdf.worker.min.js'
   ];
   
   // Try each CDN URL
