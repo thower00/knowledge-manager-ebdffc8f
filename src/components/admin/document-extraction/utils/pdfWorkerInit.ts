@@ -4,8 +4,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 let workerInitialized = false;
 
 /**
- * Initialize the PDF.js worker using working CDN sources with proper fallback
- * @returns Promise resolving to true if initialization succeeds
+ * Initialize the PDF.js worker using the correct version that matches our installed package
+ * Uses version 5.2.133 to match the installed pdfjs-dist package
  */
 export async function initPdfWorker(): Promise<boolean> {
   if (workerInitialized) {
@@ -15,22 +15,17 @@ export async function initPdfWorker(): Promise<boolean> {
 
   console.log("PDF.js version:", pdfjsLib.version);
   
-  // Use working PDF.js versions that are actually available on CDNs
-  const workingVersions = ['3.11.174', '3.4.120', '2.16.105'];
+  // Use the exact version that matches our installed pdfjs-dist package (5.2.133)
+  const matchingVersion = '5.2.133';
   
-  // Build URLs for working versions
-  const workerUrls: string[] = [];
-  for (const version of workingVersions) {
-    workerUrls.push(
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`,
-      `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.js`
-    );
-  }
+  const workerUrls = [
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${matchingVersion}/pdf.worker.min.js`,
+    `https://unpkg.com/pdfjs-dist@${matchingVersion}/build/pdf.worker.min.js`,
+    // Fallback to Mozilla's CDN
+    'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs'
+  ];
   
-  // Add Mozilla's official worker as well
-  workerUrls.push('https://mozilla.github.io/pdf.js/build/pdf.worker.mjs');
-  
-  console.log(`Trying ${workerUrls.length} different worker URLs...`);
+  console.log(`Trying ${workerUrls.length} different worker URLs for version ${matchingVersion}...`);
   
   // Try each CDN URL
   for (let i = 0; i < workerUrls.length; i++) {
@@ -54,24 +49,7 @@ export async function initPdfWorker(): Promise<boolean> {
     }
   }
   
-  // If all CDNs fail, configure for main thread mode properly
-  console.warn("All CDN sources failed, configuring for main thread mode");
-  try {
-    // The correct way to enable main thread mode in PDF.js
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    
-    // Test that main thread mode works by trying to create a simple document
-    const testData = new Uint8Array([
-      0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, // %PDF-1.4
-      0x0a, 0x25, 0xc4, 0xe5, 0xf2, 0xe5, 0xeb, 0xa7, 0xf3, 0xa0, 0xd0, 0xc4, 0xc6, 0x0a
-    ]);
-    
-    await pdfjsLib.getDocument({ data: testData }).promise;
-    console.log("PDF.js main thread mode test successful");
-    workerInitialized = true;
-    return true;
-  } catch (mainThreadError) {
-    console.error("Failed to configure PDF.js for main thread mode:", mainThreadError);
-    throw new Error("Could not initialize PDF processing. The browser may not support PDF.js in this environment.");
-  }
+  // If all CDNs fail, this indicates a network issue
+  console.error("All CDN sources failed - network connectivity issue");
+  throw new Error("Could not initialize PDF processing. Please check your internet connection and try again.");
 }

@@ -50,7 +50,7 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using simplified approach
+      // Extract text using simplified approach with proper version matching
       const result = await extractPdfTextSimplified(arrayBuffer, (progress) => {
         setProgress(progress);
       });

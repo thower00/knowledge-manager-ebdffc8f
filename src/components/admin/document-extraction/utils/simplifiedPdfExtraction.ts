@@ -9,8 +9,8 @@ export interface SimplePdfResult {
 }
 
 /**
- * Simplified PDF extraction using PDF.js with proper worker configuration
- * Uses a data URL worker to avoid external worker file dependencies
+ * Simplified PDF extraction using PDF.js with correct version matching
+ * Ensures worker version matches the installed PDF.js version (5.2.133)
  */
 export async function extractPdfTextSimplified(
   arrayBuffer: ArrayBuffer,
@@ -21,10 +21,10 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Configure PDF.js with a minimal inline worker
-    // This creates a data URL worker that runs PDF.js in worker mode but self-contained
+    // Configure PDF.js with the correct worker version that matches our installed version (5.2.133)
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      // Use the exact version that matches our installed pdfjs-dist package
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.133/pdf.worker.min.js`;
     }
     
     // Basic PDF validation
@@ -37,7 +37,7 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with standard configuration
+    // Load PDF document with minimal configuration to avoid compatibility issues
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
