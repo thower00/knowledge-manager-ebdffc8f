@@ -110,7 +110,7 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Simplified PDF Extraction
+            PDF Text Extraction
           </CardTitle>
         </CardHeader>
         

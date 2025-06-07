@@ -10,9 +10,7 @@ export interface SimplePdfResult {
 
 /**
  * Simplified PDF extraction for main thread operation
- * - No workers, main thread only
- * - Simple, reliable extraction
- * - Clear error handling
+ * Uses PDF.js without workers for reliable extraction
  */
 export async function extractPdfTextSimplified(
   arrayBuffer: ArrayBuffer,
@@ -23,8 +21,9 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Disable worker completely for main thread operation
-    pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
+    // Configure PDF.js for main thread operation (no workers)
+    // Set to empty string to disable worker usage
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     
     // Basic PDF validation
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -42,8 +41,7 @@ export async function extractPdfTextSimplified(
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0,
-      disableWorker: true
+      verbosity: 0
     });
     
     const pdf = await loadingTask.promise;
