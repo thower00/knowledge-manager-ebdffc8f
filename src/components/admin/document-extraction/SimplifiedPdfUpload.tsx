@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { extractPdfTextSimplified } from "./utils/simplifiedPdfExtraction";
+import { initPdfWorker } from "./utils/pdfWorkerInit";
 
 interface SimplifiedPdfUploadProps {
   onExtract?: (extractedText: string, fileName: string) => void;
@@ -47,10 +48,13 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
     try {
       console.log('Starting simplified extraction for:', selectedFile.name);
       
+      // Initialize PDF.js worker configuration
+      await initPdfWorker();
+      
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // Extract text using simplified approach with proper version matching
+      // Extract text using simplified approach
       const result = await extractPdfTextSimplified(arrayBuffer, (progress) => {
         setProgress(progress);
       });

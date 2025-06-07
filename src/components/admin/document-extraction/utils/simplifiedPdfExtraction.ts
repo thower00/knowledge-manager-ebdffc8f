@@ -9,8 +9,8 @@ export interface SimplePdfResult {
 }
 
 /**
- * Simplified PDF extraction using PDF.js with correct version matching
- * Ensures worker version matches the installed PDF.js version (5.2.133)
+ * Simplified PDF extraction using PDF.js without external workers
+ * Runs PDF.js in the main thread to avoid worker loading issues
  */
 export async function extractPdfTextSimplified(
   arrayBuffer: ArrayBuffer,
@@ -21,11 +21,9 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Configure PDF.js with the correct worker version that matches our installed version (5.2.133)
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      // Use the exact version that matches our installed pdfjs-dist package
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.133/pdf.worker.min.js`;
-    }
+    // Configure PDF.js to run in main thread without external workers
+    // This avoids the "Failed to fetch dynamically imported module" error
+    pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
     
     // Basic PDF validation
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -37,13 +35,15 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with minimal configuration to avoid compatibility issues
+    // Load PDF document with configuration to disable worker
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0
+      verbosity: 0,
+      // Explicitly disable worker to run in main thread
+      disableWorker: true
     });
     
     const pdf = await loadingTask.promise;
