@@ -23,7 +23,7 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Configure PDF.js for main thread operation (no workers)
+    // Properly disable worker for main thread operation
     pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     
     // Basic PDF validation
@@ -36,13 +36,15 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with minimal configuration
+    // Load PDF document with main thread configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0
+      verbosity: 0,
+      // Disable worker entirely
+      disableWorker: true
     });
     
     const pdf = await loadingTask.promise;
