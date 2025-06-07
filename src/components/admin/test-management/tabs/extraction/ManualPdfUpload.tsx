@@ -7,7 +7,7 @@ interface ManualPdfUploadProps {
 }
 
 export function ManualPdfUpload({ onExtract }: ManualPdfUploadProps) {
-  const handleExtract = (extractedText: string, chunks: any[], fileName: string) => {
+  const handleExtract = (extractedText: string, fileName: string) => {
     // Call the original callback with just the text and filename
     if (onExtract) {
       onExtract(extractedText, fileName);
