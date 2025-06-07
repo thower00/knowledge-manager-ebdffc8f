@@ -15,14 +15,12 @@ export async function initPdfWorker(): Promise<boolean> {
 
   console.log("PDF.js version:", pdfjsLib.version);
   
-  // List of CDN URLs to try in order of preference
+  // Try the most reliable CDN first
   const workerUrls = [
-    // Use the same version as the installed pdfjs-dist package
-    `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
-    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
-    // Fallback to a known working version
-    'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js',
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js'
+    // Known working CDN with version-agnostic URL
+    'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
   ];
   
   // Try each CDN URL
@@ -47,16 +45,26 @@ export async function initPdfWorker(): Promise<boolean> {
     }
   }
   
-  // If all CDNs fail, try disabling worker entirely (main thread mode)
-  console.warn("All CDN sources failed, attempting main thread mode");
+  // If all CDNs fail, disable worker entirely and use main thread mode
+  console.warn("All CDN sources failed, configuring for main thread mode");
   try {
-    // Setting workerSrc to null/undefined forces main thread mode
-    pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
-    console.log("PDF.js configured to run on main thread (no worker)");
+    // The correct way to disable worker in PDF.js is to set workerSrc to false
+    pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+    console.log("PDF.js configured to run on main thread (worker disabled)");
     workerInitialized = true;
     return true;
   } catch (mainThreadError) {
     console.error("Failed to configure PDF.js for main thread mode:", mainThreadError);
-    throw new Error("Could not initialize PDF processing. Please check your internet connection and try again.");
+    
+    // Last resort - try setting to empty string
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      console.log("PDF.js fallback: empty worker source");
+      workerInitialized = true;
+      return true;
+    } catch (finalError) {
+      console.error("All PDF.js initialization methods failed:", finalError);
+      throw new Error("Could not initialize PDF processing. The browser may not support PDF.js in this environment.");
+    }
   }
 }
