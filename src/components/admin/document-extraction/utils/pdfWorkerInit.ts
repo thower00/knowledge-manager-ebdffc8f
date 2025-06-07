@@ -16,9 +16,9 @@ export async function initPdfWorker(): Promise<boolean> {
   console.log("PDF.js version:", pdfjsLib.version);
   
   try {
-    // Configure PDF.js to run in main thread without external workers
-    // This is the most reliable approach for browser environments
-    pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
+    // Configure PDF.js to run in main thread by setting empty workerSrc
+    // This prevents PDF.js from trying to load external worker files
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     
     console.log("PDF.js configured to run in main thread (no external worker)");
     workerInitialized = true;

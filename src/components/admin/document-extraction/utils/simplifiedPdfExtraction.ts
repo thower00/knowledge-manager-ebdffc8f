@@ -22,8 +22,8 @@ export async function extractPdfTextSimplified(
     if (onProgress) onProgress(10);
     
     // Configure PDF.js to run in main thread without external workers
-    // This avoids the "Failed to fetch dynamically imported module" error
-    pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
+    // Set workerSrc to null to disable worker completely
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     
     // Basic PDF validation
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -35,15 +35,13 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with configuration to disable worker
+    // Load PDF document with minimal configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0,
-      // Explicitly disable worker to run in main thread
-      disableWorker: true
+      verbosity: 0
     });
     
     const pdf = await loadingTask.promise;
