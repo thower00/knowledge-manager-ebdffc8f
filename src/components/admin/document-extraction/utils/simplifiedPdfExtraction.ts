@@ -9,8 +9,8 @@ export interface SimplePdfResult {
 }
 
 /**
- * Simplified PDF extraction mimicking the Python PyMuPDF approach
- * - Main thread only (no workers)
+ * Simplified PDF extraction for main thread operation
+ * - No workers, main thread only
  * - Simple, reliable extraction
  * - Clear error handling
  */
@@ -23,8 +23,8 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Force main thread mode by setting workerSrc to false (not empty string)
-    pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
+    // Disable worker completely for main thread operation
+    pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
     
     // Basic PDF validation
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -36,15 +36,14 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with explicit main thread configuration
+    // Load PDF document with main thread configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
       verbosity: 0,
-      // Force main thread mode
-      worker: null
+      disableWorker: true
     });
     
     const pdf = await loadingTask.promise;
