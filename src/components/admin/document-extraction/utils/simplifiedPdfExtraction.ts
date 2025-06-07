@@ -23,8 +23,8 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(10);
     
-    // Properly disable worker for main thread operation
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // Force main thread mode by setting workerSrc to false (not empty string)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = false as any;
     
     // Basic PDF validation
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -36,13 +36,15 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(20);
     
-    // Load PDF document with main thread configuration
+    // Load PDF document with explicit main thread configuration
     const loadingTask = pdfjsLib.getDocument({
       data: arrayBuffer,
       useWorkerFetch: false,
       isEvalSupported: false,
       useSystemFonts: true,
-      verbosity: 0
+      verbosity: 0,
+      // Force main thread mode
+      worker: null
     });
     
     const pdf = await loadingTask.promise;
@@ -50,7 +52,7 @@ export async function extractPdfTextSimplified(
     
     if (onProgress) onProgress(40);
     
-    // Extract text from all pages (like Python: full_text += page.get_text())
+    // Extract text from all pages
     let fullText = '';
     const totalPages = pdf.numPages;
     
