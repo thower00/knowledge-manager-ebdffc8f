@@ -1,7 +1,7 @@
 
 import { ProcessedDocument } from "@/types/document";
 import { fetchDocumentViaProxy } from "@/components/admin/document-extraction/services/documentFetchService";
-import { extractTextFromPdfSimple } from "@/components/admin/document-extraction/utils/simplePdfExtraction";
+import { extractPdfTextSimplified } from "@/components/admin/document-extraction/utils/simplifiedPdfExtraction";
 import { cleanAndNormalizeText } from "@/components/admin/document-extraction/services/textCleaningService";
 
 export interface FileExtractionResult {
@@ -51,7 +51,7 @@ async function extractPdfContentSimple(document: ProcessedDocument): Promise<Fil
     const arrayBuffer = await fetchDocumentViaProxy(document.url!, document.title);
     
     // Extract text using simplified PDF.js
-    const result = await extractTextFromPdfSimple(arrayBuffer);
+    const result = await extractPdfTextSimplified(arrayBuffer);
     
     if (!result.success) {
       throw new Error(result.error || "PDF extraction failed");
@@ -65,7 +65,7 @@ async function extractPdfContentSimple(document: ProcessedDocument): Promise<Fil
       text: cleanedText,
       metadata: {
         fileType: 'pdf',
-        pages: result.pages,
+        pages: result.totalPages,
         size: arrayBuffer.byteLength
       }
     };
