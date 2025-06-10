@@ -14,6 +14,13 @@ export function TestManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractedFrom, setExtractedFrom] = useState<string>("");
+  const [chunks, setChunks] = useState<Array<{
+    index: number;
+    content: string;
+    size: number;
+    startPosition?: number;
+    endPosition?: number;
+  }>>([]);
 
   const handleTestComplete = (results: any) => {
     setTestResults(results);
@@ -47,6 +54,24 @@ export function TestManagement() {
     }
   };
 
+  // For ChunkingTab that passes results directly and needs to store chunks
+  const handleChunkingResult = (results: any) => {
+    setTestResults(results);
+    
+    // Extract chunks for use in EmbeddingsTab
+    if (results && results.status === 'success' && results.chunks) {
+      const chunkData = results.chunks.map((chunk: any, index: number) => ({
+        index: chunk.index || index,
+        content: chunk.content || chunk.preview || "",
+        size: chunk.size || (chunk.content ? chunk.content.length : 0),
+        startPosition: chunk.startPosition,
+        endPosition: chunk.endPosition
+      }));
+      setChunks(chunkData);
+      console.log("Chunks set for embeddings:", chunkData.length, "chunks");
+    }
+  };
+
   return (
     <ConfigProvider>
       <div className="space-y-6">
@@ -70,14 +95,19 @@ export function TestManagement() {
               <TabsContent value="chunking" className="mt-6">
                 <ChunkingTab 
                   isLoading={isLoading} 
-                  onRunTest={handleRunTest}
+                  onRunTest={handleChunkingResult}
                   extractedText={extractedText}
                   extractedFrom={extractedFrom}
                 />
               </TabsContent>
               
               <TabsContent value="embeddings" className="mt-6">
-                <EmbeddingsTab isLoading={isLoading} onRunTest={setTestResults} />
+                <EmbeddingsTab 
+                  isLoading={isLoading} 
+                  onRunTest={setTestResults}
+                  chunks={chunks}
+                  sourceDocument={extractedFrom}
+                />
               </TabsContent>
 
               <TabsContent value="embeddings-test" className="mt-6">
