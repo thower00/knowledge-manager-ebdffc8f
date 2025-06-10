@@ -76,8 +76,14 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       return;
     }
 
-    // Check for API key in the correct location
+    // Check for API key - try provider-specific first, then fall back to general apiKey
     const apiKey = config.providerApiKeys[config.provider] || config.apiKey;
+    console.log("Checking API key access:");
+    console.log("Provider:", config.provider);
+    console.log("Provider-specific key exists:", !!config.providerApiKeys[config.provider]);
+    console.log("General API key exists:", !!config.apiKey);
+    console.log("Final API key exists:", !!apiKey);
+    
     if (!apiKey && config.provider !== "local") {
       toast({
         variant: "destructive",
