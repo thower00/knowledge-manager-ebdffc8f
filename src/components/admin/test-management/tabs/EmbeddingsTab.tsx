@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
         const { data: configData, error } = await supabase
           .from("configurations")
           .select("key, value")
-          .in("key", ["document_processing_settings"]);
+          .in("key", ["document_processing"]);
 
         if (error) {
           console.error("Error loading configuration:", error);
