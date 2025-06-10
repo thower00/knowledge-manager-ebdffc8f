@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
@@ -87,13 +86,26 @@ export class DocumentProcessingService {
       content = await this.extractDocumentContent(typedDocument);
       this.updateProgress(documentId, typedDocument.title, 'extraction', 30);
     } catch (error) {
+      // If extraction fails, mark document as failed and don't proceed
+      await this.updateDocumentStatus(documentId, 'failed');
       throw new Error(`Failed to extract content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
+    // Validate that we got actual content, not error messages
     if (!content || content.trim().length === 0) {
+      await this.updateDocumentStatus(documentId, 'failed');
       throw new Error('Document content is empty or unavailable');
     }
 
+    // Check if the content looks like an error message
+    if (content.includes('Unable to extract text') || 
+        content.includes('Server-side error') || 
+        content.includes('Cannot connect to PDF processing')) {
+      await this.updateDocumentStatus(documentId, 'failed');
+      throw new Error('PDF extraction failed - only error messages were returned instead of actual content');
+    }
+
+    console.log(`Successfully extracted ${content.length} characters from ${typedDocument.title}`);
     this.updateProgress(documentId, typedDocument.title, 'chunking', 40);
 
     // Step 2: Generate chunks using shared chunking service
@@ -113,7 +125,7 @@ export class DocumentProcessingService {
     this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
     // Step 5: Update document status
-    await this.updateDocumentStatus(documentId, 'processed');
+    await this.updateDocumentStatus(documentId, 'completed');
     this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
 
     return {
@@ -150,8 +162,16 @@ export class DocumentProcessingService {
         }
       );
 
+      // Validate extracted content
       if (!extractedContent || extractedContent.trim().length === 0) {
         throw new Error('No content could be extracted from the document');
+      }
+
+      // Check if we got error messages instead of content
+      if (extractedContent.includes('Unable to extract text') || 
+          extractedContent.includes('Server-side error') || 
+          extractedContent.includes('Cannot connect to PDF processing')) {
+        throw new Error(`PDF extraction service failed: ${extractedContent}`);
       }
 
       console.log(`Successfully extracted ${extractedContent.length} characters from ${document.title}`);
