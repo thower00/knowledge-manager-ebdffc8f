@@ -57,6 +57,17 @@ export async function extractPdfTextServerSide(
       // Get initial text from proxy
       let extractedText = await extractPdfWithProxy(base64Data, extractionOptions, progressCallback);
       
+      // Check if we got an error message instead of content
+      if (extractedText && (
+        extractedText.includes('Unable to extract text') ||
+        extractedText.includes('Server-side error') ||
+        extractedText.includes('Cannot connect to PDF processing') ||
+        extractedText.includes('PDF processing failed')
+      )) {
+        console.log("Server returned error message, falling back to client-side extraction");
+        throw new Error("Server extraction returned error message");
+      }
+      
       // Apply additional client-side cleaning for better results
       if (progressCallback) progressCallback(90);
       console.log("Applying additional client-side text cleaning to improve readability");
@@ -99,29 +110,7 @@ export async function extractPdfTextServerSide(
         
       } catch (clientError) {
         console.error("Client-side extraction also failed:", clientError);
-        
-        // Final fallback - return an informative message
-        const fallbackMessage = `
-Unable to extract text from this PDF document.
-
-Server-side error: ${serverError instanceof Error ? serverError.message : String(serverError)}
-Client-side error: ${clientError instanceof Error ? clientError.message : String(clientError)}
-
-This could be due to:
-1. The PDF being scan-based (images only)
-2. Complex formatting or encryption
-3. Network connectivity issues
-4. Service temporarily unavailable
-
-Please try:
-- Ensuring the document is text-based (not scanned)
-- Checking your internet connection
-- Trying again in a few minutes
-- Using a different document
-        `;
-        
-        if (progressCallback) progressCallback(100);
-        return fallbackMessage.trim();
+        throw new Error(`Both server and client extraction failed. Server: ${serverError instanceof Error ? serverError.message : String(serverError)}. Client: ${clientError instanceof Error ? clientError.message : String(clientError)}`);
       }
     }
   } catch (error) {

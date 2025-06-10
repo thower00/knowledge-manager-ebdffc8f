@@ -3,29 +3,27 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 let workerInitialized = false;
 
-/**
- * Initialize PDF.js to run without external workers
- * This avoids network-related worker loading issues
- */
-export async function initPdfWorker(): Promise<boolean> {
+export const initializePdfWorker = (): void => {
   if (workerInitialized) {
-    console.log("PDF worker already initialized");
-    return true;
+    console.log('PDF worker already initialized');
+    return;
   }
 
-  console.log("PDF.js version:", pdfjsLib.version);
-  
   try {
-    // Configure PDF.js to run in main thread by setting empty workerSrc
-    // This prevents PDF.js from trying to load external worker files
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // Set the worker source for PDF.js
+    if (typeof window !== 'undefined') {
+      // Use the CDN version of the worker for web environments
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs';
+    }
     
-    console.log("PDF.js configured to run in main thread (no external worker)");
     workerInitialized = true;
-    return true;
-    
+    console.log('PDF worker initialized successfully');
   } catch (error) {
-    console.error("Failed to initialize PDF.js:", error);
-    throw new Error("Could not initialize PDF processing. Please try refreshing the page.");
+    console.error('Failed to initialize PDF worker:', error);
+    throw new Error(`PDF worker initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
+};
+
+export const isPdfWorkerInitialized = (): boolean => {
+  return workerInitialized;
+};
