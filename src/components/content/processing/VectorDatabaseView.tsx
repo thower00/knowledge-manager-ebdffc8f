@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,20 +74,34 @@ export function VectorDatabaseView() {
         throw new Error(`Failed to load embeddings: ${error.message}`);
       }
 
-      // Process embeddings to include vector dimensions
-      const processedEmbeddings = (embeddingData || []).map(item => ({
-        id: item.id,
-        document_id: item.document_id,
-        chunk_id: item.chunk_id,
-        embedding_model: item.embedding_model,
-        embedding_provider: item.embedding_provider,
-        similarity_threshold: item.similarity_threshold,
-        created_at: item.created_at,
-        vector_dimensions: item.embedding_vector ? 
-          (typeof item.embedding_vector === 'string' ? 
-            JSON.parse(item.embedding_vector).length : 
-            Array.isArray(item.embedding_vector) ? item.embedding_vector.length : 0) : 0
-      }));
+      // Process embeddings to include vector dimensions with proper type checking
+      const processedEmbeddings = (embeddingData || []).map(item => {
+        let vectorDimensions = 0;
+        
+        if (item.embedding_vector) {
+          if (typeof item.embedding_vector === 'string') {
+            try {
+              const parsed = JSON.parse(item.embedding_vector);
+              vectorDimensions = Array.isArray(parsed) ? parsed.length : 0;
+            } catch {
+              vectorDimensions = 0;
+            }
+          } else if (Array.isArray(item.embedding_vector)) {
+            vectorDimensions = item.embedding_vector.length;
+          }
+        }
+
+        return {
+          id: item.id,
+          document_id: item.document_id,
+          chunk_id: item.chunk_id,
+          embedding_model: item.embedding_model,
+          embedding_provider: item.embedding_provider,
+          similarity_threshold: item.similarity_threshold,
+          created_at: item.created_at,
+          vector_dimensions: vectorDimensions
+        };
+      });
 
       setEmbeddings(processedEmbeddings);
       
