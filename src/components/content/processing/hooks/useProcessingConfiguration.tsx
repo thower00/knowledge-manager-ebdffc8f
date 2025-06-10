@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { ChunkingConfig } from "@/types/chunking";
-import { useToast } from "@/components/ui/use-toast";
 
 interface EmbeddingConfig {
   provider: "openai" | "cohere" | "huggingface";
@@ -34,7 +33,6 @@ export function useProcessingConfiguration() {
     embedding: DEFAULT_EMBEDDING_CONFIG
   });
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   // Load configuration from localStorage on mount
   useEffect(() => {
@@ -54,55 +52,8 @@ export function useProcessingConfiguration() {
     }
   }, []);
 
-  // Save configuration to localStorage whenever it changes
-  const saveConfig = (newConfig: ProcessingConfig) => {
-    try {
-      localStorage.setItem("processingConfig", JSON.stringify(newConfig));
-      setConfig(newConfig);
-      console.log("Processing configuration saved");
-    } catch (error) {
-      console.error("Error saving processing configuration:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save configuration",
-      });
-    }
-  };
-
-  const updateChunkingConfig = (chunkingConfig: Partial<ChunkingConfig>) => {
-    const newConfig = {
-      ...config,
-      chunking: { ...config.chunking, ...chunkingConfig }
-    };
-    saveConfig(newConfig);
-  };
-
-  const updateEmbeddingConfig = (embeddingConfig: Partial<EmbeddingConfig>) => {
-    const newConfig = {
-      ...config,
-      embedding: { ...config.embedding, ...embeddingConfig }
-    };
-    saveConfig(newConfig);
-  };
-
-  const resetToDefaults = () => {
-    const defaultConfig = {
-      chunking: DEFAULT_CHUNKING_CONFIG,
-      embedding: DEFAULT_EMBEDDING_CONFIG
-    };
-    saveConfig(defaultConfig);
-    toast({
-      title: "Configuration Reset",
-      description: "Processing configuration has been reset to defaults",
-    });
-  };
-
   return {
     config,
-    isLoading,
-    updateChunkingConfig,
-    updateEmbeddingConfig,
-    resetToDefaults
+    isLoading
   };
 }

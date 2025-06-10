@@ -4,18 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, RotateCcw } from "lucide-react";
+import { Settings, ExternalLink } from "lucide-react";
 import { useProcessingConfiguration } from "./hooks/useProcessingConfiguration";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 export function ProcessingConfiguration() {
-  const {
-    config,
-    updateChunkingConfig,
-    updateEmbeddingConfig,
-    resetToDefaults
-  } = useProcessingConfiguration();
+  const { config } = useProcessingConfiguration();
+
+  const handleConfigurationManagement = () => {
+    window.open('/configuration-management', '_blank');
+  };
 
   return (
     <Card>
@@ -25,16 +25,24 @@ export function ProcessingConfiguration() {
             <Settings className="h-5 w-5" />
             <CardTitle>Processing Configuration</CardTitle>
           </div>
-          <Button variant="outline" size="sm" onClick={resetToDefaults}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Defaults
-          </Button>
         </div>
         <CardDescription>
-          Configure chunking and embedding settings for document processing
+          Current processing settings for document chunking and embeddings
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <Alert className="mb-6">
+          <ExternalLink className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              These settings are read-only. To modify processing configuration, please use the Configuration Management section.
+            </span>
+            <Button variant="outline" size="sm" onClick={handleConfigurationManagement}>
+              Open Configuration Management
+            </Button>
+          </AlertDescription>
+        </Alert>
+
         <Tabs defaultValue="chunking" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="chunking">Chunking</TabsTrigger>
@@ -50,11 +58,10 @@ export function ProcessingConfiguration() {
                     id="chunkSize"
                     type="number"
                     value={config.chunking.chunkSize}
-                    onChange={(e) => updateChunkingConfig({ chunkSize: parseInt(e.target.value) || 1000 })}
-                    min={100}
-                    max={8000}
+                    readOnly
+                    className="bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground">Characters per chunk (100-8000)</p>
+                  <p className="text-xs text-muted-foreground">Characters per chunk</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -63,21 +70,17 @@ export function ProcessingConfiguration() {
                     id="chunkOverlap"
                     type="number"
                     value={config.chunking.chunkOverlap}
-                    onChange={(e) => updateChunkingConfig({ chunkOverlap: parseInt(e.target.value) || 200 })}
-                    min={0}
-                    max={1000}
+                    readOnly
+                    className="bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground">Overlapping characters (0-1000)</p>
+                  <p className="text-xs text-muted-foreground">Overlapping characters</p>
                 </div>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="chunkStrategy">Chunking Strategy</Label>
-                <Select 
-                  value={config.chunking.chunkStrategy} 
-                  onValueChange={(value: any) => updateChunkingConfig({ chunkStrategy: value })}
-                >
-                  <SelectTrigger>
+                <Select value={config.chunking.chunkStrategy} disabled>
+                  <SelectTrigger className="bg-muted">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -100,11 +103,8 @@ export function ProcessingConfiguration() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="provider">Provider</Label>
-                  <Select 
-                    value={config.embedding.provider} 
-                    onValueChange={(value: any) => updateEmbeddingConfig({ provider: value })}
-                  >
-                    <SelectTrigger>
+                  <Select value={config.embedding.provider} disabled>
+                    <SelectTrigger className="bg-muted">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -117,11 +117,8 @@ export function ProcessingConfiguration() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
-                  <Select 
-                    value={config.embedding.model} 
-                    onValueChange={(value) => updateEmbeddingConfig({ model: value })}
-                  >
-                    <SelectTrigger>
+                  <Select value={config.embedding.model} disabled>
+                    <SelectTrigger className="bg-muted">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -154,12 +151,12 @@ export function ProcessingConfiguration() {
                 <Input
                   id="apiKey"
                   type="password"
-                  value={config.embedding.apiKey}
-                  onChange={(e) => updateEmbeddingConfig({ apiKey: e.target.value })}
-                  placeholder="Enter your API key"
+                  value={config.embedding.apiKey ? "••••••••••••••••" : "Not configured"}
+                  readOnly
+                  className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Required for {config.embedding.provider} embedding generation
+                  API key for {config.embedding.provider} embedding generation
                 </p>
               </div>
               
@@ -169,12 +166,11 @@ export function ProcessingConfiguration() {
                   id="batchSize"
                   type="number"
                   value={config.embedding.batchSize}
-                  onChange={(e) => updateEmbeddingConfig({ batchSize: parseInt(e.target.value) || 100 })}
-                  min={1}
-                  max={1000}
+                  readOnly
+                  className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Number of chunks to process in each batch (1-1000)
+                  Number of chunks to process in each batch
                 </p>
               </div>
             </div>
