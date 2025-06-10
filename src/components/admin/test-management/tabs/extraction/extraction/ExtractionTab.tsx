@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +7,10 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useProcessedDocumentsFetch } from "@/components/admin/document-extraction/hooks/useProcessedDocumentsFetch";
 import { 
   FileText, 
   Upload, 
@@ -18,7 +19,8 @@ import {
   Loader2, 
   Settings,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from "lucide-react";
 
 interface ExtractionTabProps {
@@ -36,11 +38,15 @@ interface TestResult {
 
 export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<string>("");
   const [currentTest, setCurrentTest] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [extractedText, setExtractedText] = useState<string>("");
   const [showDebugTests, setShowDebugTests] = useState(false);
   const { toast } = useToast();
+  
+  // Fetch processed documents from database
+  const { data: processedDocuments = [], isLoading: documentsLoading } = useProcessedDocumentsFetch();
 
   const testSteps = [
     { key: 'basic', label: 'Basic Function Test', description: 'Test if the edge function is responding' },
@@ -62,7 +68,100 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         return;
       }
       setSelectedFile(file);
+      setSelectedDocument(""); // Clear database document selection
       console.log('Selected PDF file:', file.name, 'Size:', file.size);
+    }
+  };
+
+  const handleDocumentSelect = (documentId: string) => {
+    setSelectedDocument(documentId);
+    setSelectedFile(null); // Clear file selection
+  };
+
+  const testWithStoredDocument = async (testStep: string) => {
+    if (!selectedDocument) {
+      toast({
+        variant: "destructive",
+        title: "No document selected",
+        description: "Please select a document from the database"
+      });
+      return;
+    }
+
+    const document = processedDocuments.find(doc => doc.id === selectedDocument);
+    if (!document) {
+      toast({
+        variant: "destructive",
+        title: "Document not found",
+        description: "The selected document could not be found"
+      });
+      return;
+    }
+
+    setCurrentTest(testStep);
+    
+    try {
+      console.log(`Starting database document test: ${testStep} with document:`, document.title);
+      
+      const { data, error } = await supabase.functions.invoke('process-pdf', {
+        body: {
+          testStep: testStep,
+          documentUrl: document.url,
+          documentTitle: document.title,
+          documentId: document.id,
+          useStoredDocument: true
+        }
+      });
+
+      console.log(`Database document test ${testStep} response:`, { data, error });
+
+      if (error) {
+        throw error;
+      }
+
+      const result: TestResult = {
+        status: 'success',
+        message: data.message || `${testStep} test with stored document completed successfully`,
+        data: data
+      };
+
+      if (testStep === 'full' && data.extractedText) {
+        setExtractedText(data.extractedText);
+      }
+
+      setTestResults(prev => ({
+        ...prev,
+        [`${testStep}_stored`]: result
+      }));
+
+      onRunTest(data);
+
+      toast({
+        title: "Test Completed",
+        description: result.message
+      });
+
+    } catch (error) {
+      console.error(`Database document test ${testStep} failed:`, error);
+      
+      const result: TestResult = {
+        status: 'error',
+        message: `${testStep} test with stored document failed`,
+        error: error instanceof Error ? error.message : String(error)
+      };
+
+      setTestResults(prev => ({
+        ...prev,
+        [`${testStep}_stored`]: result
+      }));
+
+      toast({
+        variant: "destructive",
+        title: "Test Failed",
+        description: result.error
+      });
+    } finally {
+      setCurrentTest(null);
     }
   };
 
@@ -166,11 +265,17 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `extracted-text-${selectedFile?.name || 'document'}.txt`;
+    a.download = `extracted-text-${selectedFile?.name || selectedDocument || 'document'}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const getSelectedDocumentTitle = () => {
+    if (!selectedDocument) return '';
+    const doc = processedDocuments.find(d => d.id === selectedDocument);
+    return doc?.title || '';
   };
 
   return (
@@ -202,6 +307,66 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                 </Badge>
               )}
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Database Documents Section */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Database className="h-5 w-5" />
+              <Label>Or Test with Stored Document</Label>
+            </div>
+            
+            <div className="space-y-2">
+              <Select value={selectedDocument} onValueChange={handleDocumentSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder={documentsLoading ? "Loading documents..." : "Select a document from database"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {processedDocuments.map((doc) => (
+                    <SelectItem key={doc.id} value={doc.id}>
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4" />
+                        <span>{doc.title}</span>
+                        {doc.source_type === 'google_drive' && (
+                          <Badge variant="outline" className="text-xs">Google Drive</Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {selectedDocument && (
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <Database className="h-4 w-4" />
+                  <span>Selected: {getSelectedDocumentTitle()}</span>
+                </div>
+              )}
+            </div>
+
+            {selectedDocument && (
+              <div className="flex space-x-2">
+                <Button
+                  onClick={() => testWithStoredDocument('full')}
+                  disabled={currentTest !== null}
+                  className="flex-1"
+                >
+                  {currentTest === 'full' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4 mr-2" />
+                      Extract Text from Stored Document
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -323,7 +488,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">
-                    Extracted {extractedText.length} characters from {selectedFile?.name}
+                    Extracted {extractedText.length} characters from {selectedFile?.name || getSelectedDocumentTitle()}
                   </div>
                   <Textarea
                     value={extractedText}
@@ -358,7 +523,10 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                         <AlertTriangle className="h-4 w-4 text-red-500" />
                       )}
                       <span className="font-medium">
-                        {testSteps.find(s => s.key === key)?.label}:
+                        {key.includes('_stored') ? 
+                          `${testSteps.find(s => s.key === key.replace('_stored', ''))?.label} (Stored Document)` :
+                          `${testSteps.find(s => s.key === key)?.label}`
+                        }:
                       </span>
                       <span className={result.status === 'success' ? 'text-green-600' : 'text-red-600'}>
                         {result.message}

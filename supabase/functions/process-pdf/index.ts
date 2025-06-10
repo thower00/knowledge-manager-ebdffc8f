@@ -28,21 +28,44 @@ Deno.serve(async (req) => {
       });
     }
 
-    let formData;
+    let requestBody;
     let file;
     let testStep;
+    let documentUrl;
+    let documentTitle;
+    let documentId;
+    let useStoredDocument;
     
     try {
-      console.log('📥 Parsing form data...');
-      formData = await req.formData();
-      file = formData.get('file') as File;
-      testStep = formData.get('testStep') as string || 'full';
-      console.log(`✅ Form data parsed. testStep: ${testStep}, file: ${file ? file.name : 'none'}`);
+      console.log('📥 Parsing request body...');
+      
+      // Check if it's JSON (stored document test) or FormData (file upload test)
+      const contentType = req.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        // Handle JSON request for stored document tests
+        requestBody = await req.json();
+        testStep = requestBody.testStep || 'full';
+        documentUrl = requestBody.documentUrl;
+        documentTitle = requestBody.documentTitle;
+        documentId = requestBody.documentId;
+        useStoredDocument = requestBody.useStoredDocument;
+        
+        console.log(`✅ JSON parsed. testStep: ${testStep}, useStoredDocument: ${useStoredDocument}`);
+        console.log(`Document: ${documentTitle} (${documentId})`);
+        console.log(`URL: ${documentUrl}`);
+      } else {
+        // Handle FormData for file upload tests
+        const formData = await req.formData();
+        file = formData.get('file') as File;
+        testStep = formData.get('testStep') as string || 'full';
+        console.log(`✅ Form data parsed. testStep: ${testStep}, file: ${file ? file.name : 'none'}`);
+      }
     } catch (error) {
-      console.error('❌ Failed to parse form data:', error);
+      console.error('❌ Failed to parse request body:', error);
       return new Response(JSON.stringify({
         status: 'error',
-        error: 'Failed to parse form data',
+        error: 'Failed to parse request body',
         details: error.message
       }), {
         status: 400,
@@ -88,7 +111,7 @@ Deno.serve(async (req) => {
 
     // Step 3: Test file upload to Adobe
     if (testStep === 'upload') {
-      if (!file) {
+      if (!file && !useStoredDocument) {
         console.log('❌ No file provided for upload test');
         return new Response(JSON.stringify({ 
           status: 'error',
@@ -101,11 +124,32 @@ Deno.serve(async (req) => {
       
       try {
         console.log('📤 Starting upload test...');
-        const result = await testAdobeUpload(file);
-        console.log('✅ Upload test completed successfully');
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        
+        if (useStoredDocument) {
+          // For stored documents, we'll fetch the file from the URL first
+          console.log(`Fetching document from URL: ${documentUrl}`);
+          const response = await fetch(documentUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const fetchedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
+          
+          const result = await testAdobeUpload(fetchedFile);
+          console.log('✅ Upload test with stored document completed successfully');
+          return new Response(JSON.stringify({
+            ...result,
+            message: `Adobe file upload test passed for stored document: ${documentTitle}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } else {
+          const result = await testAdobeUpload(file);
+          console.log('✅ Upload test completed successfully');
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       } catch (error) {
         console.error('❌ Upload test failed:', error);
         return new Response(JSON.stringify({
@@ -121,7 +165,7 @@ Deno.serve(async (req) => {
 
     // Step 4: Test extract job creation
     if (testStep === 'extract') {
-      if (!file) {
+      if (!file && !useStoredDocument) {
         console.log('❌ No file provided for extract test');
         return new Response(JSON.stringify({ 
           status: 'error',
@@ -134,11 +178,31 @@ Deno.serve(async (req) => {
       
       try {
         console.log('🔍 Starting extract test...');
-        const result = await testAdobeExtractJobWithFixedHandling(file);
-        console.log('✅ Extract test completed');
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        
+        if (useStoredDocument) {
+          console.log(`Fetching document from URL: ${documentUrl}`);
+          const response = await fetch(documentUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const fetchedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
+          
+          const result = await testAdobeExtractJobWithFixedHandling(fetchedFile);
+          console.log('✅ Extract test with stored document completed');
+          return new Response(JSON.stringify({
+            ...result,
+            message: `Adobe extract job creation test passed for stored document: ${documentTitle}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } else {
+          const result = await testAdobeExtractJobWithFixedHandling(file);
+          console.log('✅ Extract test completed');
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       } catch (error) {
         console.error('❌ Extract test failed:', error);
         return new Response(JSON.stringify({
@@ -153,45 +217,71 @@ Deno.serve(async (req) => {
     }
 
     // Default: Full processing
-    if (!file) {
-      console.log('❌ No file provided for full processing');
+    if (!file && !useStoredDocument) {
+      console.log('❌ No file or document reference provided for full processing');
       return new Response(JSON.stringify({ 
         status: 'error',
-        error: 'No file provided' 
+        error: 'No file or document reference provided' 
       }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    if (file.type !== 'application/pdf') {
-      console.log(`❌ Invalid file type: ${file.type}`);
-      return new Response(JSON.stringify({ 
-        status: 'error',
-        error: 'File must be a PDF' 
-      }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log(`🔄 STARTING FULL PROCESSING for: ${file.name}, size: ${file.size} bytes`);
-    
     try {
-      const extractedText = await extractWithAdobe(file);
-      console.log(`✅ FULL PROCESSING COMPLETED for: ${file.name}`);
+      let processedFile: File;
+      let filename: string;
+      let fileSize: number;
+
+      if (useStoredDocument) {
+        console.log(`🔄 STARTING FULL PROCESSING for stored document: ${documentTitle}`);
+        console.log(`Fetching document from URL: ${documentUrl}`);
+        
+        const response = await fetch(documentUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        processedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
+        filename = documentTitle;
+        fileSize = arrayBuffer.byteLength;
+        
+        console.log(`✅ Successfully fetched stored document, size: ${fileSize} bytes`);
+      } else {
+        if (file.type !== 'application/pdf') {
+          console.log(`❌ Invalid file type: ${file.type}`);
+          return new Response(JSON.stringify({ 
+            status: 'error',
+            error: 'File must be a PDF' 
+          }), { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`🔄 STARTING FULL PROCESSING for uploaded file: ${file.name}, size: ${file.size} bytes`);
+        processedFile = file;
+        filename = file.name;
+        fileSize = file.size;
+      }
+      
+      const extractedText = await extractWithAdobe(processedFile);
+      console.log(`✅ FULL PROCESSING COMPLETED for: ${filename}`);
       console.log(`✅ Extracted text length: ${extractedText.length} characters`);
 
       return new Response(JSON.stringify({
-        filename: file.name,
-        size: file.size,
+        filename: filename,
+        size: fileSize,
         extractedText: extractedText,
-        status: 'completed'
+        status: 'completed',
+        source: useStoredDocument ? 'database' : 'upload',
+        documentId: useStoredDocument ? documentId : undefined
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } catch (extractError) {
-      console.error(`❌ FULL PROCESSING FAILED for: ${file.name}`);
+      console.error(`❌ FULL PROCESSING FAILED for: ${useStoredDocument ? documentTitle : file?.name}`);
       console.error(`❌ Extract error:`, extractError);
       console.error(`❌ Extract error message:`, extractError.message);
       console.error(`❌ Extract error stack:`, extractError.stack);
@@ -200,7 +290,8 @@ Deno.serve(async (req) => {
         status: 'error',
         error: `Full processing failed: ${extractError.message}`,
         details: extractError.stack,
-        filename: file.name
+        filename: useStoredDocument ? documentTitle : file?.name,
+        source: useStoredDocument ? 'database' : 'upload'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
