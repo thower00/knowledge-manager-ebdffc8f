@@ -8,6 +8,9 @@ interface EmbeddingConfig {
   model: string;
   apiKey: string;
   batchSize: number;
+  similarityThreshold: string;
+  embeddingMetadata?: Record<string, any>;
+  vectorStorage?: string;
 }
 
 interface ProcessingConfig {
@@ -25,7 +28,8 @@ const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
   provider: "openai",
   model: "text-embedding-3-small",
   apiKey: "",
-  batchSize: 100
+  batchSize: 100,
+  similarityThreshold: "0.7"
 };
 
 export function useProcessingConfiguration() {
@@ -66,7 +70,10 @@ export function useProcessingConfiguration() {
               provider: dbConfig.provider || DEFAULT_EMBEDDING_CONFIG.provider,
               model: dbConfig.specificModelId || DEFAULT_EMBEDDING_CONFIG.model,
               apiKey: dbConfig.providerApiKeys?.[dbConfig.provider] || dbConfig.apiKey || "",
-              batchSize: parseInt(dbConfig.embeddingBatchSize) || DEFAULT_EMBEDDING_CONFIG.batchSize
+              batchSize: parseInt(dbConfig.embeddingBatchSize) || DEFAULT_EMBEDDING_CONFIG.batchSize,
+              similarityThreshold: dbConfig.similarityThreshold || DEFAULT_EMBEDDING_CONFIG.similarityThreshold,
+              embeddingMetadata: dbConfig.embeddingMetadata,
+              vectorStorage: dbConfig.vectorStorage
             }
           };
           

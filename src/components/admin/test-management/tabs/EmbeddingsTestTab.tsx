@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfig } from "../../document-processing/ConfigContext";
-import { EmbeddingService } from "../services/embeddingService";
+import { EmbeddingService, EmbeddingConfig } from "@/services/embedding/embeddingService";
 import { Loader2, Zap, Search, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,7 +21,16 @@ export function EmbeddingsTestTab() {
   const [embeddingResult, setEmbeddingResult] = useState<any>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
-  const embeddingService = new EmbeddingService(config);
+  // Map ConfigSettings to EmbeddingConfig
+  const createEmbeddingConfig = (): EmbeddingConfig => ({
+    provider: config.provider as "openai" | "cohere" | "huggingface",
+    model: config.specificModelId,
+    apiKey: config.providerApiKeys[config.provider] || config.apiKey || "",
+    batchSize: parseInt(config.embeddingBatchSize) || 10,
+    similarityThreshold: config.similarityThreshold,
+    embeddingMetadata: config.embeddingMetadata,
+    vectorStorage: config.vectorStorage
+  });
 
   const handleGenerateEmbedding = async () => {
     if (!testText.trim()) {
@@ -36,6 +45,7 @@ export function EmbeddingsTestTab() {
     setIsGenerating(true);
     try {
       console.log("Generating embedding for text:", testText);
+      const embeddingService = new EmbeddingService(createEmbeddingConfig());
       const result = await embeddingService.generateEmbedding(testText);
       setEmbeddingResult(result);
       
@@ -68,6 +78,7 @@ export function EmbeddingsTestTab() {
     setIsSearching(true);
     try {
       console.log("Searching for similar embeddings:", queryText);
+      const embeddingService = new EmbeddingService(createEmbeddingConfig());
       const results = await embeddingService.searchSimilarEmbeddings(queryText, 10);
       setSearchResults(results);
       
