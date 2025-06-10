@@ -116,7 +116,7 @@ export default function Navbar() {
             <Button 
               variant="default"
               className="bg-brand-600 hover:bg-brand-700"
-              onClick={() => window.location.href = '/auth'}
+              onClick={() => navigate('/')}
             >
               Sign In
             </Button>
