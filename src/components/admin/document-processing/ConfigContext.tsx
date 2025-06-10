@@ -16,6 +16,16 @@ export interface ConfigSettings {
   providerApiKeys: {
     [provider: string]: string;
   };
+  // New embedding-specific configurations
+  embeddingBatchSize: string;
+  similarityThreshold: string;
+  vectorStorage: "supabase" | "pinecone" | "weaviate" | "local";
+  embeddingMetadata: {
+    includeSource: boolean;
+    includeTimestamp: boolean;
+    includeModelInfo: boolean;
+    includeChunkIndex: boolean;
+  };
   [key: string]: string | object; // Add index signature to make it compatible with { [key: string]: Json }
 }
 
@@ -39,7 +49,17 @@ export const DEFAULT_CONFIG: ConfigSettings = {
   chunkStrategy: "fixed_size",
   storagePath: "/data/documents",
   customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
-  providerApiKeys: {}
+  providerApiKeys: {},
+  // New embedding defaults
+  embeddingBatchSize: "10",
+  similarityThreshold: "0.7",
+  vectorStorage: "supabase",
+  embeddingMetadata: {
+    includeSource: true,
+    includeTimestamp: true,
+    includeModelInfo: true,
+    includeChunkIndex: true
+  }
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

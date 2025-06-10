@@ -7,6 +7,7 @@ import { ChunkSettings } from "./ChunkSettings";
 import { ChunkStrategyField } from "./ChunkStrategyField";
 import { StoragePathField } from "./StoragePathField";
 import { CustomConfigField } from "./CustomConfigField";
+import { EmbeddingSettings } from "./EmbeddingSettings";
 import { useConfig } from "./ConfigContext";
 import { getModelDefaults } from "./utils/modelProviders";
 
@@ -119,6 +120,12 @@ export function ConfigForm() {
             defaultStrategy={getModelDefaults(config.provider, config.specificModelId).chunkStrategy}
           />
         </div>
+      </div>
+
+      <div className="border-b py-6">
+        <h3 className="text-lg font-medium mb-4">Embedding Configuration</h3>
+        
+        <EmbeddingSettings isLoading={isLoading} />
       </div>
 
       <div className="border-b py-6">

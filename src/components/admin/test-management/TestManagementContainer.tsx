@@ -6,12 +6,21 @@ import { ExtractionTab } from "./tabs/extraction";
 import { TestResultDisplay } from "./TestResultDisplay";
 import { useState } from "react";
 
+interface ChunkData {
+  index: number;
+  content: string;
+  size: number;
+  startPosition?: number;
+  endPosition?: number;
+}
+
 export function TestManagement() {
   const [activeTab, setActiveTab] = useState("extraction");
   const [isTestRunning, setIsTestRunning] = useState(false);
   const [testResult, setTestResult] = useState<string>("");
   const [extractedText, setExtractedText] = useState<string>("");
   const [extractedFrom, setExtractedFrom] = useState<string>("");
+  const [chunkData, setChunkData] = useState<ChunkData[]>([]);
   
   const handleRunTest = (data: any) => {
     setIsTestRunning(true);
@@ -25,6 +34,19 @@ export function TestManagement() {
         setExtractedText(data.extractedText);
         setExtractedFrom(data.filename || data.source || "Document extraction");
         console.log("Captured extracted text:", data.extractedText.length, "characters");
+      }
+      
+      // Capture chunk data from chunking tab
+      if (data && data.chunks) {
+        const chunks = data.chunks.map((chunk: any) => ({
+          index: chunk.index,
+          content: chunk.content || chunk.preview,
+          size: chunk.size,
+          startPosition: chunk.startPosition,
+          endPosition: chunk.endPosition
+        }));
+        setChunkData(chunks);
+        console.log("Captured chunk data:", chunks.length, "chunks");
       }
     } catch (error) {
       console.error("Error processing test result:", error);
@@ -67,7 +89,9 @@ export function TestManagement() {
         <TabsContent value="embeddings">
           <EmbeddingsTab 
             isLoading={isTestRunning} 
-            onRunTest={handleRunTest} 
+            onRunTest={handleRunTest}
+            chunks={chunkData}
+            sourceDocument={extractedFrom}
           />
         </TabsContent>
       </Tabs>
