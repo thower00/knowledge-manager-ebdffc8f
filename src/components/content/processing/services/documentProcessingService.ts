@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
+import { fetchAndExtractPdfServerSide } from "@/components/admin/document-extraction/services/serverPdfService";
 
 export interface ProcessingConfig {
   chunking: ChunkingConfig;
@@ -78,7 +79,7 @@ export class DocumentProcessingService {
 
     this.updateProgress(documentId, typedDocument.title, 'extraction', 10);
 
-    // Step 1: Extract document content
+    // Step 1: Extract document content using existing extraction service
     let content: string;
     try {
       content = await this.extractDocumentContent(typedDocument);
@@ -118,23 +119,43 @@ export class DocumentProcessingService {
   }
 
   private async extractDocumentContent(document: ProcessedDocument): Promise<string> {
-    // For now, we'll use a placeholder content extraction
-    // In a real implementation, this would extract text from the document based on its type
-    
-    if (document.mime_type === 'application/pdf') {
-      // For PDFs, we would typically use a PDF extraction service
-      // For now, return a placeholder indicating we need content extraction
-      throw new Error('PDF content extraction not yet implemented. Please ensure documents have been processed through the extraction pipeline first.');
-    } else if (document.mime_type === 'text/plain') {
-      // For text files, we could fetch the content directly if available
-      // For now, return sample content
-      return `Sample content for document: ${document.title}. This is placeholder text that would normally be extracted from the actual document file.`;
-    } else if (document.mime_type.startsWith('application/vnd.google-apps.document')) {
-      // For Google Docs, we would use the Google Drive API
-      return `Sample Google Doc content for: ${document.title}. This would normally be extracted using the Google Drive API.`;
-    } else {
-      // For other file types, provide a meaningful error
-      throw new Error(`Content extraction not supported for file type: ${document.mime_type}`);
+    // Use the existing PDF extraction service from Test Management
+    if (!document.url) {
+      throw new Error('Document URL is required for content extraction');
+    }
+
+    try {
+      console.log(`Extracting content from document: ${document.title}`);
+      
+      // Use the existing server-side PDF extraction service
+      const extractedContent = await fetchAndExtractPdfServerSide(
+        document.url,
+        document.title,
+        {
+          forceTextMode: true,
+          disableBinaryOutput: true,
+          strictTextCleaning: true,
+          useAdvancedExtraction: true,
+          useTextPatternExtraction: true,
+          timeout: 60
+        },
+        (progress) => {
+          // Map extraction progress to our 10-30% range
+          const mappedProgress = 10 + Math.floor((progress / 100) * 20);
+          this.updateProgress(document.id, document.title, 'extraction', mappedProgress);
+        }
+      );
+
+      if (!extractedContent || extractedContent.trim().length === 0) {
+        throw new Error('No content could be extracted from the document');
+      }
+
+      console.log(`Successfully extracted ${extractedContent.length} characters from ${document.title}`);
+      return extractedContent;
+      
+    } catch (error) {
+      console.error('Error extracting document content:', error);
+      throw new Error(`Content extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
