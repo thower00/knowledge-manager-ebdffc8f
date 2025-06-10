@@ -55,15 +55,35 @@ export function useConfigLoader(configKey: string = "document_processing") {
       // Convert ConfigSettings to Json-compatible format
       const configAsJson: Json = JSON.parse(JSON.stringify(config));
       
-      const { error: upsertError } = await supabase
+      // First check if the configuration already exists
+      const { data: existingConfig } = await supabase
         .from("configurations")
-        .upsert({
-          key: configKey,
-          value: configAsJson
-        });
+        .select("key")
+        .eq("key", configKey)
+        .maybeSingle();
       
-      if (upsertError) {
-        throw new Error(`Error saving configuration: ${upsertError.message}`);
+      let result;
+      if (existingConfig) {
+        // Update existing configuration
+        result = await supabase
+          .from("configurations")
+          .update({
+            value: configAsJson,
+            updated_at: new Date().toISOString()
+          })
+          .eq("key", configKey);
+      } else {
+        // Insert new configuration
+        result = await supabase
+          .from("configurations")
+          .insert({
+            key: configKey,
+            value: configAsJson
+          });
+      }
+      
+      if (result.error) {
+        throw new Error(`Error saving configuration: ${result.error.message}`);
       }
       
       console.log(`${configKey} configuration saved successfully`);
