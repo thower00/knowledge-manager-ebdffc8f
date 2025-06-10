@@ -7,6 +7,7 @@ import { CHAT_PROVIDERS } from "../document-processing/utils/chatProviders";
 import { useConfig } from "../document-processing/ConfigContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Check, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatAPIKeyFieldProps {
   isLoading: boolean;
@@ -41,44 +42,29 @@ export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
 
     try {
       const provider = CHAT_PROVIDERS[config.chatProvider];
-      if (!provider || !provider.verificationEndpoint) {
+      if (!provider) {
         throw new Error("Invalid provider configuration");
       }
 
       console.log(`Verifying ${provider.name} API key...`);
       
-      const response = await fetch(provider.verificationEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: config.apiKey })
+      // Use Supabase function invocation instead of direct fetch
+      const functionName = config.chatProvider === 'openai' ? 'verify-openai-key' : 
+                          config.chatProvider === 'anthropic' ? 'verify-anthropic-key' :
+                          config.chatProvider === 'cohere' ? 'verify-cohere-key' :
+                          'verify-openai-key'; // default fallback
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { apiKey: config.apiKey }
       });
 
-      console.log(`Verification response status: ${response.status}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      console.log(`Verification response:`, { data, error });
+
+      if (error) {
+        throw new Error(error.message || 'Verification failed');
       }
 
-      const responseText = await response.text();
-      console.log(`Verification response text: ${responseText}`);
-      
-      if (!responseText.trim()) {
-        throw new Error("Empty response from verification endpoint");
-      }
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error("Failed to parse response as JSON:", parseError);
-        throw new Error("Invalid JSON response from verification endpoint");
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      if (data.valid) {
+      if (data?.valid) {
         setIsValid(true);
         toast({
           title: "API key verified",
@@ -98,7 +84,7 @@ export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
         toast({
           variant: "destructive",
           title: "Invalid API key",
-          description: data.error || `Unable to verify your ${provider.name} API key`,
+          description: data?.error || `Unable to verify your ${provider.name} API key`,
         });
       }
     } catch (err: any) {

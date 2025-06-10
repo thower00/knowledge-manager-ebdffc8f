@@ -7,6 +7,7 @@ import { useConfig } from "./ConfigContext";
 import { MODEL_PROVIDERS } from "./utils/modelProviders";
 import { useToast } from "@/components/ui/use-toast";
 import { Check, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
   const { config, setConfig } = useConfig();
@@ -27,7 +28,7 @@ export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
       toast({
         variant: "destructive",
         title: "API key required",
-        description: "Please enter your OpenAI API key",
+        description: "Please enter your API key",
       });
       return;
     }
@@ -36,27 +37,35 @@ export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
     setIsValid(null);
 
     try {
-      const { data, error } = await fetch('/functions/v1/verify-openai-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: config.apiKey })
-      }).then(res => res.json());
+      console.log(`Verifying ${config.provider} API key...`);
+      
+      // Map provider to the correct edge function
+      const functionName = config.provider === 'openai' ? 'verify-openai-key' : 
+                          config.provider === 'anthropic' ? 'verify-anthropic-key' :
+                          config.provider === 'cohere' ? 'verify-cohere-key' :
+                          config.provider === 'huggingface' ? 'verify-huggingface-key' :
+                          'verify-openai-key'; // default fallback
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { apiKey: config.apiKey }
+      });
+
+      console.log(`Verification response:`, { data, error });
 
       if (error) {
-        throw new Error(error);
+        throw new Error(error.message || 'Verification failed');
       }
 
       if (data?.valid) {
         setIsValid(true);
         toast({
           title: "API key verified",
-          description: "Your OpenAI API key is valid",
+          description: `Your ${config.provider} API key is valid`,
         });
 
         // If we received models from the API, update the available models
         if (data.models && data.models.length > 0) {
-          console.log("Received OpenAI models:", data.models);
-          // This could be used to dynamically update available models in the future
+          console.log(`Received ${config.provider} models:`, data.models);
         }
         
         // Save the verified API key to the provider-specific keys
@@ -64,7 +73,7 @@ export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
           ...prev,
           providerApiKeys: {
             ...prev.providerApiKeys,
-            openai: config.apiKey
+            [config.provider]: config.apiKey
           }
         }));
       } else {
@@ -72,7 +81,7 @@ export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
         toast({
           variant: "destructive",
           title: "Invalid API key",
-          description: data?.error || "Unable to verify your OpenAI API key",
+          description: data?.error || `Unable to verify your ${config.provider} API key`,
         });
       }
     } catch (err: any) {
