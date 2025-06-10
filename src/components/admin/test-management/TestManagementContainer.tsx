@@ -72,6 +72,12 @@ export function TestManagement() {
     }
   };
 
+  // For EmbeddingsTab that passes results directly
+  const handleEmbeddingResult = (results: any) => {
+    setTestResults(results);
+    console.log("Embedding results set:", results);
+  };
+
   return (
     <ConfigProvider>
       <div className="space-y-6">
@@ -104,7 +110,7 @@ export function TestManagement() {
               <TabsContent value="embeddings" className="mt-6">
                 <EmbeddingsTab 
                   isLoading={isLoading} 
-                  onRunTest={setTestResults}
+                  onRunTest={handleEmbeddingResult}
                   chunks={chunks}
                   sourceDocument={extractedFrom}
                 />
