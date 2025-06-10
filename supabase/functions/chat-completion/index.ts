@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -124,18 +123,39 @@ serve(async (req) => {
       console.log('Generated embedding with dimensions:', queryEmbedding.length)
       
       // Search for similar embeddings using the database function
+      // Convert the embedding array to the format expected by the database
       const { data: searchResults, error: searchError } = await supabase.rpc(
         'search_similar_embeddings',
         { 
-          query_embedding: queryEmbedding,
-          similarity_threshold: 0.3,
+          query_embedding: queryEmbedding, // Pass as array, not JSON string
+          similarity_threshold: 0.1, // Lower threshold for testing
           match_count: 5
         }
       )
       
+      console.log('Search parameters:', {
+        embeddingLength: queryEmbedding.length,
+        threshold: 0.1,
+        matchCount: 5
+      })
+      
       if (searchError) {
         console.warn('Vector search failed:', searchError)
         console.warn('Search error details:', JSON.stringify(searchError))
+        
+        // Try alternative approach - direct query to check data format
+        const { data: sampleEmbedding, error: sampleError } = await supabase
+          .from('document_embeddings')
+          .select('id, embedding_vector')
+          .limit(1)
+          .single()
+          
+        if (sampleError) {
+          console.warn('Error fetching sample embedding:', sampleError)
+        } else {
+          console.log('Sample embedding type:', typeof sampleEmbedding?.embedding_vector)
+          console.log('Sample embedding preview:', JSON.stringify(sampleEmbedding?.embedding_vector).slice(0, 100))
+        }
       } else if (searchResults && searchResults.length > 0) {
         relevantDocs = searchResults
         contextText = searchResults
@@ -144,8 +164,9 @@ serve(async (req) => {
         console.log('Found relevant documents:', searchResults.length)
         console.log('First document title:', searchResults[0]?.document_title)
       } else {
-        console.log('No relevant documents found')
-        // Let's also check if there are any embeddings in the database at all
+        console.log('No relevant documents found with threshold 0.1')
+        
+        // Check if there are any embeddings in the database at all
         const { data: embeddingCount, error: countError } = await supabase
           .from('document_embeddings')
           .select('id', { count: 'exact' })
@@ -155,6 +176,24 @@ serve(async (req) => {
           console.warn('Error checking embeddings:', countError)
         } else {
           console.log('Total embeddings in database:', embeddingCount?.length || 0)
+          
+          // If we have embeddings but no matches, try manual similarity check
+          if ((embeddingCount?.length || 0) > 0) {
+            const { data: allEmbeddings, error: allError } = await supabase
+              .from('document_embeddings')
+              .select('id, document_id, embedding_vector')
+              .limit(3)
+              
+            if (!allError && allEmbeddings) {
+              console.log('Sample embeddings for debugging:')
+              allEmbeddings.forEach((emb, idx) => {
+                const embVector = typeof emb.embedding_vector === 'string' 
+                  ? JSON.parse(emb.embedding_vector) 
+                  : emb.embedding_vector
+                console.log(`Embedding ${idx + 1}: length=${embVector?.length}, type=${typeof embVector}`)
+              })
+            }
+          }
         }
       }
     } catch (searchErr) {
@@ -164,7 +203,8 @@ serve(async (req) => {
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
       (contextText ? `Context information from knowledge base:\n${contextText}\n\n` +
-      'Use this context to answer the user query. If the context doesn\'t contain relevant information, respond based on your general knowledge.' : '')
+      'Use this context to answer the user query. If the context doesn\'t contain relevant information, respond based on your general knowledge but mention that you found some relevant documents.' : 
+      'I currently have access to document embeddings in the knowledge base but was unable to find relevant content for this specific query. You may want to ask more specific questions about document content.')
     
     // Prepare messages array
     const promptMessages: ChatMessage[] = [
