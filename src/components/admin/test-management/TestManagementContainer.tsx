@@ -12,6 +12,8 @@ import { TestResultDisplay } from "./TestResultDisplay";
 export function TestManagement() {
   const [testResults, setTestResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [extractedText, setExtractedText] = useState<string>("");
+  const [extractedFrom, setExtractedFrom] = useState<string>("");
 
   const handleTestComplete = (results: any) => {
     setTestResults(results);
@@ -27,9 +29,22 @@ export function TestManagement() {
     });
   };
 
-  // For tabs that handle their own loading and just pass results (ExtractionTab)
-  const handleDirectResult = (results: any) => {
+  // For ExtractionTab that handles its own loading and passes results directly
+  const handleExtractionResult = (results: any) => {
     setTestResults(results);
+    
+    // Extract the text for use in other tabs
+    if (results && typeof results === 'object') {
+      if (results.extractedText) {
+        setExtractedText(results.extractedText);
+        setExtractedFrom(results.filename || results.source || "extraction");
+        console.log("Extracted text set for chunking:", results.extractedText.length, "characters");
+      } else if (results.data && results.data.extractedText) {
+        setExtractedText(results.data.extractedText);
+        setExtractedFrom(results.data.filename || results.data.source || "extraction");
+        console.log("Extracted text set for chunking:", results.data.extractedText.length, "characters");
+      }
+    }
   };
 
   return (
@@ -49,11 +64,16 @@ export function TestManagement() {
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
-                <ExtractionTab isLoading={false} onRunTest={handleDirectResult} />
+                <ExtractionTab isLoading={false} onRunTest={handleExtractionResult} />
               </TabsContent>
               
               <TabsContent value="chunking" className="mt-6">
-                <ChunkingTab isLoading={isLoading} onRunTest={handleRunTest} />
+                <ChunkingTab 
+                  isLoading={isLoading} 
+                  onRunTest={handleRunTest}
+                  extractedText={extractedText}
+                  extractedFrom={extractedFrom}
+                />
               </TabsContent>
               
               <TabsContent value="embeddings" className="mt-6">
