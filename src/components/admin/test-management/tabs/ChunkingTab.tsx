@@ -9,8 +9,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useChunkingConfig } from "@/components/content/chunking/hooks/useChunkingConfig";
+import { ChunkingService, ChunkResult } from "@/services/chunking/chunkingService";
 import { 
   Scissors, 
   FileText, 
@@ -28,15 +28,6 @@ interface ChunkingTabProps {
   extractedFrom?: string;
 }
 
-interface ChunkResult {
-  id: string;
-  content: string;
-  index: number;
-  startPosition?: number;
-  endPosition?: number;
-  size: number;
-}
-
 export function ChunkingTab({ isLoading, onRunTest, extractedText, extractedFrom }: ChunkingTabProps) {
   const [isChunking, setIsChunking] = useState(false);
   const [chunkResults, setChunkResults] = useState<ChunkResult[]>([]);
@@ -45,237 +36,6 @@ export function ChunkingTab({ isLoading, onRunTest, extractedText, extractedFrom
   
   // Load chunking configuration from Configuration Management
   const { chunkingConfig, handleChunkingConfigChange } = useChunkingConfig();
-
-  const performChunking = (text: string, config: ChunkingConfig): ChunkResult[] => {
-    const { chunkSize, chunkOverlap, chunkStrategy } = config;
-    const chunks: ChunkResult[] = [];
-    
-    console.log(`Starting chunking with strategy: ${chunkStrategy}, size: ${chunkSize}, overlap: ${chunkOverlap}`);
-    
-    switch (chunkStrategy) {
-      case "fixed_size":
-        return createFixedSizeChunks(text, chunkSize, chunkOverlap);
-      
-      case "paragraph":
-        return createParagraphChunks(text, chunkSize, chunkOverlap);
-      
-      case "sentence":
-        return createSentenceChunks(text, chunkSize, chunkOverlap);
-      
-      case "recursive":
-        return createRecursiveChunks(text, chunkSize, chunkOverlap);
-      
-      case "semantic":
-        // For now, fall back to fixed size for semantic chunking
-        console.warn("Semantic chunking not fully implemented, using fixed size");
-        return createFixedSizeChunks(text, chunkSize, chunkOverlap);
-      
-      default:
-        return createFixedSizeChunks(text, chunkSize, chunkOverlap);
-    }
-  };
-
-  const createFixedSizeChunks = (text: string, chunkSize: number, overlap: number): ChunkResult[] => {
-    const chunks: ChunkResult[] = [];
-    let startPos = 0;
-    let index = 0;
-
-    while (startPos < text.length) {
-      const endPos = Math.min(startPos + chunkSize, text.length);
-      const chunkText = text.slice(startPos, endPos);
-      
-      chunks.push({
-        id: `chunk_${index}`,
-        content: chunkText,
-        index,
-        startPosition: startPos,
-        endPosition: endPos,
-        size: chunkText.length
-      });
-
-      index++;
-      startPos = endPos - overlap;
-      
-      // Avoid infinite loop if overlap is too large
-      if (startPos <= chunks[chunks.length - 1]?.startPosition && startPos < text.length) {
-        startPos = (chunks[chunks.length - 1]?.startPosition || 0) + 1;
-      }
-    }
-
-    return chunks;
-  };
-
-  const createParagraphChunks = (text: string, maxSize: number, overlap: number): ChunkResult[] => {
-    const paragraphs = text.split(/\n\s*\n/);
-    const chunks: ChunkResult[] = [];
-    let currentChunk = "";
-    let currentStartPos = 0;
-    let index = 0;
-
-    for (const paragraph of paragraphs) {
-      if (currentChunk.length + paragraph.length <= maxSize) {
-        currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
-      } else {
-        if (currentChunk) {
-          chunks.push({
-            id: `chunk_${index}`,
-            content: currentChunk,
-            index,
-            startPosition: currentStartPos,
-            endPosition: currentStartPos + currentChunk.length,
-            size: currentChunk.length
-          });
-          index++;
-        }
-        
-        currentChunk = paragraph;
-        currentStartPos = text.indexOf(paragraph, currentStartPos);
-      }
-    }
-
-    if (currentChunk) {
-      chunks.push({
-        id: `chunk_${index}`,
-        content: currentChunk,
-        index,
-        startPosition: currentStartPos,
-        endPosition: currentStartPos + currentChunk.length,
-        size: currentChunk.length
-      });
-    }
-
-    return chunks;
-  };
-
-  const createSentenceChunks = (text: string, maxSize: number, overlap: number): ChunkResult[] => {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const chunks: ChunkResult[] = [];
-    let currentChunk = "";
-    let currentStartPos = 0;
-    let index = 0;
-
-    for (const sentence of sentences) {
-      const sentenceWithPunct = sentence.trim() + ".";
-      
-      if (currentChunk.length + sentenceWithPunct.length <= maxSize) {
-        currentChunk += (currentChunk ? " " : "") + sentenceWithPunct;
-      } else {
-        if (currentChunk) {
-          chunks.push({
-            id: `chunk_${index}`,
-            content: currentChunk,
-            index,
-            startPosition: currentStartPos,
-            endPosition: currentStartPos + currentChunk.length,
-            size: currentChunk.length
-          });
-          index++;
-        }
-        
-        currentChunk = sentenceWithPunct;
-        currentStartPos = text.indexOf(sentence.trim(), currentStartPos);
-      }
-    }
-
-    if (currentChunk) {
-      chunks.push({
-        id: `chunk_${index}`,
-        content: currentChunk,
-        index,
-        startPosition: currentStartPos,
-        endPosition: currentStartPos + currentChunk.length,
-        size: currentChunk.length
-      });
-    }
-
-    return chunks;
-  };
-
-  const createRecursiveChunks = (text: string, chunkSize: number, overlap: number): ChunkResult[] => {
-    // Recursive chunking: try paragraphs first, then sentences, then characters
-    const separators = ["\n\n", "\n", ". ", " ", ""];
-    return recursiveChunkText(text, chunkSize, overlap, separators, 0);
-  };
-
-  const recursiveChunkText = (
-    text: string, 
-    chunkSize: number, 
-    overlap: number, 
-    separators: string[], 
-    separatorIndex: number
-  ): ChunkResult[] => {
-    const separator = separators[separatorIndex];
-    const chunks: ChunkResult[] = [];
-    
-    if (text.length <= chunkSize) {
-      return [{
-        id: `chunk_0`,
-        content: text,
-        index: 0,
-        startPosition: 0,
-        endPosition: text.length,
-        size: text.length
-      }];
-    }
-
-    if (separatorIndex >= separators.length) {
-      // Fallback to character-level chunking
-      return createFixedSizeChunks(text, chunkSize, overlap);
-    }
-
-    const splits = separator ? text.split(separator) : [text];
-    let currentChunk = "";
-    let currentStartPos = 0;
-    let index = 0;
-
-    for (let i = 0; i < splits.length; i++) {
-      const piece = splits[i] + (separator && i < splits.length - 1 ? separator : "");
-      
-      if (currentChunk.length + piece.length <= chunkSize) {
-        currentChunk += piece;
-      } else {
-        if (currentChunk) {
-          chunks.push({
-            id: `chunk_${index}`,
-            content: currentChunk,
-            index,
-            startPosition: currentStartPos,
-            endPosition: currentStartPos + currentChunk.length,
-            size: currentChunk.length
-          });
-          index++;
-        }
-
-        if (piece.length > chunkSize) {
-          // Recursively chunk this piece with the next separator
-          const subChunks = recursiveChunkText(piece, chunkSize, overlap, separators, separatorIndex + 1);
-          chunks.push(...subChunks.map(chunk => ({
-            ...chunk,
-            id: `chunk_${index++}`,
-            index: index - 1
-          })));
-          currentChunk = "";
-        } else {
-          currentChunk = piece;
-        }
-        
-        currentStartPos = text.indexOf(piece, currentStartPos);
-      }
-    }
-
-    if (currentChunk) {
-      chunks.push({
-        id: `chunk_${index}`,
-        content: currentChunk,
-        index,
-        startPosition: currentStartPos,
-        endPosition: currentStartPos + currentChunk.length,
-        size: currentChunk.length
-      });
-    }
-
-    return chunks;
-  };
 
   const handleRunChunking = async () => {
     if (!extractedText) {
@@ -294,7 +54,9 @@ export function ChunkingTab({ isLoading, onRunTest, extractedText, extractedFrom
       console.log(`Text length: ${extractedText.length} characters`);
       console.log(`Chunking config:`, chunkingConfig);
       
-      const chunks = performChunking(extractedText, chunkingConfig);
+      // Use the shared chunking service
+      const chunkingService = new ChunkingService(chunkingConfig);
+      const chunks = chunkingService.generateDetailedChunks(extractedText);
       
       console.log(`Generated ${chunks.length} chunks`);
       setChunkResults(chunks);
