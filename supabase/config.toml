@@ -54,3 +54,7 @@ name = "verify-huggingface-key"
 [[functions]]
 verify_jwt = true
 name = "verify-anthropic-key"
+
+[[functions]]
+verify_jwt = true
+name = "chat-completion"
