@@ -158,4 +158,50 @@ export class EmbeddingDbService {
       throw error;
     }
   }
+
+  /**
+   * Clear all embeddings from the database
+   */
+  static async clearAllEmbeddings(): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('document_embeddings')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (error) {
+        throw new Error(`Failed to clear all embeddings: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error clearing all embeddings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get embedding count by provider
+   */
+  static async getEmbeddingCountByProvider(): Promise<Record<string, number>> {
+    try {
+      const { data, error } = await supabase
+        .from('document_embeddings')
+        .select('embedding_provider');
+
+      if (error) {
+        throw new Error(`Failed to fetch embedding providers: ${error.message}`);
+      }
+
+      const counts: Record<string, number> = {};
+      data.forEach(item => {
+        counts[item.embedding_provider] = (counts[item.embedding_provider] || 0) + 1;
+      });
+
+      return counts;
+    } catch (error) {
+      console.error('Error fetching embedding count by provider:', error);
+      throw error;
+    }
+  }
 }

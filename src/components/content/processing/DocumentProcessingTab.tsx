@@ -1,10 +1,11 @@
 
 import React, { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Settings } from "lucide-react";
+import { FileText, Settings, Database } from "lucide-react";
 import { DocumentSelector } from "./DocumentSelector";
 import { ProcessingConfiguration } from "./ProcessingConfiguration";
 import { ProcessingPipeline } from "./ProcessingPipeline";
+import { VectorDatabaseView } from "./VectorDatabaseView";
 import { useDocumentSelection } from "./hooks/useDocumentSelection";
 
 export function DocumentProcessingTab() {
@@ -61,6 +62,9 @@ export function DocumentProcessingTab() {
         selectedDocuments={selectedDocuments}
         documents={documents}
       />
+      
+      {/* Vector Database Verification */}
+      <VectorDatabaseView />
       
       {/* Processing Configuration */}
       <ProcessingConfiguration />
