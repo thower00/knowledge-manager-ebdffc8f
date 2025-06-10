@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { Database, Trash2, FileText, RotateCcw, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { EmbeddingDbService } from "@/components/content/utils/embeddingDbService";
 import { 
   AlertDialog,
