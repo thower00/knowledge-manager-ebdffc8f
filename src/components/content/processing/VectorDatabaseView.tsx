@@ -78,16 +78,19 @@ export function VectorDatabaseView() {
       const processedEmbeddings = (embeddingData || []).map(item => {
         let vectorDimensions = 0;
         
-        if (item.embedding_vector) {
-          if (typeof item.embedding_vector === 'string') {
+        // Handle the embedding_vector which could be string, array, or null/undefined
+        const embeddingVector = item.embedding_vector as any;
+        
+        if (embeddingVector) {
+          if (typeof embeddingVector === 'string') {
             try {
-              const parsed = JSON.parse(item.embedding_vector);
+              const parsed = JSON.parse(embeddingVector);
               vectorDimensions = Array.isArray(parsed) ? parsed.length : 0;
             } catch {
               vectorDimensions = 0;
             }
-          } else if (Array.isArray(item.embedding_vector)) {
-            vectorDimensions = item.embedding_vector.length;
+          } else if (Array.isArray(embeddingVector)) {
+            vectorDimensions = embeddingVector.length;
           }
         }
 
