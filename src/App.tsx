@@ -9,7 +9,6 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
@@ -38,7 +37,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/" replace />;
   }
   
   return <>{children}</>;
@@ -53,7 +52,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/" replace />;
   }
   
   if (!isAdmin) {
@@ -80,8 +79,6 @@ const App = () => (
                     <main className="flex-grow">
                       <Routes>
                         <Route path="/" element={<Index />} />
-                        {/* Auth route - DO NOT protect this route */}
-                        <Route path="/auth" element={<Auth />} />
                         <Route path="/profile" element={
                           <ProtectedRoute>
                             <Profile />

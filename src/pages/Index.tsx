@@ -1,150 +1,89 @@
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Key, Settings, UserPlus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import SignInForm from "@/components/auth/SignInForm";
+import SignUpForm from "@/components/auth/SignUpForm";
+import AIChat from "@/components/chat/AIChat";
+import { useState, useEffect } from "react";
+import { debugAuthState } from "@/integrations/supabase/client";
 
 export default function Index() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { user, isLoading } = useAuth();
+  
+  // Debug function to help diagnose auth issues
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log("Index page mounted, checking auth state");
+      const session = await debugAuthState();
+      console.log("Index page debug - Current user state:", user);
+      console.log("Index page debug - Current session state:", session);
+    };
+    
+    checkAuth();
+  }, [user]);
+  
+  // Show loading state while checking authentication
+  if (isLoading) {
+    console.log("Index page - Loading state...");
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
+  // Show AI Chat for authenticated users
+  if (user) {
+    console.log("Index page - User authenticated, showing AI chat", user);
+    return <AIChat />;
+  }
+
+  // Show login/signup for non-authenticated users
+  console.log("Index page - No user, showing auth forms");
+  
   return (
     <div className="min-h-screen flex flex-col">
-      <main className="flex-grow">
-        {/* Hero Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-36 bg-brand-50">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Knowledge Management Intelligence
-                </h1>
-                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl">
-                  Extract, convert, and process text from multiple document formats. Transform raw content into meaningful knowledge.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Button 
-                  className="bg-brand-600 hover:bg-brand-700"
-                  size="lg"
-                  onClick={() => user ? navigate('/dashboard') : navigate('/auth')}
-                >
-                  {user ? 'Go to Dashboard' : 'Get Started'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                >
-                  Learn More
-                </Button>
-              </div>
+      {/* Hero Section */}
+      <section className="w-full py-12 md:py-24 lg:py-32 xl:py-36 bg-brand-50">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center space-y-4 text-center">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
+                Knowledge Management Intelligence
+              </h1>
+              <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl">
+                Extract, convert, and process text from multiple document formats. Transform raw content into meaningful knowledge.
+              </p>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Features Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-white">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                  Powerful Knowledge Processing
-                </h2>
-                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Our platform handles the complexity of document processing so you can focus on insights.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3">
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <FileText className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Document Extraction</h3>
-                    <p className="text-sm text-gray-500">
-                      Extract text from various document formats including PDF, DOC, and more.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <Settings className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Text Processing</h3>
-                    <p className="text-sm text-gray-500">
-                      Process and normalize text data with advanced NLP techniques.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <Key className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Vector Embeddings</h3>
-                    <p className="text-sm text-gray-500">
-                      Create semantic vector representations for advanced search and analysis.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-        
-        {/* Admin Features Preview */}
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-50">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                  Powerful Administration
-                </h2>
-                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Complete control over users, configuration, and system testing.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3">
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <UserPlus className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Role Management</h3>
-                    <p className="text-sm text-gray-500">
-                      Promote users to admin roles and manage access permissions.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <Settings className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Configuration</h3>
-                    <p className="text-sm text-gray-500">
-                      Customize system settings and store configuration in the database.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="feature-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-                  <Key className="h-12 w-12 text-brand-600" />
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold">Test Management</h3>
-                    <p className="text-sm text-gray-500">
-                      Verify implementations with comprehensive testing tools.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-      </main>
+      {/* Auth Section */}
+      <section className="w-full py-12 bg-white">
+        <div className="container flex items-center justify-center px-4 md:px-6">
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold">
+                {isSignUp ? "Create an account" : "Sign in"}
+              </CardTitle>
+              <CardDescription>
+                {isSignUp 
+                  ? "Enter your details to create a new account" 
+                  : "Enter your credentials to access your account"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isSignUp ? (
+                <SignUpForm 
+                  onSignIn={() => setIsSignUp(false)} 
+                />
+              ) : (
+                <SignInForm 
+                  onSignUp={() => setIsSignUp(true)} 
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
