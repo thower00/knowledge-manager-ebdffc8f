@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
@@ -74,13 +73,16 @@ export class DocumentProcessingService {
       throw new Error(`Failed to fetch document: ${docError?.message}`);
     }
 
-    this.updateProgress(documentId, document.title, 'extraction', 10);
+    // Type assertion for the status field since we know it's constrained in the database
+    const typedDocument = document as ProcessedDocument;
+
+    this.updateProgress(documentId, typedDocument.title, 'extraction', 10);
 
     // Step 1: Extract document content
     let content: string;
     try {
-      content = await this.extractDocumentContent(document);
-      this.updateProgress(documentId, document.title, 'extraction', 30);
+      content = await this.extractDocumentContent(typedDocument);
+      this.updateProgress(documentId, typedDocument.title, 'extraction', 30);
     } catch (error) {
       throw new Error(`Failed to extract content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -89,23 +91,23 @@ export class DocumentProcessingService {
       throw new Error('Document content is empty or unavailable');
     }
 
-    this.updateProgress(documentId, document.title, 'chunking', 40);
+    this.updateProgress(documentId, typedDocument.title, 'chunking', 40);
 
     // Step 2: Generate chunks
     const chunks = await this.generateChunks(content, this.config.chunking);
-    this.updateProgress(documentId, document.title, 'chunking', 60, chunks.length);
+    this.updateProgress(documentId, typedDocument.title, 'chunking', 60, chunks.length);
 
     // Step 3: Store chunks in database
     const chunkIds = await this.storeChunks(documentId, chunks);
-    this.updateProgress(documentId, document.title, 'embedding', 70, chunks.length);
+    this.updateProgress(documentId, typedDocument.title, 'embedding', 70, chunks.length);
 
     // Step 4: Generate embeddings
     const embeddingCount = await this.generateEmbeddings(documentId, chunkIds, chunks);
-    this.updateProgress(documentId, document.title, 'storage', 90, chunks.length, embeddingCount);
+    this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
     // Step 5: Update document status
     await this.updateDocumentStatus(documentId, 'processed');
-    this.updateProgress(documentId, document.title, 'completed', 100, chunks.length, embeddingCount);
+    this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
 
     return {
       documentId,
