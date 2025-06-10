@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ExternalLink } from "lucide-react";
+import { Settings, ExternalLink, Check, X } from "lucide-react";
 import { useProcessingConfiguration } from "./hooks/useProcessingConfiguration";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -164,32 +164,40 @@ export function ProcessingConfiguration() {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={config.embedding.apiKey ? "••••••••••••••••••••••••••••••••••••••••" : "Not configured"}
-                  readOnly
-                  className="bg-muted font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  API key for {config.embedding.provider} embedding generation (configured in Configuration Management)
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="batchSize">Batch Size</Label>
-                <Input
-                  id="batchSize"
-                  type="number"
-                  value={config.embedding.batchSize}
-                  readOnly
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Number of chunks to process in each batch
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="apiKeyStatus">API Key Status</Label>
+                  <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted">
+                    {config.embedding.apiKey ? (
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-green-600">Configured</span>
+                      </>
+                    ) : (
+                      <>
+                        <X className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-red-600">Not configured</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    API key status for {config.embedding.provider} embedding generation
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="batchSize">Batch Size</Label>
+                  <Input
+                    id="batchSize"
+                    type="number"
+                    value={config.embedding.batchSize}
+                    readOnly
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Number of chunks to process in each batch
+                  </p>
+                </div>
               </div>
             </div>
           </TabsContent>
