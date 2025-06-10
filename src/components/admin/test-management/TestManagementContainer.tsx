@@ -1,104 +1,56 @@
 
+import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
-import { ChunkingTab } from "./tabs/ChunkingTab";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExtractionTab } from "./tabs/extraction";
+import { ChunkingTab } from "./tabs/ChunkingTab";
+import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
+import { EmbeddingsTestTab } from "./tabs/EmbeddingsTestTab";
+import { ConfigProvider } from "../document-processing/ConfigContext";
 import { TestResultDisplay } from "./TestResultDisplay";
-import { useState } from "react";
-
-interface ChunkData {
-  index: number;
-  content: string;
-  size: number;
-  startPosition?: number;
-  endPosition?: number;
-}
 
 export function TestManagement() {
-  const [activeTab, setActiveTab] = useState("extraction");
-  const [isTestRunning, setIsTestRunning] = useState(false);
-  const [testResult, setTestResult] = useState<string>("");
-  const [extractedText, setExtractedText] = useState<string>("");
-  const [extractedFrom, setExtractedFrom] = useState<string>("");
-  const [chunkData, setChunkData] = useState<ChunkData[]>([]);
-  
-  const handleRunTest = (data: any) => {
-    setIsTestRunning(true);
-    
-    try {
-      const result = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
-      setTestResult(result);
-      
-      // Capture extracted text from extraction tab
-      if (data && data.extractedText) {
-        setExtractedText(data.extractedText);
-        setExtractedFrom(data.filename || data.source || "Document extraction");
-        console.log("Captured extracted text:", data.extractedText.length, "characters");
-      }
-      
-      // Capture chunk data from chunking tab
-      if (data && data.chunks) {
-        const chunks = data.chunks.map((chunk: any) => ({
-          index: chunk.index,
-          content: chunk.content || chunk.preview,
-          size: chunk.size,
-          startPosition: chunk.startPosition,
-          endPosition: chunk.endPosition
-        }));
-        setChunkData(chunks);
-        console.log("Captured chunk data:", chunks.length, "chunks");
-      }
-    } catch (error) {
-      console.error("Error processing test result:", error);
-      setTestResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsTestRunning(false);
-    }
-  };
+  const [testResults, setTestResults] = useState<any>(null);
 
   return (
-    <div className="space-y-6">
-      <Tabs 
-        defaultValue="extraction" 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
-        <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
-          <TabsTrigger value="chunking">Chunking</TabsTrigger>
-          <TabsTrigger value="embeddings">Embeddings</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="extraction">
-          <ExtractionTab 
-            isLoading={isTestRunning} 
-            onRunTest={handleRunTest} 
-          />
-        </TabsContent>
-        
-        <TabsContent value="chunking">
-          <ChunkingTab 
-            isLoading={isTestRunning} 
-            onRunTest={handleRunTest}
-            extractedText={extractedText}
-            extractedFrom={extractedFrom}
-          />
-        </TabsContent>
-        
-        <TabsContent value="embeddings">
-          <EmbeddingsTab 
-            isLoading={isTestRunning} 
-            onRunTest={handleRunTest}
-            chunks={chunkData}
-            sourceDocument={extractedFrom}
-          />
-        </TabsContent>
-      </Tabs>
-      
-      {testResult && (
-        <TestResultDisplay result={testResult} />
-      )}
-    </div>
+    <ConfigProvider>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>System Testing & Validation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="extraction" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
+                <TabsTrigger value="chunking">Text Chunking</TabsTrigger>
+                <TabsTrigger value="embeddings">Embeddings Processing</TabsTrigger>
+                <TabsTrigger value="embeddings-test">Embeddings Testing</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="extraction" className="mt-6">
+                <ExtractionTab onTestComplete={setTestResults} />
+              </TabsContent>
+              
+              <TabsContent value="chunking" className="mt-6">
+                <ChunkingTab onTestComplete={setTestResults} />
+              </TabsContent>
+              
+              <TabsContent value="embeddings" className="mt-6">
+                <EmbeddingsTab onTestComplete={setTestResults} />
+              </TabsContent>
+
+              <TabsContent value="embeddings-test" className="mt-6">
+                <EmbeddingsTestTab />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {testResults && (
+          <TestResultDisplay results={testResults} />
+        )}
+      </div>
+    </ConfigProvider>
   );
 }
