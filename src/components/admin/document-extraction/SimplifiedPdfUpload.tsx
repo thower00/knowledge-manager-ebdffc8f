@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, File, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { extractPdfTextSimplified } from "./utils/simplifiedPdfExtraction";
-import { initPdfWorker } from "./utils/pdfWorkerInit";
+import { initializePdfWorker } from "./utils/pdfWorkerInit";
 
 interface SimplifiedPdfUploadProps {
   onExtract?: (extractedText: string, fileName: string) => void;
@@ -49,7 +48,7 @@ export function SimplifiedPdfUpload({ onExtract }: SimplifiedPdfUploadProps) {
       console.log('Starting simplified extraction for:', selectedFile.name);
       
       // Initialize PDF.js worker configuration
-      await initPdfWorker();
+      await initializePdfWorker();
       
       // Convert file to ArrayBuffer
       const arrayBuffer = await selectedFile.arrayBuffer();

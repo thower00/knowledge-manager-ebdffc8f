@@ -1,6 +1,5 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
-import { initPdfWorker } from './pdfWorkerInit';
+import { initializePdfWorker } from './pdfWorkerInit';
 import { isPdfBuffer } from './pdfValidation';
 import { 
   PdfExtractionOptions, 
@@ -108,7 +107,7 @@ export const extractPdfText = async (
   
   // Initialize the worker before processing
   try {
-    await initPdfWorker();
+    await initializePdfWorker();
     if (progressCallback) progressCallback(15);
   } catch (error) {
     console.error("Failed to initialize PDF worker:", error);
@@ -365,7 +364,7 @@ export const extractPdfTextProgressively = async (
   
   try {
     // Initialize the worker before processing
-    await initPdfWorker();
+    await initializePdfWorker();
     if (progressCallback) progressCallback(10);
     
     // Create object for PDF loading with shorter initial timeout
@@ -508,4 +507,3 @@ export const extractPdfTextProgressively = async (
     throw error;
   }
 };
-

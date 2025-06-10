@@ -1,6 +1,5 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
-import { initPdfWorker } from './pdfWorkerInit';
+import { initializePdfWorker } from './pdfWorkerInit';
 
 export interface PdfExtractionResult {
   success: boolean;
@@ -24,7 +23,7 @@ export async function extractTextFromPdfBuffer(
     
     // Initialize the PDF worker
     console.log('Initializing PDF worker...');
-    await initPdfWorker();
+    await initializePdfWorker();
     if (progressCallback) progressCallback(20);
     
     // Validate PDF data
