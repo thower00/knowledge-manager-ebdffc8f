@@ -1,1 +1,56 @@
+
 project_id = "sxrinuxxlmytddymjbmr"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enabled = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+
+[experimental]
+multiservice = false
+
+[[functions]]
+verify_jwt = true
+name = "verify-openai-key"
+
+[[functions]]
+verify_jwt = true
+name = "verify-cohere-key"
+
+[[functions]]
+verify_jwt = true
+name = "verify-huggingface-key"
+
+[[functions]]
+verify_jwt = true
+name = "verify-anthropic-key"

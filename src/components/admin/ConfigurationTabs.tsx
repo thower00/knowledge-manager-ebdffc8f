@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentProcessingSettings } from "./DocumentProcessingSettings";
 import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
+import { ChatSettings } from "./ChatSettings";
 
 export function ConfigurationTabs() {
   // Use localStorage to persist the active tab between renders
@@ -32,9 +33,10 @@ export function ConfigurationTabs() {
       className="w-full"
       defaultValue="document-processing"
     >
-      <TabsList className="grid w-full grid-cols-2 mb-6">
+      <TabsList className="grid w-full grid-cols-3 mb-6">
         <TabsTrigger value="document-processing">Document Processing Settings</TabsTrigger>
         <TabsTrigger value="google-drive">Google Drive Integration</TabsTrigger>
+        <TabsTrigger value="chat-settings">AI Chat Settings</TabsTrigger>
       </TabsList>
       
       <TabsContent value="document-processing">
@@ -43,6 +45,10 @@ export function ConfigurationTabs() {
       
       <TabsContent value="google-drive">
         <GoogleDriveIntegration activeTab={activeTab} />
+      </TabsContent>
+      
+      <TabsContent value="chat-settings">
+        <ChatSettings activeTab={activeTab} />
       </TabsContent>
     </Tabs>
   );

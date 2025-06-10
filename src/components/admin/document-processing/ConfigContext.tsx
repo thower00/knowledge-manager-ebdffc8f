@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from "react";
 import { Json } from "@/integrations/supabase/types";
 
@@ -25,6 +24,15 @@ export interface ConfigSettings {
     includeTimestamp: boolean;
     includeModelInfo: boolean;
     includeChunkIndex: boolean;
+  };
+  // New chat-specific configurations
+  chatProvider: string;
+  chatModel: string;
+  chatTemperature: string;
+  chatMaxTokens: string;
+  chatSystemPrompt: string;
+  chatProviderApiKeys: {
+    [provider: string]: string;
   };
   [key: string]: string | object; // Add index signature to make it compatible with { [key: string]: Json }
 }
@@ -59,7 +67,14 @@ export const DEFAULT_CONFIG: ConfigSettings = {
     includeTimestamp: true,
     includeModelInfo: true,
     includeChunkIndex: true
-  }
+  },
+  // New chat defaults
+  chatProvider: "openai",
+  chatModel: "gpt-4o-mini",
+  chatTemperature: "0.7",
+  chatMaxTokens: "2000",
+  chatSystemPrompt: "You are a helpful assistant answering questions based on the provided context.",
+  chatProviderApiKeys: {}
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
@@ -87,3 +102,5 @@ export const useConfig = () => {
   }
   return context;
 };
+
+export default ConfigContext;

@@ -21,18 +21,18 @@ serve(async (req) => {
     }
 
     // Test API key by listing available models
-    const response = await fetch('https://api.openai.com/v1/models', {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
     });
 
     const data = await response.json();
     
     if (!response.ok) {
-      console.error("OpenAI API error:", data);
+      console.error("Anthropic API error:", data);
       return new Response(JSON.stringify({
         valid: false,
         error: data.error?.message || `API Error: ${response.status} ${response.statusText}`
@@ -43,36 +43,21 @@ serve(async (req) => {
     }
 
     // Extract models from response
-    const models = data.data || [];
-    
-    // Filter to get embedding and chat models
-    const embeddingModels = models.filter((model: any) => 
-      model.id.includes('embedding') || model.id.includes('text-embedding')
-    );
-    
-    const chatModels = models.filter((model: any) => 
-      model.id.includes('gpt-') || 
-      model.id.includes('text-davinci') ||
-      model.id.includes('-o')
-    );
+    const models = data.models || [];
     
     return new Response(JSON.stringify({
       valid: true,
       models: models.map((model: any) => ({
         id: model.id,
-        name: model.id,
-        type: model.id.includes('embedding') ? 'embedding' : 
-              model.id.includes('gpt') || model.id.includes('o') ? 'chat' : 
-              'other'
-      })),
-      embeddingModels: embeddingModels.map((model: any) => model.id),
-      chatModels: chatModels.map((model: any) => model.id)
+        name: model.name || model.id,
+        capabilities: model.capabilities || []
+      }))
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
-    console.error("Error in verify-openai-key function:", error);
+    console.error("Error in verify-anthropic-key function:", error);
     
     return new Response(JSON.stringify({
       valid: false,
