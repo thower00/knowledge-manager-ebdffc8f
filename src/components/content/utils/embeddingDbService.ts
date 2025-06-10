@@ -57,12 +57,20 @@ export class EmbeddingDbService {
         throw new Error(`Failed to fetch embeddings: ${error.message}`);
       }
 
-      // Convert embedding_vector string back to number array
+      // Convert embedding_vector string back to number array and ensure proper typing
       return (data || []).map(item => ({
-        ...item,
+        id: item.id,
+        document_id: item.document_id,
+        chunk_id: item.chunk_id,
         embedding_vector: typeof item.embedding_vector === 'string' 
           ? JSON.parse(item.embedding_vector) 
-          : item.embedding_vector
+          : item.embedding_vector,
+        embedding_model: item.embedding_model,
+        embedding_provider: item.embedding_provider,
+        similarity_threshold: item.similarity_threshold,
+        metadata: item.metadata as Record<string, any> || {},
+        created_at: item.created_at,
+        updated_at: item.updated_at,
       }));
     } catch (error) {
       console.error('Error fetching document embeddings:', error);

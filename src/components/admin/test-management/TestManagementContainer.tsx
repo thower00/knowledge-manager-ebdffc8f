@@ -11,6 +11,20 @@ import { TestResultDisplay } from "./TestResultDisplay";
 
 export function TestManagement() {
   const [testResults, setTestResults] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleTestComplete = (results: any) => {
+    setTestResults(results);
+    setIsLoading(false);
+  };
+
+  const handleRunTest = (callback: () => Promise<any>) => {
+    setIsLoading(true);
+    callback().then(handleTestComplete).catch((error) => {
+      console.error('Test failed:', error);
+      setIsLoading(false);
+    });
+  };
 
   return (
     <ConfigProvider>
@@ -29,15 +43,15 @@ export function TestManagement() {
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
-                <ExtractionTab />
+                <ExtractionTab isLoading={isLoading} onRunTest={handleRunTest} />
               </TabsContent>
               
               <TabsContent value="chunking" className="mt-6">
-                <ChunkingTab />
+                <ChunkingTab isLoading={isLoading} onRunTest={handleRunTest} />
               </TabsContent>
               
               <TabsContent value="embeddings" className="mt-6">
-                <EmbeddingsTab isLoading={false} onRunTest={setTestResults} />
+                <EmbeddingsTab isLoading={isLoading} onRunTest={setTestResults} />
               </TabsContent>
 
               <TabsContent value="embeddings-test" className="mt-6">

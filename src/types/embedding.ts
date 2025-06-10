@@ -6,16 +6,8 @@ export interface EmbeddingVector {
   embedding_vector: number[];
   embedding_model: string;
   embedding_provider: string;
-  similarity_threshold: number;
-  metadata: {
-    includeSource?: boolean;
-    includeTimestamp?: boolean;
-    includeModelInfo?: boolean;
-    includeChunkIndex?: boolean;
-    batch_size?: string;
-    vector_storage?: string;
-    [key: string]: any;
-  };
+  similarity_threshold: number | null;
+  metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
 }

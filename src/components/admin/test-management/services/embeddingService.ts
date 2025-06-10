@@ -25,8 +25,8 @@ export interface DocumentEmbedding {
   embedding_vector: number[];
   embedding_model: string;
   embedding_provider: string;
-  similarity_threshold: number;
-  metadata: any;
+  similarity_threshold: number | null;
+  metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -201,12 +201,20 @@ export class EmbeddingService {
       throw new Error(`Failed to fetch document embeddings: ${error.message}`);
     }
 
-    // Convert embedding_vector string back to number array
+    // Convert embedding_vector string back to number array and ensure proper typing
     return (data || []).map(item => ({
-      ...item,
+      id: item.id,
+      document_id: item.document_id,
+      chunk_id: item.chunk_id,
       embedding_vector: typeof item.embedding_vector === 'string' 
         ? JSON.parse(item.embedding_vector) 
-        : item.embedding_vector
+        : item.embedding_vector,
+      embedding_model: item.embedding_model,
+      embedding_provider: item.embedding_provider,
+      similarity_threshold: item.similarity_threshold,
+      metadata: item.metadata as Record<string, any> || {},
+      created_at: item.created_at,
+      updated_at: item.updated_at,
     }));
   }
 
