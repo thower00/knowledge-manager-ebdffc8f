@@ -1,22 +1,15 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { useConfig } from "@/components/admin/document-processing/ConfigContext";
+import { Brain } from "lucide-react";
 import { EmbeddingService } from "../services/embeddingService";
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  Brain, 
-  Settings, 
-  CheckCircle,
-  AlertTriangle,
-  Download,
-  Database,
-  Zap
-} from "lucide-react";
+import { useEmbeddingConfig } from "./embedding/hooks/useEmbeddingConfig";
+import { EmbeddingSourceChunks } from "./embedding/EmbeddingSourceChunks";
+import { EmbeddingConfigurationDisplay } from "./embedding/EmbeddingConfigurationDisplay";
+import { EmbeddingTestControls } from "./embedding/EmbeddingTestControls";
+import { EmbeddingResults } from "./embedding/EmbeddingResults";
+import { getDimensionsForModel } from "./embedding/utils/embeddingUtils";
 
 interface EmbeddingsTabProps {
   isLoading: boolean;
@@ -45,88 +38,16 @@ interface EmbeddingResult {
 }
 
 export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: EmbeddingsTabProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [embeddingResults, setEmbeddingResults] = useState<EmbeddingResult[]>([]);
-  const [showEmbeddings, setShowEmbeddings] = useState(false);
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [loadedConfig, setLoadedConfig] = useState<any>(null);
-  const { toast } = useToast();
-  const { config } = useConfig();
-
-  // Load configuration from database
-  useEffect(() => {
-    const loadConfiguration = async () => {
-      try {
-        console.log("Loading configuration from database...");
-        
-        const { data: configData, error } = await supabase
-          .from("configurations")
-          .select("key, value")
-          .in("key", ["document_processing"]);
-
-        if (error) {
-          console.error("Error loading configuration:", error);
-          setLoadedConfig(config);
-          setConfigLoaded(true);
-          return;
-        }
-
-        if (configData && configData.length > 0) {
-          const dbConfig = configData[0]?.value;
-          console.log("Loaded configuration from database:", dbConfig);
-          setLoadedConfig(dbConfig);
-        } else {
-          console.log("No configuration found in database, using context config");
-          setLoadedConfig(config);
-        }
-        setConfigLoaded(true);
-      } catch (error) {
-        console.error("Error loading configuration:", error);
-        setLoadedConfig(config);
-        setConfigLoaded(true);
-      }
-    };
-
-    loadConfiguration();
-  }, [config]);
-
-  const getDimensionsForModel = (modelId: string): number => {
-    const dimensionMap: { [key: string]: number } = {
-      "text-embedding-ada-002": 1536,
-      "text-embedding-3-small": 1536,
-      "text-embedding-3-large": 3072,
-      "embed-english-v2.0": 4096,
-      "embed-multilingual-v2.0": 768,
-      "embed-english-light-v2.0": 1024,
-      "sentence-transformers/all-mpnet-base-v2": 768,
-      "sentence-transformers/all-MiniLM-L6-v2": 384,
-      "sentence-transformers/multi-qa-mpnet-base-dot-v1": 768,
-      "local-model": 512
-    };
-    return dimensionMap[modelId] || 1536;
-  };
-
-  const getApiKey = () => {
-    if (!loadedConfig) return "";
-    
-    // First try provider-specific key, then fall back to general API key
-    const providerKey = loadedConfig.providerApiKeys?.[loadedConfig.provider];
-    const generalKey = loadedConfig.apiKey;
-    
-    console.log("Getting API key:");
-    console.log("Provider:", loadedConfig.provider);
-    console.log("Provider-specific key exists:", !!providerKey);
-    console.log("General API key exists:", !!generalKey);
-    
-    return providerKey || generalKey || "";
-  };
-
-  const hasApiKey = () => {
-    const apiKey = getApiKey();
-    const hasKey = !!apiKey && apiKey.trim().length > 0;
-    console.log("hasApiKey check:", hasKey, "API key length:", apiKey?.length || 0);
-    return hasKey;
-  };
+  const {
+    isGenerating,
+    setIsGenerating,
+    configLoaded,
+    loadedConfig,
+    getApiKey,
+    hasApiKey,
+    toast
+  } = useEmbeddingConfig();
 
   const handleGenerateEmbeddings = async () => {
     if (!chunks || chunks.length === 0) {
@@ -162,7 +83,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       console.log(`Processing ${chunks.length} chunks with ${loadedConfig?.provider}/${loadedConfig?.specificModelId}`);
       
       // Use the loaded config for the embedding service
-      const embeddingService = new EmbeddingService(loadedConfig || config);
+      const embeddingService = new EmbeddingService(loadedConfig);
       const batchSize = parseInt(loadedConfig?.embeddingBatchSize || "10");
       const results: EmbeddingResult[] = [];
       
@@ -206,7 +127,6 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       
       console.log(`Generated ${results.length} embeddings`);
       setEmbeddingResults(results);
-      setShowEmbeddings(true);
       
       const result = {
         status: 'success',
@@ -261,32 +181,6 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     }
   };
 
-  const downloadEmbeddings = () => {
-    if (embeddingResults.length === 0) return;
-    
-    const embeddings = {
-      metadata: {
-        totalEmbeddings: embeddingResults.length,
-        model: `${loadedConfig?.provider}/${loadedConfig?.specificModelId}`,
-        dimensions: embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002"),
-        generatedAt: new Date().toISOString(),
-        sourceDocument: sourceDocument,
-        configuration: loadedConfig
-      },
-      embeddings: embeddingResults
-    };
-    
-    const blob = new Blob([JSON.stringify(embeddings, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `embeddings-${loadedConfig?.specificModelId}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -298,199 +192,35 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Source Chunks Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Source Chunks</h3>
-            {chunks && chunks.length > 0 ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-muted-foreground">
-                      Chunks available from: {sourceDocument || "Previous chunking"}
-                    </span>
-                  </div>
-                  <Badge variant="secondary">
-                    {chunks.length} chunks
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-3 gap-4 text-center p-3 border rounded-lg bg-muted/50">
-                  <div>
-                    <div className="text-lg font-bold">{chunks.length}</div>
-                    <div className="text-xs text-muted-foreground">Total Chunks</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold">
-                      {Math.round(chunks.reduce((sum, chunk) => sum + chunk.size, 0) / chunks.length)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Avg. Size</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold">
-                      {chunks.reduce((sum, chunk) => sum + chunk.size, 0)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Total Chars</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 p-4 border rounded-lg bg-muted/50">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm text-muted-foreground">
-                  No chunks available. Please run chunking first in the Chunking tab.
-                </span>
-              </div>
-            )}
-          </div>
+          <EmbeddingSourceChunks chunks={chunks} sourceDocument={sourceDocument} />
 
           <Separator />
 
-          {/* Configuration Display */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <h3 className="text-lg font-medium">Embedding Configuration</h3>
-              <Badge variant="outline" className="text-xs">From Configuration Management</Badge>
-              {!configLoaded && <Badge variant="secondary" className="text-xs">Loading...</Badge>}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Provider:</span>
-                  <span className="font-medium">{configLoaded ? (loadedConfig?.provider || "openai") : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">{configLoaded ? (loadedConfig?.specificModelId || "text-embedding-ada-002") : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">API Key:</span>
-                  <span className={`font-medium ${hasApiKey() ? 'text-green-600' : 'text-red-600'}`}>
-                    {configLoaded ? (hasApiKey() ? "✓ Configured" : "❌ Missing") : "Loading..."}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Batch Size:</span>
-                  <span className="font-medium">{configLoaded ? (loadedConfig?.embeddingBatchSize || "10") : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vector Storage:</span>
-                  <span className="font-medium">{configLoaded ? (loadedConfig?.vectorStorage || "supabase") : "Loading..."}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Similarity Threshold:</span>
-                  <span className="font-medium">{configLoaded ? (loadedConfig?.similarityThreshold || "0.7") : "Loading..."}</span>
-                </div>
-              </div>
-            </div>
-
-            {configLoaded && !hasApiKey() && (
-              <div className="flex items-center space-x-2 p-3 border border-red-200 rounded-lg bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                <span className="text-sm text-red-700">
-                  Please configure your {loadedConfig?.provider || "provider"} API key in Configuration Management before running embeddings.
-                </span>
-              </div>
-            )}
-          </div>
+          <EmbeddingConfigurationDisplay 
+            configLoaded={configLoaded}
+            loadedConfig={loadedConfig}
+            hasApiKey={hasApiKey}
+          />
 
           <Separator />
 
-          {/* Test Controls */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Run Embedding Test</h3>
-            
-            <Button
-              onClick={handleGenerateEmbeddings}
-              disabled={!chunks || chunks.length === 0 || isGenerating || !configLoaded || !hasApiKey()}
-              className="w-full"
-            >
-              {isGenerating ? (
-                <>
-                  <Zap className="h-4 w-4 mr-2 animate-pulse" />
-                  Generating Embeddings... ({Math.ceil((chunks?.length || 0) / parseInt(loadedConfig?.embeddingBatchSize || "10"))} batches)
-                </>
-              ) : (
-                <>
-                  <Brain className="h-4 w-4 mr-2" />
-                  Generate Embeddings from Chunks
-                </>
-              )}
-            </Button>
-          </div>
+          <EmbeddingTestControls
+            chunks={chunks}
+            isGenerating={isGenerating}
+            configLoaded={configLoaded}
+            hasApiKey={hasApiKey}
+            loadedConfig={loadedConfig}
+            onGenerateEmbeddings={handleGenerateEmbeddings}
+          />
 
-          {/* Embedding Results */}
           {embeddingResults.length > 0 && (
             <>
               <Separator />
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Embedding Results</h3>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      onClick={downloadEmbeddings}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button
-                      onClick={() => setShowEmbeddings(!showEmbeddings)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {showEmbeddings ? 'Hide' : 'Show'} Details
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 border rounded-lg">
-                    <div className="text-2xl font-bold">{embeddingResults.length}</div>
-                    <div className="text-sm text-muted-foreground">Embeddings</div>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="text-2xl font-bold">
-                      {embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002")}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Dimensions</div>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="text-2xl font-bold">{loadedConfig?.vectorStorage || "supabase"}</div>
-                    <div className="text-sm text-muted-foreground">Storage</div>
-                  </div>
-                </div>
-
-                {showEmbeddings && (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {embeddingResults.slice(0, 10).map((result) => (
-                      <div key={result.chunkIndex} className="border rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="secondary">Chunk {result.chunkIndex + 1}</Badge>
-                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                            <Database className="h-3 w-3" />
-                            <span>{result.embedding.length}D vector</span>
-                          </div>
-                        </div>
-                        <div className="text-xs space-y-1">
-                          <div><strong>Source:</strong> {result.metadata.sourceDocument}</div>
-                          <div><strong>Model:</strong> {result.metadata.model}</div>
-                          <div><strong>Vector Preview:</strong> [{result.embedding.slice(0, 5).map(v => v.toFixed(4)).join(', ')}...]</div>
-                        </div>
-                      </div>
-                    ))}
-                    {embeddingResults.length > 10 && (
-                      <div className="text-center text-sm text-muted-foreground">
-                        ... and {embeddingResults.length - 10} more embeddings
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <EmbeddingResults 
+                embeddingResults={embeddingResults}
+                loadedConfig={loadedConfig}
+                sourceDocument={sourceDocument}
+              />
             </>
           )}
         </CardContent>
