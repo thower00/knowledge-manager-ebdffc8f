@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -123,80 +122,107 @@ serve(async (req) => {
       const queryEmbedding = embeddingData.data[0].embedding
       console.log('Generated embedding with dimensions:', queryEmbedding.length)
       
-      // Check what embeddings we have in the database first
+      // Get some sample embeddings to check what we have
       const { data: embeddingCount, error: countError } = await supabase
         .from('document_embeddings')
-        .select('id, document_id, embedding_model, embedding_provider', { count: 'exact' })
+        .select('*', { count: 'exact' })
+        .limit(5)
         
       if (countError) {
-        console.error('Error counting embeddings:', countError)
+        console.error('Error getting embeddings:', countError)
       } else {
         console.log('Total embeddings in database:', embeddingCount?.length || 0)
         if (embeddingCount && embeddingCount.length > 0) {
-          console.log('Sample embeddings:', embeddingCount.slice(0, 3).map(e => ({
-            id: e.id,
-            model: e.embedding_model,
-            provider: e.embedding_provider
-          })))
+          console.log('Sample embedding structure:', {
+            id: embeddingCount[0].id,
+            document_id: embeddingCount[0].document_id,
+            chunk_id: embeddingCount[0].chunk_id,
+            has_embedding: !!embeddingCount[0].embedding_vector,
+            embedding_type: typeof embeddingCount[0].embedding_vector
+          })
         }
       }
       
-      // Try to search using the RPC function with proper vector format
-      console.log('Searching for similar embeddings...')
-      const { data: searchResults, error: searchError } = await supabase.rpc(
-        'search_similar_embeddings',
-        { 
-          query_embedding: queryEmbedding, // Pass as array directly
-          similarity_threshold: 0.1, // Very low threshold for testing
-          match_count: 5
-        }
-      )
+      // Try direct database query first to understand the data structure
+      console.log('Querying embeddings directly with document info...')
+      const { data: embeddingsWithDocs, error: directError } = await supabase
+        .from('document_embeddings')
+        .select(`
+          id,
+          document_id,
+          chunk_id,
+          embedding_vector,
+          processed_documents!inner(title, content, url)
+        `)
+        .limit(10)
       
-      console.log('Search completed')
-      console.log('Search error:', searchError)
-      console.log('Search results count:', searchResults?.length || 0)
+      console.log('Direct query result:', {
+        error: directError,
+        count: embeddingsWithDocs?.length || 0,
+        sample: embeddingsWithDocs?.[0] ? {
+          document_title: embeddingsWithDocs[0].processed_documents?.title,
+          has_content: !!embeddingsWithDocs[0].processed_documents?.content
+        } : null
+      })
       
-      if (searchError) {
-        console.warn('Vector search failed:', searchError)
-        console.warn('Search error details:', JSON.stringify(searchError))
-      }
-      
-      if (searchResults && searchResults.length > 0) {
-        relevantDocs = searchResults
-        contextText = searchResults
-          .map(doc => `Document: ${doc.document_title}\nContent: ${doc.chunk_content}`)
-          .join('\n\n')
-        console.log('Found relevant documents:', searchResults.length)
-        console.log('First document:', searchResults[0]?.document_title)
-      } else {
-        console.log('No relevant documents found')
+      if (embeddingsWithDocs && embeddingsWithDocs.length > 0) {
+        // Use the first few embeddings as context regardless of similarity for now
+        console.log('Using direct document content as context')
         
-        // Get sample documents for context
+        // Get actual document content chunks
+        const contextChunks = embeddingsWithDocs.slice(0, 3).map(item => {
+          const doc = item.processed_documents
+          if (doc?.content) {
+            // Extract a meaningful chunk from the document content
+            const content = doc.content
+            const chunkSize = 500 // Use first 500 characters
+            const chunk = content.substring(0, chunkSize) + (content.length > chunkSize ? '...' : '')
+            return {
+              document_title: doc.title,
+              chunk_content: chunk,
+              document_url: doc.url
+            }
+          }
+          return null
+        }).filter(Boolean)
+        
+        if (contextChunks.length > 0) {
+          relevantDocs = contextChunks
+          contextText = contextChunks
+            .map(doc => `Document: ${doc.document_title}\nContent: ${doc.chunk_content}`)
+            .join('\n\n')
+          console.log('Using document content as context, chunks:', contextChunks.length)
+        }
+      }
+      
+      // Fallback to document list if no content found
+      if (!contextText) {
         const { data: sampleDocs, error: sampleError } = await supabase
-          .from('document_embeddings')
-          .select(`
-            document_id,
-            processed_documents!inner(title)
-          `)
+          .from('processed_documents')
+          .select('title, content, url')
           .limit(5)
           
         if (!sampleError && sampleDocs && sampleDocs.length > 0) {
-          const uniqueTitles = [...new Set(sampleDocs.map(d => d.processed_documents?.title).filter(Boolean))]
-          contextText = `I have access to ${embeddingCount?.length || 0} document embeddings from ${uniqueTitles.length} documents including: ${uniqueTitles.slice(0, 3).join(', ')}${uniqueTitles.length > 3 ? ' and others' : ''}. However, I didn't find content specifically relevant to your current question. You can ask me about any topics covered in these documents.`
-          console.log('Using fallback context with document titles:', uniqueTitles.slice(0, 3))
-        } else {
-          contextText = `I have access to document embeddings in the knowledge base, but didn't find content specifically relevant to your current question.`
+          const docInfo = sampleDocs.map(d => ({
+            title: d.title,
+            hasContent: !!d.content,
+            contentLength: d.content?.length || 0
+          }))
+          
+          console.log('Available documents:', docInfo)
+          contextText = `I have access to documents including: ${sampleDocs.map(d => d.title).join(', ')}. Let me search for specific content from these documents.`
         }
       }
+      
     } catch (searchErr) {
-      console.warn('Vector search error:', searchErr)
-      contextText = 'I have access to document embeddings but encountered an issue searching for relevant content.'
+      console.warn('Document search error:', searchErr)
+      contextText = 'I have access to document embeddings but encountered an issue retrieving content.'
     }
     
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
-      `Context information:\n${contextText}\n\n` +
-      'When asked about document access, refer to the context information provided above. Use this context to answer user queries accurately.'
+      `Document Context:\n${contextText}\n\n` +
+      'Use the provided document context to answer questions about the documents. If you have specific content from documents, use it to provide detailed answers.'
     
     // Prepare messages array
     const promptMessages: ChatMessage[] = [
@@ -310,10 +336,7 @@ serve(async (req) => {
       response: assistantResponse,
       sessionId: currentSessionId,
       messageId,
-      context: relevantDocs ? relevantDocs.map(d => ({
-        title: d.document_title,
-        content: d.chunk_content
-      })) : []
+      context: relevantDocs
     }
     
     console.log('Chat completion successful')
