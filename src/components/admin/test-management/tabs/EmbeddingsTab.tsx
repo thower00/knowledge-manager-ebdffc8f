@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,8 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
 
         if (error) {
           console.error("Error loading configuration:", error);
+          setLoadedConfig(config);
+          setConfigLoaded(true);
           return;
         }
 
@@ -72,12 +75,11 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
           const dbConfig = configData[0]?.value;
           console.log("Loaded configuration from database:", dbConfig);
           setLoadedConfig(dbConfig);
-          setConfigLoaded(true);
         } else {
           console.log("No configuration found in database, using context config");
           setLoadedConfig(config);
-          setConfigLoaded(true);
         }
+        setConfigLoaded(true);
       } catch (error) {
         console.error("Error loading configuration:", error);
         setLoadedConfig(config);
@@ -356,11 +358,11 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Provider:</span>
-                  <span className="font-medium">{loadedConfig?.provider || "Loading..."}</span>
+                  <span className="font-medium">{configLoaded ? (loadedConfig?.provider || "openai") : "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">{loadedConfig?.specificModelId || "Loading..."}</span>
+                  <span className="font-medium">{configLoaded ? (loadedConfig?.specificModelId || "text-embedding-ada-002") : "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">API Key:</span>
@@ -372,15 +374,15 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Batch Size:</span>
-                  <span className="font-medium">{loadedConfig?.embeddingBatchSize || "Loading..."}</span>
+                  <span className="font-medium">{configLoaded ? (loadedConfig?.embeddingBatchSize || "10") : "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Vector Storage:</span>
-                  <span className="font-medium">{loadedConfig?.vectorStorage || "Loading..."}</span>
+                  <span className="font-medium">{configLoaded ? (loadedConfig?.vectorStorage || "supabase") : "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Similarity Threshold:</span>
-                  <span className="font-medium">{loadedConfig?.similarityThreshold || "Loading..."}</span>
+                  <span className="font-medium">{configLoaded ? (loadedConfig?.similarityThreshold || "0.7") : "Loading..."}</span>
                 </div>
               </div>
             </div>
