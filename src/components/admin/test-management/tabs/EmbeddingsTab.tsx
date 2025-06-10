@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +47,16 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
   const [isGenerating, setIsGenerating] = useState(false);
   const [embeddingResults, setEmbeddingResults] = useState<EmbeddingResult[]>([]);
   const [showEmbeddings, setShowEmbeddings] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const { toast } = useToast();
   const { config } = useConfig();
+
+  // Wait for config to be loaded
+  useEffect(() => {
+    if (config.provider && (config.apiKey || config.providerApiKeys[config.provider])) {
+      setConfigLoaded(true);
+    }
+  }, [config]);
 
   const getDimensionsForModel = (modelId: string): number => {
     const dimensionMap: { [key: string]: number } = {
@@ -66,6 +74,16 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     return dimensionMap[modelId] || 1536;
   };
 
+  const getApiKey = () => {
+    // First try provider-specific key, then fall back to general API key
+    return config.providerApiKeys?.[config.provider] || config.apiKey;
+  };
+
+  const hasApiKey = () => {
+    const apiKey = getApiKey();
+    return !!apiKey && apiKey.trim().length > 0;
+  };
+
   const handleGenerateEmbeddings = async () => {
     if (!chunks || chunks.length === 0) {
       toast({
@@ -76,15 +94,15 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       return;
     }
 
-    // Check for API key - try provider-specific first, then fall back to general apiKey
-    const apiKey = config.providerApiKeys[config.provider] || config.apiKey;
-    console.log("Checking API key access:");
+    const apiKey = getApiKey();
+    console.log("Embedding generation - API key check:");
     console.log("Provider:", config.provider);
-    console.log("Provider-specific key exists:", !!config.providerApiKeys[config.provider]);
+    console.log("Provider-specific key exists:", !!config.providerApiKeys?.[config.provider]);
     console.log("General API key exists:", !!config.apiKey);
     console.log("Final API key exists:", !!apiKey);
+    console.log("API key length:", apiKey?.length || 0);
     
-    if (!apiKey && config.provider !== "local") {
+    if (!apiKey || apiKey.trim().length === 0) {
       toast({
         variant: "destructive",
         title: "API Key Missing",
@@ -98,7 +116,6 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     try {
       console.log("Starting embedding generation...");
       console.log(`Processing ${chunks.length} chunks with ${config.provider}/${config.specificModelId}`);
-      console.log("API key available:", !!apiKey);
       
       const embeddingService = new EmbeddingService(config);
       const batchSize = parseInt(config.embeddingBatchSize) || 10;
@@ -303,8 +320,8 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">API Key:</span>
-                  <span className="font-medium">
-                    {(config.providerApiKeys[config.provider] || config.apiKey) ? "✓ Configured" : "❌ Missing"}
+                  <span className={`font-medium ${hasApiKey() ? 'text-green-600' : 'text-red-600'}`}>
+                    {hasApiKey() ? "✓ Configured" : "❌ Missing"}
                   </span>
                 </div>
               </div>
@@ -323,6 +340,15 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
                 </div>
               </div>
             </div>
+
+            {!hasApiKey() && (
+              <div className="flex items-center space-x-2 p-3 border border-red-200 rounded-lg bg-red-50">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <span className="text-sm text-red-700">
+                  Please configure your {config.provider} API key in Configuration Management before running embeddings.
+                </span>
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -333,7 +359,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
             
             <Button
               onClick={handleGenerateEmbeddings}
-              disabled={!chunks || chunks.length === 0 || isGenerating}
+              disabled={!chunks || chunks.length === 0 || isGenerating || !hasApiKey()}
               className="w-full"
             >
               {isGenerating ? (
