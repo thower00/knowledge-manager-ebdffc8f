@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -100,24 +99,23 @@ export const useChat = (initialSessionId?: string) => {
       const userMessage: ChatMessage = { role: 'user', content };
       setMessages(prev => [...prev, userMessage]);
 
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
       // Call the edge function for chat processing
-      const response = await fetch(`${process.env.SUPABASE_URL || 'https://sxrinuxxlmytddymjbmr.supabase.co'}/functions/v1/chat-completion`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('chat-completion', {
+        body: {
           sessionId,
           messages: messages.map(m => ({ role: m.role, content: m.content })),
           question: content
-        }),
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        }
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Error processing chat request');
+      if (error) {
+        throw new Error(error.message || 'Error processing chat request');
       }
 
       // Update session ID if new session was created
