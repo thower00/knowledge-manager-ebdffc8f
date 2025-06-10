@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProcessedDocumentsFetch } from "@/components/admin/document-extraction/hooks/useProcessedDocumentsFetch";
@@ -39,6 +41,7 @@ interface TestResult {
 export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<string>("");
+  const [testMode, setTestMode] = useState<"file" | "database">("file");
   const [currentTest, setCurrentTest] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [extractedText, setExtractedText] = useState<string>("");
@@ -49,11 +52,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   const { data: processedDocuments = [], isLoading: documentsLoading } = useProcessedDocumentsFetch();
 
   const testSteps = [
-    { key: 'basic', label: 'Basic Function Test', description: 'Test if the edge function is responding' },
-    { key: 'credentials', label: 'Adobe Credentials', description: 'Verify Adobe API credentials are configured' },
-    { key: 'upload', label: 'File Upload', description: 'Test file upload to Adobe services' },
-    { key: 'extract', label: 'Extract Job', description: 'Test PDF text extraction job creation' },
-    { key: 'full', label: 'Full Processing', description: 'Complete end-to-end PDF text extraction' }
+    { key: 'basic', label: 'Basic Function Test', description: 'Test if the edge function is responding', requiresDocument: false },
+    { key: 'credentials', label: 'Adobe Credentials', description: 'Verify Adobe API credentials are configured', requiresDocument: false },
+    { key: 'upload', label: 'File Upload', description: 'Test file upload to Adobe services', requiresDocument: true },
+    { key: 'extract', label: 'Extract Job', description: 'Test PDF text extraction job creation', requiresDocument: true },
+    { key: 'full', label: 'Full Processing', description: 'Complete end-to-end PDF text extraction', requiresDocument: true }
   ];
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,14 +71,14 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         return;
       }
       setSelectedFile(file);
-      setSelectedDocument(""); // Clear database document selection
+      setTestMode("file");
       console.log('Selected PDF file:', file.name, 'Size:', file.size);
     }
   };
 
   const handleDocumentSelect = (documentId: string) => {
     setSelectedDocument(documentId);
-    setSelectedFile(null); // Clear file selection
+    setTestMode("database");
   };
 
   const testWithStoredDocument = async (testStep: string) => {
@@ -236,8 +239,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
   const runAllTests = async () => {
     for (const step of testSteps) {
-      if (step.key === 'upload' || step.key === 'extract' || step.key === 'full') {
-        if (!selectedFile) {
+      if (step.requiresDocument) {
+        if (testMode === "file" && !selectedFile) {
           toast({
             variant: "destructive",
             title: "No file selected",
@@ -245,17 +248,67 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           });
           return;
         }
+        if (testMode === "database" && !selectedDocument) {
+          toast({
+            variant: "destructive",
+            title: "No document selected",
+            description: "Please select a document from the database before running document-dependent tests"
+          });
+          return;
+        }
       }
-      await runTest(step.key);
+      
+      if (testMode === "database" && step.requiresDocument) {
+        await testWithStoredDocument(step.key);
+      } else {
+        await runTest(step.key);
+      }
       // Add small delay between tests
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   };
 
+  const runSingleTest = async (testStep: string) => {
+    const step = testSteps.find(s => s.key === testStep);
+    if (step?.requiresDocument) {
+      if (testMode === "file" && !selectedFile) {
+        toast({
+          variant: "destructive",
+          title: "No file selected",
+          description: "Please select a PDF file for this test"
+        });
+        return;
+      }
+      if (testMode === "database" && !selectedDocument) {
+        toast({
+          variant: "destructive",
+          title: "No document selected",
+          description: "Please select a document from the database for this test"
+        });
+        return;
+      }
+    }
+
+    if (testMode === "database" && step?.requiresDocument) {
+      await testWithStoredDocument(testStep);
+    } else {
+      await runTest(testStep);
+    }
+  };
+
   const getTestStatus = (testKey: string) => {
-    const result = testResults[testKey];
-    if (!result) return 'pending';
-    return result.status;
+    const fileResult = testResults[testKey];
+    const storedResult = testResults[`${testKey}_stored`];
+    
+    // Return the result based on current test mode
+    if (testMode === "database" && storedResult) {
+      return storedResult.status;
+    }
+    if (testMode === "file" && fileResult) {
+      return fileResult.status;
+    }
+    
+    return 'pending';
   };
 
   const downloadExtractedText = () => {
@@ -278,6 +331,16 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     return doc?.title || '';
   };
 
+  const canRunTest = (step: any) => {
+    if (!step.requiresDocument) return true;
+    
+    if (testMode === "file") {
+      return selectedFile !==  null;
+    } else {
+      return selectedDocument !== "";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -289,85 +352,89 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* File Upload Section */}
-          <div className="space-y-2">
-            <Label htmlFor="pdf-file">Select PDF File</Label>
-            <div className="flex items-center space-x-4">
-              <Input
-                id="pdf-file"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileSelect}
-                className="flex-1"
-              />
-              {selectedFile && (
-                <Badge variant="secondary" className="flex items-center space-x-1">
-                  <FileText className="h-3 w-3" />
-                  <span>{selectedFile.name}</span>
-                </Badge>
-              )}
-            </div>
+          {/* Test Mode Selection */}
+          <div className="space-y-4">
+            <Label>Select Test Mode</Label>
+            <RadioGroup 
+              value={testMode} 
+              onValueChange={(value) => setTestMode(value as "file" | "database")}
+              className="flex flex-col sm:flex-row gap-4"
+            >
+              <div className={`flex items-center space-x-2 border p-4 rounded-md w-full sm:w-1/2 cursor-pointer ${testMode === "file" ? "border-primary bg-primary/5" : "border-muted"}`}>
+                <RadioGroupItem value="file" id="file-mode" />
+                <Label htmlFor="file-mode" className="flex items-center space-x-2 cursor-pointer">
+                  <Upload className="h-5 w-5" />
+                  <span>Upload PDF File</span>
+                </Label>
+              </div>
+              
+              <div className={`flex items-center space-x-2 border p-4 rounded-md w-full sm:w-1/2 cursor-pointer ${testMode === "database" ? "border-primary bg-primary/5" : "border-muted"}`}>
+                <RadioGroupItem value="database" id="database-mode" />
+                <Label htmlFor="database-mode" className="flex items-center space-x-2 cursor-pointer">
+                  <Database className="h-5 w-5" />
+                  <span>Use Stored Document</span>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <Separator />
 
-          {/* Database Documents Section */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Database className="h-5 w-5" />
-              <Label>Or Test with Stored Document</Label>
-            </div>
-            
+          {/* File Upload Section */}
+          {testMode === "file" && (
             <div className="space-y-2">
-              <Select value={selectedDocument} onValueChange={handleDocumentSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder={documentsLoading ? "Loading documents..." : "Select a document from database"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {processedDocuments.map((doc) => (
-                    <SelectItem key={doc.id} value={doc.id}>
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4" />
-                        <span>{doc.title}</span>
-                        {doc.source_type === 'google_drive' && (
-                          <Badge variant="outline" className="text-xs">Google Drive</Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {selectedDocument && (
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <Database className="h-4 w-4" />
-                  <span>Selected: {getSelectedDocumentTitle()}</span>
-                </div>
-              )}
-            </div>
-
-            {selectedDocument && (
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => testWithStoredDocument('full')}
-                  disabled={currentTest !== null}
+              <Label htmlFor="pdf-file">Select PDF File</Label>
+              <div className="flex items-center space-x-4">
+                <Input
+                  id="pdf-file"
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileSelect}
                   className="flex-1"
-                >
-                  {currentTest === 'full' ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="h-4 w-4 mr-2" />
-                      Extract Text from Stored Document
-                    </>
-                  )}
-                </Button>
+                />
+                {selectedFile && (
+                  <Badge variant="secondary" className="flex items-center space-x-1">
+                    <FileText className="h-3 w-3" />
+                    <span>{selectedFile.name}</span>
+                  </Badge>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Database Documents Section */}
+          {testMode === "database" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Select Document from Database</Label>
+                <Select value={selectedDocument} onValueChange={handleDocumentSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={documentsLoading ? "Loading documents..." : "Select a document from database"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {processedDocuments.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4" />
+                          <span>{doc.title}</span>
+                          {doc.source_type === 'google_drive' && (
+                            <Badge variant="outline" className="text-xs">Google Drive</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {selectedDocument && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Database className="h-4 w-4" />
+                    <span>Selected: {getSelectedDocumentTitle()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <Separator />
 
@@ -387,8 +454,12 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
             <div className="flex space-x-2">
               <Button
-                onClick={() => runTest('full')}
-                disabled={!selectedFile || currentTest !== null}
+                onClick={() => testMode === "database" ? testWithStoredDocument('full') : runTest('full')}
+                disabled={
+                  currentTest !== null || 
+                  (testMode === "file" && !selectedFile) ||
+                  (testMode === "database" && !selectedDocument)
+                }
                 className="flex-1"
               >
                 {currentTest === 'full' ? (
@@ -396,10 +467,15 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processing...
                   </>
+                ) : testMode === "database" ? (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    Extract Text from Stored Document
+                  </>
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Extract Text from PDF
+                    Extract Text from Uploaded PDF
                   </>
                 )}
               </Button>
@@ -443,8 +519,20 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                       
                       <div className="flex-1">
                         <div className="font-medium">{step.label}</div>
-                        <div className="text-sm text-muted-foreground">{step.description}</div>
-                        {testResults[step.key]?.error && (
+                        <div className="text-sm text-muted-foreground">
+                          {step.description}
+                          {step.requiresDocument && (
+                            <span className="ml-1 text-xs font-medium text-amber-500">
+                              {testMode === "file" ? "(Requires PDF file)" : "(Requires document selection)"}
+                            </span>
+                          )}
+                        </div>
+                        {testMode === "database" && testResults[`${step.key}_stored`]?.error && (
+                          <div className="text-sm text-red-600 mt-1">
+                            {testResults[`${step.key}_stored`].error}
+                          </div>
+                        )}
+                        {testMode === "file" && testResults[step.key]?.error && (
                           <div className="text-sm text-red-600 mt-1">
                             {testResults[step.key].error}
                           </div>
@@ -452,11 +540,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                       </div>
                       
                       <Button
-                        onClick={() => runTest(step.key)}
-                        disabled={
-                          currentTest !== null || 
-                          (['upload', 'extract', 'full'].includes(step.key) && !selectedFile)
-                        }
+                        onClick={() => runSingleTest(step.key)}
+                        disabled={currentTest !== null || !canRunTest(step)}
                         size="sm"
                         variant="outline"
                       >
@@ -488,7 +573,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">
-                    Extracted {extractedText.length} characters from {selectedFile?.name || getSelectedDocumentTitle()}
+                    Extracted {extractedText.length} characters from {testMode === "file" ? selectedFile?.name : getSelectedDocumentTitle()}
                   </div>
                   <Textarea
                     value={extractedText}
@@ -515,24 +600,33 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                 )}
                 
                 <div className="grid gap-2">
-                  {Object.entries(testResults).map(([key, result]) => (
-                    <div key={key} className="flex items-center space-x-2 text-sm">
-                      {result.status === 'success' ? (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                      )}
-                      <span className="font-medium">
-                        {key.includes('_stored') ? 
-                          `${testSteps.find(s => s.key === key.replace('_stored', ''))?.label} (Stored Document)` :
-                          `${testSteps.find(s => s.key === key)?.label}`
-                        }:
-                      </span>
-                      <span className={result.status === 'success' ? 'text-green-600' : 'text-red-600'}>
-                        {result.message}
-                      </span>
-                    </div>
-                  ))}
+                  {Object.entries(testResults)
+                    .filter(([key]) => {
+                      // Only show results for the current test mode
+                      if (testMode === "database") {
+                        return key.includes('_stored');
+                      } else {
+                        return !key.includes('_stored');
+                      }
+                    })
+                    .map(([key, result]) => (
+                      <div key={key} className="flex items-center space-x-2 text-sm">
+                        {result.status === 'success' ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className="font-medium">
+                          {key.includes('_stored') ? 
+                            `${testSteps.find(s => s.key === key.replace('_stored', ''))?.label}` :
+                            `${testSteps.find(s => s.key === key)?.label}`
+                          }:
+                        </span>
+                        <span className={result.status === 'success' ? 'text-green-600' : 'text-red-600'}>
+                          {result.message}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             </>
