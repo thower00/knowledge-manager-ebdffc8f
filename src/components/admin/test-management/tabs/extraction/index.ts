@@ -1,3 +1,2 @@
 
-export { ExtractionTab } from "./ExtractionTab";
-export { DatabaseDocumentExtractor } from "./DatabaseDocumentExtractor";
+export { ExtractionTab } from "./extraction/ExtractionTab";

@@ -1,28 +1,22 @@
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { ProcessingTab } from "./tabs/ProcessingTab";
-import { ExtractionTab } from "./tabs/ExtractionTab";
+import { ExtractionTab } from "./tabs/extraction";
 import { TestResultDisplay } from "./TestResultDisplay";
 import { useState } from "react";
 
 export function TestManagement() {
-  const [activeTab, setActiveTab] = useState("extraction"); // Changed default to extraction
+  const [activeTab, setActiveTab] = useState("extraction");
   const [isTestRunning, setIsTestRunning] = useState(false);
   const [testResult, setTestResult] = useState<string>("");
   
   const handleRunTest = (data: any) => {
     setIsTestRunning(true);
     
-    // Process test data based on the active tab
     try {
-      // Handle results for different tabs
-      if (activeTab === "processing") {
-        setTestResult(JSON.stringify(data, null, 2));
-      } else if (activeTab === "extraction" || activeTab === "embeddings") {
-        // For extraction or embeddings, just show what we received
-        const result = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
-        setTestResult(result);
-      }
+      const result = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+      setTestResult(result);
     } catch (error) {
       console.error("Error processing test result:", error);
       setTestResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
