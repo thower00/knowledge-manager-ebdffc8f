@@ -29,15 +29,15 @@ export function TestManagement() {
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
-                <ExtractionTab onTestComplete={setTestResults} />
+                <ExtractionTab />
               </TabsContent>
               
               <TabsContent value="chunking" className="mt-6">
-                <ChunkingTab onTestComplete={setTestResults} />
+                <ChunkingTab />
               </TabsContent>
               
               <TabsContent value="embeddings" className="mt-6">
-                <EmbeddingsTab onTestComplete={setTestResults} />
+                <EmbeddingsTab isLoading={false} onRunTest={setTestResults} />
               </TabsContent>
 
               <TabsContent value="embeddings-test" className="mt-6">
@@ -48,7 +48,7 @@ export function TestManagement() {
         </Card>
 
         {testResults && (
-          <TestResultDisplay results={testResults} />
+          <TestResultDisplay result={testResults} />
         )}
       </div>
     </ConfigProvider>

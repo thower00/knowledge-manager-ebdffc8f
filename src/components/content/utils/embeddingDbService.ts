@@ -23,7 +23,7 @@ export class EmbeddingDbService {
         .insert({
           document_id: documentId,
           chunk_id: chunkId,
-          embedding_vector: embedding,
+          embedding_vector: JSON.stringify(embedding), // Convert array to string
           embedding_model: model,
           embedding_provider: provider,
           metadata,
@@ -57,7 +57,13 @@ export class EmbeddingDbService {
         throw new Error(`Failed to fetch embeddings: ${error.message}`);
       }
 
-      return data || [];
+      // Convert embedding_vector string back to number array
+      return (data || []).map(item => ({
+        ...item,
+        embedding_vector: typeof item.embedding_vector === 'string' 
+          ? JSON.parse(item.embedding_vector) 
+          : item.embedding_vector
+      }));
     } catch (error) {
       console.error('Error fetching document embeddings:', error);
       throw error;
@@ -74,7 +80,7 @@ export class EmbeddingDbService {
   ): Promise<SimilaritySearchResult[]> {
     try {
       const { data, error } = await supabase.rpc('search_similar_embeddings', {
-        query_embedding: queryEmbedding,
+        query_embedding: JSON.stringify(queryEmbedding), // Convert array to string
         similarity_threshold: similarityThreshold,
         match_count: maxResults,
       });

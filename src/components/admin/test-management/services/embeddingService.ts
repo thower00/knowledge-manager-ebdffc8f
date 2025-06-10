@@ -148,7 +148,7 @@ export class EmbeddingService {
       .insert({
         document_id: documentId,
         chunk_id: chunkId,
-        embedding_vector: embedding,
+        embedding_vector: JSON.stringify(embedding), // Convert array to string
         embedding_model: this.config.specificModelId,
         embedding_provider: this.config.provider,
         similarity_threshold: parseFloat(this.config.similarityThreshold),
@@ -178,7 +178,7 @@ export class EmbeddingService {
     
     // Use the database function to search for similar embeddings
     const { data, error } = await supabase.rpc('search_similar_embeddings', {
-      query_embedding: queryEmbedding.embedding,
+      query_embedding: JSON.stringify(queryEmbedding.embedding), // Convert array to string
       similarity_threshold: parseFloat(this.config.similarityThreshold),
       match_count: matchCount,
     });
@@ -201,7 +201,13 @@ export class EmbeddingService {
       throw new Error(`Failed to fetch document embeddings: ${error.message}`);
     }
 
-    return data || [];
+    // Convert embedding_vector string back to number array
+    return (data || []).map(item => ({
+      ...item,
+      embedding_vector: typeof item.embedding_vector === 'string' 
+        ? JSON.parse(item.embedding_vector) 
+        : item.embedding_vector
+    }));
   }
 
   async deleteDocumentEmbeddings(documentId: string): Promise<boolean> {
