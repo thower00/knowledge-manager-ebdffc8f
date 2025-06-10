@@ -11,11 +11,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export function ProcessingConfiguration() {
-  const { config } = useProcessingConfiguration();
+  const { config, isLoading } = useProcessingConfiguration();
 
   const handleConfigurationManagement = () => {
     window.open('/configuration-management', '_blank');
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5" />
+            <span>Processing Configuration</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8">
+            <div className="text-sm text-muted-foreground">Loading configuration...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -27,7 +45,7 @@ export function ProcessingConfiguration() {
           </div>
         </div>
         <CardDescription>
-          Current processing settings for document chunking and embeddings
+          Current processing settings loaded from Configuration Management
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -35,7 +53,7 @@ export function ProcessingConfiguration() {
           <ExternalLink className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
             <span>
-              These settings are read-only. To modify processing configuration, please use the Configuration Management section.
+              These settings are read-only and synchronized with Configuration Management. To modify these settings, please use the Configuration Management section.
             </span>
             <Button variant="outline" size="sm" onClick={handleConfigurationManagement}>
               Open Configuration Management
@@ -151,12 +169,12 @@ export function ProcessingConfiguration() {
                 <Input
                   id="apiKey"
                   type="password"
-                  value={config.embedding.apiKey ? "••••••••••••••••" : "Not configured"}
+                  value={config.embedding.apiKey ? "••••••••••••••••••••••••••••••••••••••••" : "Not configured"}
                   readOnly
-                  className="bg-muted"
+                  className="bg-muted font-mono"
                 />
                 <p className="text-xs text-muted-foreground">
-                  API key for {config.embedding.provider} embedding generation
+                  API key for {config.embedding.provider} embedding generation (configured in Configuration Management)
                 </p>
               </div>
               
@@ -175,7 +193,7 @@ export function ProcessingConfiguration() {
               </div>
             </div>
           </TabsContent>
-        </Tabs>
+        </tabs>
       </CardContent>
     </Card>
   );
