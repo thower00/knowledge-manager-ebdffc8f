@@ -1,9 +1,10 @@
 
 import React, { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Settings, Play } from "lucide-react";
+import { FileText, Settings } from "lucide-react";
 import { DocumentSelector } from "./DocumentSelector";
 import { ProcessingConfiguration } from "./ProcessingConfiguration";
+import { ProcessingPipeline } from "./ProcessingPipeline";
 import { useDocumentSelection } from "./hooks/useDocumentSelection";
 
 export function DocumentProcessingTab() {
@@ -51,42 +52,18 @@ export function DocumentProcessingTab() {
                 isLoading={isLoading}
               />
             </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium flex items-center space-x-2">
-                <Play className="h-4 w-4" />
-                <span>Processing Pipeline</span>
-              </h3>
-              <div className="p-4 border rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">
-                  Processing pipeline will be implemented here.
-                  This will handle: Text Extraction → Chunking → Embeddings → Vector Storage
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Selected documents: {selectedDocuments.length}
-                </p>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Processing Pipeline */}
+      <ProcessingPipeline 
+        selectedDocuments={selectedDocuments}
+        documents={documents}
+      />
       
       {/* Processing Configuration */}
       <ProcessingConfiguration />
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Processing Progress & Results</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 border rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground">
-              Progress tracking and results display will be implemented here.
-              You'll see real-time updates during processing and detailed results afterward.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
