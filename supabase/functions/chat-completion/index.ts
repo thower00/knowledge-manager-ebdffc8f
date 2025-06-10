@@ -122,39 +122,36 @@ serve(async (req) => {
       const queryEmbedding = embeddingData.data[0].embedding
       console.log('Generated embedding with dimensions:', queryEmbedding.length)
       
-      // Search for similar embeddings using the database function
-      // Convert the embedding array to the format expected by the database
+      // Convert array to PostgreSQL vector format and search
       const { data: searchResults, error: searchError } = await supabase.rpc(
         'search_similar_embeddings',
         { 
-          query_embedding: queryEmbedding, // Pass as array, not JSON string
-          similarity_threshold: 0.1, // Lower threshold for testing
+          query_embedding: `[${queryEmbedding.join(',')}]`, // Convert to vector format
+          similarity_threshold: 0.3,
           match_count: 5
         }
       )
       
       console.log('Search parameters:', {
         embeddingLength: queryEmbedding.length,
-        threshold: 0.1,
-        matchCount: 5
+        threshold: 0.3,
+        matchCount: 5,
+        vectorFormat: `[${queryEmbedding.slice(0, 3).join(',')}...]`
       })
       
       if (searchError) {
         console.warn('Vector search failed:', searchError)
         console.warn('Search error details:', JSON.stringify(searchError))
         
-        // Try alternative approach - direct query to check data format
-        const { data: sampleEmbedding, error: sampleError } = await supabase
+        // Fallback: check if we have any documents at all
+        const { data: docCount, error: docError } = await supabase
           .from('document_embeddings')
-          .select('id, embedding_vector')
+          .select('id', { count: 'exact' })
           .limit(1)
-          .single()
           
-        if (sampleError) {
-          console.warn('Error fetching sample embedding:', sampleError)
-        } else {
-          console.log('Sample embedding type:', typeof sampleEmbedding?.embedding_vector)
-          console.log('Sample embedding preview:', JSON.stringify(sampleEmbedding?.embedding_vector).slice(0, 100))
+        if (!docError && docCount) {
+          console.log(`Database contains ${docCount.length} embeddings but search failed`)
+          contextText = 'I have access to document embeddings in the knowledge base, but there was a technical issue retrieving relevant content for your specific query.'
         }
       } else if (searchResults && searchResults.length > 0) {
         relevantDocs = searchResults
@@ -164,47 +161,43 @@ serve(async (req) => {
         console.log('Found relevant documents:', searchResults.length)
         console.log('First document title:', searchResults[0]?.document_title)
       } else {
-        console.log('No relevant documents found with threshold 0.1')
+        console.log('No relevant documents found with threshold 0.3')
         
-        // Check if there are any embeddings in the database at all
+        // Check total document count for user feedback
         const { data: embeddingCount, error: countError } = await supabase
           .from('document_embeddings')
-          .select('id', { count: 'exact' })
-          .limit(1)
-        
-        if (countError) {
-          console.warn('Error checking embeddings:', countError)
-        } else {
-          console.log('Total embeddings in database:', embeddingCount?.length || 0)
+          .select('document_id', { count: 'exact' })
           
-          // If we have embeddings but no matches, try manual similarity check
-          if ((embeddingCount?.length || 0) > 0) {
-            const { data: allEmbeddings, error: allError } = await supabase
-              .from('document_embeddings')
-              .select('id, document_id, embedding_vector')
-              .limit(3)
-              
-            if (!allError && allEmbeddings) {
-              console.log('Sample embeddings for debugging:')
-              allEmbeddings.forEach((emb, idx) => {
-                const embVector = typeof emb.embedding_vector === 'string' 
-                  ? JSON.parse(emb.embedding_vector) 
-                  : emb.embedding_vector
-                console.log(`Embedding ${idx + 1}: length=${embVector?.length}, type=${typeof embVector}`)
-              })
-            }
+        if (!countError && embeddingCount && embeddingCount.length > 0) {
+          console.log('Total embeddings in database:', embeddingCount.length)
+          
+          // Get unique document titles for context
+          const { data: docs, error: docsError } = await supabase
+            .from('document_embeddings')
+            .select(`
+              document_id,
+              processed_documents!inner(title)
+            `)
+            .limit(10)
+            
+          if (!docsError && docs && docs.length > 0) {
+            const uniqueTitles = [...new Set(docs.map(d => d.processed_documents?.title).filter(Boolean))]
+            contextText = `I have access to ${embeddingCount.length} document embeddings from ${uniqueTitles.length} documents including: ${uniqueTitles.slice(0, 5).join(', ')}${uniqueTitles.length > 5 ? ' and others' : ''}. However, I didn't find content specifically relevant to your question.`
+          } else {
+            contextText = `I have access to ${embeddingCount.length} document embeddings in the knowledge base, but didn't find content specifically relevant to your question.`
           }
         }
       }
     } catch (searchErr) {
       console.warn('Vector search error:', searchErr)
+      contextText = 'I have access to document embeddings but encountered an issue searching for relevant content.'
     }
     
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
-      (contextText ? `Context information from knowledge base:\n${contextText}\n\n` +
-      'Use this context to answer the user query. If the context doesn\'t contain relevant information, respond based on your general knowledge but mention that you found some relevant documents.' : 
-      'I currently have access to document embeddings in the knowledge base but was unable to find relevant content for this specific query. You may want to ask more specific questions about document content.')
+      (contextText ? `Context information:\n${contextText}\n\n` +
+      'Use this context to answer the user query accurately. If asked about document access, refer to the context information provided.' : 
+      'You have access to a document knowledge base but no specific context was retrieved for this query.')
     
     // Prepare messages array
     const promptMessages: ChatMessage[] = [
