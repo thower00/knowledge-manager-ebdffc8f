@@ -95,9 +95,58 @@ serve(async (req) => {
       )
     }
     
-    // Skip vector search for now to avoid dimension errors
+    // Generate embedding for the user question
     let contextText = ''
     let relevantDocs: any[] = []
+    
+    try {
+      console.log('Generating embedding for question...')
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-ada-002',
+          input: question,
+        }),
+      })
+      
+      if (!embeddingResponse.ok) {
+        const errorData = await embeddingResponse.text()
+        console.error('OpenAI embedding error:', embeddingResponse.status, errorData)
+        throw new Error(`Embedding generation failed: ${embeddingResponse.status}`)
+      }
+      
+      const embeddingData = await embeddingResponse.json()
+      const queryEmbedding = embeddingData.data[0].embedding
+      console.log('Generated embedding with dimensions:', queryEmbedding.length)
+      
+      // Search for similar embeddings using the database function
+      const { data: searchResults, error: searchError } = await supabase.rpc(
+        'search_similar_embeddings',
+        { 
+          query_embedding: queryEmbedding,
+          similarity_threshold: 0.7,
+          match_count: 5
+        }
+      )
+      
+      if (searchError) {
+        console.warn('Vector search failed:', searchError)
+      } else if (searchResults && searchResults.length > 0) {
+        relevantDocs = searchResults
+        contextText = searchResults
+          .map(doc => `Document: ${doc.document_title}\n${doc.chunk_content}`)
+          .join('\n\n')
+        console.log('Found relevant documents:', searchResults.length)
+      } else {
+        console.log('No relevant documents found')
+      }
+    } catch (searchErr) {
+      console.warn('Vector search error:', searchErr)
+    }
     
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
