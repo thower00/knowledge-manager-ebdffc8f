@@ -1,10 +1,9 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
-import { useConfig } from "./ConfigContext";
+import { useConfig, DEFAULT_CONFIG } from "./ConfigContext";
 import { getProviderFromModel } from "./utils/modelProviders";
 
 export function ConfigActions() {
@@ -39,7 +38,12 @@ export function ConfigActions() {
           chunkStrategy: configValue.chunkStrategy || "fixed_size",
           storagePath: configValue.storagePath || "/data/documents",
           customConfiguration: configValue.customConfiguration || "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
-          providerApiKeys: configValue.providerApiKeys || {}
+          providerApiKeys: configValue.providerApiKeys || {},
+          // Add missing embedding properties
+          embeddingBatchSize: configValue.embeddingBatchSize || DEFAULT_CONFIG.embeddingBatchSize,
+          similarityThreshold: configValue.similarityThreshold || DEFAULT_CONFIG.similarityThreshold,
+          vectorStorage: configValue.vectorStorage || DEFAULT_CONFIG.vectorStorage,
+          embeddingMetadata: configValue.embeddingMetadata || DEFAULT_CONFIG.embeddingMetadata
         });
         
         toast({
@@ -48,18 +52,7 @@ export function ConfigActions() {
         });
       } else {
         // Reset to default values if no configuration exists
-        setConfig({
-          apiKey: "",
-          provider: "openai",
-          embeddingModel: "openai",
-          specificModelId: "text-embedding-ada-002",
-          chunkSize: "1000",
-          chunkOverlap: "200",
-          chunkStrategy: "fixed_size",
-          storagePath: "/data/documents",
-          customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
-          providerApiKeys: {}
-        });
+        setConfig(DEFAULT_CONFIG);
         
         toast({
           title: "Configuration reset",

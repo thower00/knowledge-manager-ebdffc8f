@@ -54,7 +54,12 @@ export function useConfigLoader(activeTab: string) {
           chunkStrategy: configValue.chunkStrategy || DEFAULT_CONFIG.chunkStrategy,
           storagePath: configValue.storagePath || DEFAULT_CONFIG.storagePath,
           customConfiguration: configValue.customConfiguration || DEFAULT_CONFIG.customConfiguration,
-          providerApiKeys: configValue.providerApiKeys || {}
+          providerApiKeys: configValue.providerApiKeys || {},
+          // Add missing embedding properties
+          embeddingBatchSize: configValue.embeddingBatchSize || DEFAULT_CONFIG.embeddingBatchSize,
+          similarityThreshold: configValue.similarityThreshold || DEFAULT_CONFIG.similarityThreshold,
+          vectorStorage: configValue.vectorStorage || DEFAULT_CONFIG.vectorStorage,
+          embeddingMetadata: configValue.embeddingMetadata || DEFAULT_CONFIG.embeddingMetadata
         });
         
         setConfigFetched(true);
