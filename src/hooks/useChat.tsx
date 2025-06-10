@@ -66,7 +66,16 @@ export const useChat = (initialSessionId?: string) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Cast the role field to the proper type
+      const typedMessages: ChatMessage[] = (data || []).map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        created_at: msg.created_at
+      }));
+      
+      setMessages(typedMessages);
     } catch (err: any) {
       console.error('Error fetching chat messages:', err);
       setError(err.message);
