@@ -8,6 +8,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Convert Google Drive sharing URL to direct download URL
+function convertGoogleDriveUrl(url: string): string {
+  console.log('🔗 Converting Google Drive URL:', url);
+  
+  // Check if it's already a direct download URL
+  if (url.includes('/uc?export=download') || url.includes('drive.google.com/uc')) {
+    console.log('✅ URL is already in direct download format');
+    return url;
+  }
+  
+  // Extract file ID from various Google Drive URL formats
+  let fileId = '';
+  
+  // Format: https://drive.google.com/file/d/FILE_ID/view
+  const viewMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+  if (viewMatch) {
+    fileId = viewMatch[1];
+  }
+  
+  // Format: https://drive.google.com/open?id=FILE_ID
+  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+  if (openMatch) {
+    fileId = openMatch[1];
+  }
+  
+  if (fileId) {
+    const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    console.log('✅ Converted to direct download URL:', directUrl);
+    return directUrl;
+  }
+  
+  console.log('⚠️ Could not extract file ID, using original URL');
+  return url;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -126,13 +161,29 @@ Deno.serve(async (req) => {
         console.log('📤 Starting upload test...');
         
         if (useStoredDocument) {
-          // For stored documents, we'll fetch the file from the URL first
-          console.log(`Fetching document from URL: ${documentUrl}`);
-          const response = await fetch(documentUrl);
+          // Convert Google Drive URL and fetch the file
+          const directUrl = convertGoogleDriveUrl(documentUrl);
+          console.log(`Fetching document from converted URL: ${directUrl}`);
+          
+          const response = await fetch(directUrl);
           if (!response.ok) {
-            throw new Error(`Failed to fetch document: ${response.status}`);
+            throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
           }
+          
           const arrayBuffer = await response.arrayBuffer();
+          console.log(`✅ Fetched document, size: ${arrayBuffer.byteLength} bytes`);
+          
+          // Check if the response looks like a PDF
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const pdfHeader = uint8Array.slice(0, 5);
+          const headerString = String.fromCharCode(...pdfHeader);
+          
+          if (!headerString.startsWith('%PDF-')) {
+            console.error('❌ Downloaded file does not appear to be a PDF. Header:', headerString);
+            console.error('❌ This might be a Google Drive download page instead of the actual file');
+            throw new Error(`Downloaded file is not a PDF. Expected PDF header but got: ${headerString}. This suggests the Google Drive URL is not correctly converted to a direct download link.`);
+          }
+          
           const fetchedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
           
           const result = await testAdobeUpload(fetchedFile);
@@ -180,12 +231,25 @@ Deno.serve(async (req) => {
         console.log('🔍 Starting extract test...');
         
         if (useStoredDocument) {
-          console.log(`Fetching document from URL: ${documentUrl}`);
-          const response = await fetch(documentUrl);
+          const directUrl = convertGoogleDriveUrl(documentUrl);
+          console.log(`Fetching document from converted URL: ${directUrl}`);
+          
+          const response = await fetch(directUrl);
           if (!response.ok) {
-            throw new Error(`Failed to fetch document: ${response.status}`);
+            throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
           }
+          
           const arrayBuffer = await response.arrayBuffer();
+          
+          // Validate PDF header
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const pdfHeader = uint8Array.slice(0, 5);
+          const headerString = String.fromCharCode(...pdfHeader);
+          
+          if (!headerString.startsWith('%PDF-')) {
+            throw new Error(`Downloaded file is not a PDF. Expected PDF header but got: ${headerString}`);
+          }
+          
           const fetchedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
           
           const result = await testAdobeExtractJobWithFixedHandling(fetchedFile);
@@ -235,19 +299,35 @@ Deno.serve(async (req) => {
 
       if (useStoredDocument) {
         console.log(`🔄 STARTING FULL PROCESSING for stored document: ${documentTitle}`);
-        console.log(`Fetching document from URL: ${documentUrl}`);
         
-        const response = await fetch(documentUrl);
+        const directUrl = convertGoogleDriveUrl(documentUrl);
+        console.log(`Fetching document from converted URL: ${directUrl}`);
+        
+        const response = await fetch(directUrl);
         if (!response.ok) {
           throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
         }
         
         const arrayBuffer = await response.arrayBuffer();
+        
+        // Validate PDF header before processing
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const pdfHeader = uint8Array.slice(0, 5);
+        const headerString = String.fromCharCode(...pdfHeader);
+        
+        console.log(`📄 File header analysis: ${headerString}`);
+        
+        if (!headerString.startsWith('%PDF-')) {
+          console.error('❌ Downloaded file is not a PDF');
+          console.error('❌ First 20 bytes:', uint8Array.slice(0, 20));
+          throw new Error(`Downloaded file is not a valid PDF. Header: "${headerString}". This might indicate the Google Drive URL is returning a download page instead of the actual file.`);
+        }
+        
         processedFile = new File([arrayBuffer], documentTitle, { type: 'application/pdf' });
         filename = documentTitle;
         fileSize = arrayBuffer.byteLength;
         
-        console.log(`✅ Successfully fetched stored document, size: ${fileSize} bytes`);
+        console.log(`✅ Successfully fetched and validated stored document, size: ${fileSize} bytes`);
       } else {
         if (file.type !== 'application/pdf') {
           console.log(`❌ Invalid file type: ${file.type}`);

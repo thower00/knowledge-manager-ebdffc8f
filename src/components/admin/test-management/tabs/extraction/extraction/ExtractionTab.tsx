@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -132,9 +131,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         setExtractedText(data.extractedText);
       }
 
+      // Update results for current test mode
+      const resultKey = testMode === "database" ? `${testStep}_stored` : testStep;
       setTestResults(prev => ({
         ...prev,
-        [`${testStep}_stored`]: result
+        [resultKey]: result
       }));
 
       onRunTest(data);
@@ -153,9 +154,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         error: error instanceof Error ? error.message : String(error)
       };
 
+      // Update results for current test mode
+      const resultKey = testMode === "database" ? `${testStep}_stored` : testStep;
       setTestResults(prev => ({
         ...prev,
-        [`${testStep}_stored`]: result
+        [resultKey]: result
       }));
 
       toast({
@@ -201,6 +204,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         setExtractedText(data.extractedText);
       }
 
+      // Update results for current test mode
+      const resultKey = testMode === "file" ? testStep : `${testStep}_stored`;
       setTestResults(prev => ({
         ...prev,
         [testStep]: result
@@ -222,6 +227,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         error: error instanceof Error ? error.message : String(error)
       };
 
+      // Update results for current test mode
       setTestResults(prev => ({
         ...prev,
         [testStep]: result
@@ -297,18 +303,17 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
   };
 
   const getTestStatus = (testKey: string) => {
-    const fileResult = testResults[testKey];
-    const storedResult = testResults[`${testKey}_stored`];
+    // Get the appropriate result key based on current test mode
+    const resultKey = testMode === "database" ? `${testKey}_stored` : testKey;
+    const result = testResults[resultKey];
     
-    // Return the result based on current test mode
-    if (testMode === "database" && storedResult) {
-      return storedResult.status;
-    }
-    if (testMode === "file" && fileResult) {
-      return fileResult.status;
-    }
-    
-    return 'pending';
+    return result ? result.status : 'pending';
+  };
+
+  const getTestResult = (testKey: string) => {
+    // Get the appropriate result key based on current test mode
+    const resultKey = testMode === "database" ? `${testKey}_stored` : testKey;
+    return testResults[resultKey];
   };
 
   const downloadExtractedText = () => {
@@ -527,14 +532,9 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                             </span>
                           )}
                         </div>
-                        {testMode === "database" && testResults[`${step.key}_stored`]?.error && (
+                        {getTestResult(step.key)?.error && (
                           <div className="text-sm text-red-600 mt-1">
-                            {testResults[`${step.key}_stored`].error}
-                          </div>
-                        )}
-                        {testMode === "file" && testResults[step.key]?.error && (
-                          <div className="text-sm text-red-600 mt-1">
-                            {testResults[step.key].error}
+                            {getTestResult(step.key)?.error}
                           </div>
                         )}
                       </div>
@@ -600,33 +600,26 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                 )}
                 
                 <div className="grid gap-2">
-                  {Object.entries(testResults)
-                    .filter(([key]) => {
-                      // Only show results for the current test mode
-                      if (testMode === "database") {
-                        return key.includes('_stored');
-                      } else {
-                        return !key.includes('_stored');
-                      }
-                    })
-                    .map(([key, result]) => (
-                      <div key={key} className="flex items-center space-x-2 text-sm">
+                  {testSteps.map((step) => {
+                    const result = getTestResult(step.key);
+                    if (!result) return null;
+                    
+                    return (
+                      <div key={step.key} className="flex items-center space-x-2 text-sm">
                         {result.status === 'success' ? (
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         ) : (
                           <AlertTriangle className="h-4 w-4 text-red-500" />
                         )}
                         <span className="font-medium">
-                          {key.includes('_stored') ? 
-                            `${testSteps.find(s => s.key === key.replace('_stored', ''))?.label}` :
-                            `${testSteps.find(s => s.key === key)?.label}`
-                          }:
+                          {step.label}:
                         </span>
                         <span className={result.status === 'success' ? 'text-green-600' : 'text-red-600'}>
                           {result.message}
                         </span>
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
               </div>
             </>
