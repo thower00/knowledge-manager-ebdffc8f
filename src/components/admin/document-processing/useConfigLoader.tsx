@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, DEFAULT_CONFIG } from "./ConfigContext";
+import { Json } from "@/integrations/supabase/types";
 
 export function useConfigLoader(configKey: string = "document_processing") {
   const { config, setConfig, setIsLoading, setIsSaving } = useConfig();
@@ -24,11 +25,11 @@ export function useConfigLoader(configKey: string = "document_processing") {
         throw new Error(`Error loading configuration: ${dbError.message}`);
       }
       
-      if (data?.value) {
+      if (data?.value && typeof data.value === 'object' && data.value !== null) {
         console.log(`${configKey} configuration loaded:`, data.value);
         setConfig(prevConfig => ({
           ...prevConfig,
-          ...data.value
+          ...(data.value as Record<string, any>)
         }));
       } else {
         console.log(`No ${configKey} configuration found in database, using defaults`);
@@ -51,11 +52,14 @@ export function useConfigLoader(configKey: string = "document_processing") {
     try {
       console.log(`Saving ${configKey} configuration to database:`, config);
       
+      // Convert ConfigSettings to Json-compatible format
+      const configAsJson: Json = JSON.parse(JSON.stringify(config));
+      
       const { error: upsertError } = await supabase
         .from("configurations")
         .upsert({
           key: configKey,
-          value: config
+          value: configAsJson
         });
       
       if (upsertError) {

@@ -23,13 +23,17 @@ export function DocumentProcessingSettings({ activeTab }: { activeTab: string })
 
 // This is a separate component to ensure the hook is called inside a function component
 function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string }) {
-  // Load configuration when component mounts or activeTab changes
-  useConfigLoader(activeTab);
+  const { loadConfig, saveConfig, isLoading, isSaving, error } = useConfigLoader("document_processing");
   
-  // Debug log to check if component is rendering with the correct activeTab
+  // Load configuration when component mounts or activeTab changes
   useEffect(() => {
-    console.log(`DocumentProcessingSettings rendered with activeTab: ${activeTab}`);
-  }, [activeTab]);
+    if (activeTab === "document-processing") {
+      console.log(`DocumentProcessingSettings rendered with activeTab: ${activeTab}`);
+      loadConfig().catch((err) => {
+        console.error("Error loading document processing configuration:", err);
+      });
+    }
+  }, [activeTab, loadConfig]);
   
   return (
     <Card className="transition-all">
@@ -43,7 +47,13 @@ function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string })
         <ConfigForm />
       </CardContent>
       <CardFooter>
-        <ConfigActions />
+        <ConfigActions 
+          onSave={saveConfig}
+          isSaving={isSaving}
+          isLoading={isLoading}
+          error={error}
+          configKey="document_processing"
+        />
       </CardFooter>
     </Card>
   );
