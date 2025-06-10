@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Settings, Play } from "lucide-react";
 import { DocumentSelector } from "./DocumentSelector";
+import { ProcessingConfiguration } from "./ProcessingConfiguration";
 import { useDocumentSelection } from "./hooks/useDocumentSelection";
 
 export function DocumentProcessingTab() {
@@ -69,6 +70,9 @@ export function DocumentProcessingTab() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Processing Configuration */}
+      <ProcessingConfiguration />
       
       <Card>
         <CardHeader>
