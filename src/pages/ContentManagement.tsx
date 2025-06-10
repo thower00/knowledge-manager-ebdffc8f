@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentsTab } from "@/components/content/DocumentsTab";
-import { ChunkingTab } from "@/components/content/chunking/ChunkingTab";
+import { DocumentProcessingTab } from "@/components/content/processing/DocumentProcessingTab";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function ContentManagement() {
@@ -13,6 +13,10 @@ export default function ContentManagement() {
     try {
       const savedTab = localStorage.getItem("contentActiveTab");
       console.log("Initial content tab from localStorage:", savedTab);
+      // Update default tab to 'documents' if saved tab was 'chunking'
+      if (savedTab === "chunking") {
+        return "processing";
+      }
       return savedTab || "documents";
     } catch (e) {
       console.error("Error accessing localStorage:", e);
@@ -59,7 +63,7 @@ export default function ContentManagement() {
         >
           <TabsList className="mb-4">
             <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="chunking">Chunking</TabsTrigger>
+            <TabsTrigger value="processing">Processing</TabsTrigger>
           </TabsList>
           
           {/* Documents Tab */}
@@ -86,9 +90,9 @@ export default function ContentManagement() {
             <DocumentsTab />
           </TabsContent>
           
-          {/* Chunking Tab - Always render to prevent hooks issues */}
-          <TabsContent value="chunking" className="space-y-4">
-            <ChunkingTab />
+          {/* Document Processing Tab - Always render to prevent hooks issues */}
+          <TabsContent value="processing" className="space-y-4">
+            <DocumentProcessingTab />
           </TabsContent>
         </Tabs>
       </div>
