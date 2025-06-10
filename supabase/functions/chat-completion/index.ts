@@ -95,32 +95,9 @@ serve(async (req) => {
       )
     }
     
-    // Use vector search to find relevant document chunks for the question
+    // Skip vector search for now to avoid dimension errors
     let contextText = ''
     let relevantDocs: any[] = []
-    
-    try {
-      const { data: searchResults, error: searchError } = await supabase.rpc(
-        'search_similar_embeddings',
-        { 
-          query_embedding: Array(1536).fill(0.1), // Placeholder embedding for now
-          similarity_threshold: 0.7,
-          match_count: 5
-        }
-      )
-      
-      if (searchError) {
-        console.warn('Vector search failed:', searchError)
-      } else if (searchResults && searchResults.length > 0) {
-        relevantDocs = searchResults
-        contextText = searchResults
-          .map(doc => `Document: ${doc.document_title}\n${doc.chunk_content}`)
-          .join('\n\n')
-        console.log('Found relevant documents:', searchResults.length)
-      }
-    } catch (searchErr) {
-      console.warn('Vector search error:', searchErr)
-    }
     
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
@@ -134,7 +111,7 @@ serve(async (req) => {
       { role: 'user', content: question }
     ]
     
-    // Send to OpenAI (simplified for now - only supporting OpenAI)
+    // Send to OpenAI using native fetch (simplified for now - only supporting OpenAI)
     let assistantResponse = ''
     
     if (config.chatProvider === 'openai') {
@@ -156,7 +133,10 @@ serve(async (req) => {
       if (!openaiResponse.ok) {
         const errorData = await openaiResponse.text()
         console.error('OpenAI API error:', openaiResponse.status, errorData)
-        throw new Error(`OpenAI API error: ${openaiResponse.status}`)
+        return new Response(
+          JSON.stringify({ error: `OpenAI API error: ${openaiResponse.status} - ${errorData}` }),
+          { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        )
       }
       
       const openaiData = await openaiResponse.json()
