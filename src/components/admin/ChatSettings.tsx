@@ -10,6 +10,14 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function ChatSettings({ activeTab }: { activeTab: string }) {
+  return (
+    <ConfigProvider>
+      <ChatSettingsContent activeTab={activeTab} />
+    </ConfigProvider>
+  );
+}
+
+function ChatSettingsContent({ activeTab }: { activeTab: string }) {
   const [isError, setIsError] = useState(false);
   const { loadConfig, saveConfig, isLoading, isSaving, error } = useConfigLoader("chat_settings");
 
@@ -27,33 +35,32 @@ export function ChatSettings({ activeTab }: { activeTab: string }) {
   }, [activeTab, loadConfig]);
 
   return (
-    <ConfigProvider>
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Chat Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isError && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Error loading chat configuration. Please check your database connection and try again.
-              </AlertDescription>
-            </Alert>
-          )}
+    <Card>
+      <CardHeader>
+        <CardTitle>AI Chat Configuration</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Error loading chat configuration. Please check your database connection and try again.
+            </AlertDescription>
+          </Alert>
+        )}
 
-          <ChatConfigForm isLoading={isLoading} />
-          
-          <Separator className="my-6" />
-          
-          <ConfigActions
-            onSave={saveConfig}
-            isSaving={isSaving}
-            isLoading={isLoading}
-            error={error}
-          />
-        </CardContent>
-      </Card>
-    </ConfigProvider>
+        <ChatConfigForm isLoading={isLoading} />
+        
+        <Separator className="my-6" />
+        
+        <ConfigActions
+          onSave={saveConfig}
+          isSaving={isSaving}
+          isLoading={isLoading}
+          error={error}
+          configKey="chat_settings"
+        />
+      </CardContent>
+    </Card>
   );
 }
