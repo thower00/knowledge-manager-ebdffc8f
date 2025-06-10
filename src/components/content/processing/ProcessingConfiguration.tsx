@@ -193,7 +193,7 @@ export function ProcessingConfiguration() {
               </div>
             </div>
           </TabsContent>
-        </tabs>
+        </Tabs>
       </CardContent>
     </Card>
   );
