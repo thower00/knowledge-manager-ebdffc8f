@@ -45,17 +45,40 @@ export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
         throw new Error("Invalid provider configuration");
       }
 
-      const { data, error } = await fetch(provider.verificationEndpoint, {
+      console.log(`Verifying ${provider.name} API key...`);
+      
+      const response = await fetch(provider.verificationEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: config.apiKey })
-      }).then(res => res.json());
+      });
 
-      if (error) {
-        throw new Error(error);
+      console.log(`Verification response status: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      if (data?.valid) {
+      const responseText = await response.text();
+      console.log(`Verification response text: ${responseText}`);
+      
+      if (!responseText.trim()) {
+        throw new Error("Empty response from verification endpoint");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError);
+        throw new Error("Invalid JSON response from verification endpoint");
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.valid) {
         setIsValid(true);
         toast({
           title: "API key verified",
@@ -75,7 +98,7 @@ export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
         toast({
           variant: "destructive",
           title: "Invalid API key",
-          description: data?.error || `Unable to verify your ${provider.name} API key`,
+          description: data.error || `Unable to verify your ${provider.name} API key`,
         });
       }
     } catch (err: any) {
