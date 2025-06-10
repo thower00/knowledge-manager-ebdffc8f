@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export function VectorDatabaseView() {
         vector_dimensions: item.embedding_vector ? 
           (typeof item.embedding_vector === 'string' ? 
             JSON.parse(item.embedding_vector).length : 
-            item.embedding_vector.length) : 0
+            Array.isArray(item.embedding_vector) ? item.embedding_vector.length : 0) : 0
       }));
 
       setEmbeddings(processedEmbeddings);
