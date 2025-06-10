@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useConfig } from "@/components/admin/document-processing/ConfigContext";
 import { EmbeddingService } from "../services/embeddingService";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Brain, 
   Settings, 
@@ -48,14 +49,44 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
   const [embeddingResults, setEmbeddingResults] = useState<EmbeddingResult[]>([]);
   const [showEmbeddings, setShowEmbeddings] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [loadedConfig, setLoadedConfig] = useState<any>(null);
   const { toast } = useToast();
   const { config } = useConfig();
 
-  // Wait for config to be loaded
+  // Load configuration from database
   useEffect(() => {
-    if (config.provider && (config.apiKey || config.providerApiKeys[config.provider])) {
-      setConfigLoaded(true);
-    }
+    const loadConfiguration = async () => {
+      try {
+        console.log("Loading configuration from database...");
+        
+        const { data: configData, error } = await supabase
+          .from("configurations")
+          .select("key, value")
+          .in("key", ["document_processing_settings"]);
+
+        if (error) {
+          console.error("Error loading configuration:", error);
+          return;
+        }
+
+        if (configData && configData.length > 0) {
+          const dbConfig = configData[0]?.value;
+          console.log("Loaded configuration from database:", dbConfig);
+          setLoadedConfig(dbConfig);
+          setConfigLoaded(true);
+        } else {
+          console.log("No configuration found in database, using context config");
+          setLoadedConfig(config);
+          setConfigLoaded(true);
+        }
+      } catch (error) {
+        console.error("Error loading configuration:", error);
+        setLoadedConfig(config);
+        setConfigLoaded(true);
+      }
+    };
+
+    loadConfiguration();
   }, [config]);
 
   const getDimensionsForModel = (modelId: string): number => {
@@ -75,13 +106,25 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
   };
 
   const getApiKey = () => {
+    if (!loadedConfig) return "";
+    
     // First try provider-specific key, then fall back to general API key
-    return config.providerApiKeys?.[config.provider] || config.apiKey;
+    const providerKey = loadedConfig.providerApiKeys?.[loadedConfig.provider];
+    const generalKey = loadedConfig.apiKey;
+    
+    console.log("Getting API key:");
+    console.log("Provider:", loadedConfig.provider);
+    console.log("Provider-specific key exists:", !!providerKey);
+    console.log("General API key exists:", !!generalKey);
+    
+    return providerKey || generalKey || "";
   };
 
   const hasApiKey = () => {
     const apiKey = getApiKey();
-    return !!apiKey && apiKey.trim().length > 0;
+    const hasKey = !!apiKey && apiKey.trim().length > 0;
+    console.log("hasApiKey check:", hasKey, "API key length:", apiKey?.length || 0);
+    return hasKey;
   };
 
   const handleGenerateEmbeddings = async () => {
@@ -96,9 +139,9 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
 
     const apiKey = getApiKey();
     console.log("Embedding generation - API key check:");
-    console.log("Provider:", config.provider);
-    console.log("Provider-specific key exists:", !!config.providerApiKeys?.[config.provider]);
-    console.log("General API key exists:", !!config.apiKey);
+    console.log("Provider:", loadedConfig?.provider);
+    console.log("Provider-specific key exists:", !!loadedConfig?.providerApiKeys?.[loadedConfig?.provider || ""]);
+    console.log("General API key exists:", !!loadedConfig?.apiKey);
     console.log("Final API key exists:", !!apiKey);
     console.log("API key length:", apiKey?.length || 0);
     
@@ -106,7 +149,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       toast({
         variant: "destructive",
         title: "API Key Missing",
-        description: `Please configure your ${config.provider} API key in Configuration Management. Current provider: ${config.provider}`
+        description: `Please configure your ${loadedConfig?.provider || "provider"} API key in Configuration Management. Current provider: ${loadedConfig?.provider || "unknown"}`
       });
       return;
     }
@@ -115,10 +158,11 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     
     try {
       console.log("Starting embedding generation...");
-      console.log(`Processing ${chunks.length} chunks with ${config.provider}/${config.specificModelId}`);
+      console.log(`Processing ${chunks.length} chunks with ${loadedConfig?.provider}/${loadedConfig?.specificModelId}`);
       
-      const embeddingService = new EmbeddingService(config);
-      const batchSize = parseInt(config.embeddingBatchSize) || 10;
+      // Use the loaded config for the embedding service
+      const embeddingService = new EmbeddingService(loadedConfig || config);
+      const batchSize = parseInt(loadedConfig?.embeddingBatchSize || "10");
       const results: EmbeddingResult[] = [];
       
       // Process chunks in batches
@@ -138,7 +182,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
           };
 
           // Include optional metadata based on configuration
-          if (config.embeddingMetadata.includeChunkIndex && chunk.startPosition !== undefined) {
+          if (loadedConfig?.embeddingMetadata?.includeChunkIndex && chunk.startPosition !== undefined) {
             metadata.startPosition = chunk.startPosition;
             metadata.endPosition = chunk.endPosition;
           }
@@ -167,18 +211,18 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
         status: 'success',
         message: `Successfully generated ${results.length} embeddings`,
         totalEmbeddings: results.length,
-        dimensions: results.length > 0 ? results[0].embedding.length : getDimensionsForModel(config.specificModelId),
-        model: `${config.provider}/${config.specificModelId}`,
+        dimensions: results.length > 0 ? results[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002"),
+        model: `${loadedConfig?.provider}/${loadedConfig?.specificModelId}`,
         batchSize: batchSize,
-        vectorStorage: config.vectorStorage,
+        vectorStorage: loadedConfig?.vectorStorage,
         config: {
-          provider: config.provider,
-          model: config.specificModelId,
-          dimensions: results.length > 0 ? results[0].embedding.length : getDimensionsForModel(config.specificModelId),
-          batchSize: config.embeddingBatchSize,
-          similarityThreshold: config.similarityThreshold,
-          vectorStorage: config.vectorStorage,
-          metadata: config.embeddingMetadata
+          provider: loadedConfig?.provider,
+          model: loadedConfig?.specificModelId,
+          dimensions: results.length > 0 ? results[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002"),
+          batchSize: loadedConfig?.embeddingBatchSize,
+          similarityThreshold: loadedConfig?.similarityThreshold,
+          vectorStorage: loadedConfig?.vectorStorage,
+          metadata: loadedConfig?.embeddingMetadata
         },
         embeddings: results.map(result => ({
           chunkIndex: result.chunkIndex,
@@ -192,7 +236,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
       
       toast({
         title: "Embeddings Generated",
-        description: `Successfully created ${results.length} embeddings using ${config.provider}/${config.specificModelId}`
+        description: `Successfully created ${results.length} embeddings using ${loadedConfig?.provider}/${loadedConfig?.specificModelId}`
       });
       
     } catch (error) {
@@ -222,11 +266,11 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     const embeddings = {
       metadata: {
         totalEmbeddings: embeddingResults.length,
-        model: `${config.provider}/${config.specificModelId}`,
-        dimensions: embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(config.specificModelId),
+        model: `${loadedConfig?.provider}/${loadedConfig?.specificModelId}`,
+        dimensions: embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002"),
         generatedAt: new Date().toISOString(),
         sourceDocument: sourceDocument,
-        configuration: config
+        configuration: loadedConfig
       },
       embeddings: embeddingResults
     };
@@ -235,7 +279,7 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `embeddings-${config.specificModelId}-${Date.now()}.json`;
+    a.download = `embeddings-${loadedConfig?.specificModelId}-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -306,46 +350,47 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
               <Settings className="h-4 w-4" />
               <h3 className="text-lg font-medium">Embedding Configuration</h3>
               <Badge variant="outline" className="text-xs">From Configuration Management</Badge>
+              {!configLoaded && <Badge variant="secondary" className="text-xs">Loading...</Badge>}
             </div>
             
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Provider:</span>
-                  <span className="font-medium">{config.provider}</span>
+                  <span className="font-medium">{loadedConfig?.provider || "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">{config.specificModelId}</span>
+                  <span className="font-medium">{loadedConfig?.specificModelId || "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">API Key:</span>
                   <span className={`font-medium ${hasApiKey() ? 'text-green-600' : 'text-red-600'}`}>
-                    {hasApiKey() ? "✓ Configured" : "❌ Missing"}
+                    {configLoaded ? (hasApiKey() ? "✓ Configured" : "❌ Missing") : "Loading..."}
                   </span>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Batch Size:</span>
-                  <span className="font-medium">{config.embeddingBatchSize}</span>
+                  <span className="font-medium">{loadedConfig?.embeddingBatchSize || "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Vector Storage:</span>
-                  <span className="font-medium">{config.vectorStorage}</span>
+                  <span className="font-medium">{loadedConfig?.vectorStorage || "Loading..."}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Similarity Threshold:</span>
-                  <span className="font-medium">{config.similarityThreshold}</span>
+                  <span className="font-medium">{loadedConfig?.similarityThreshold || "Loading..."}</span>
                 </div>
               </div>
             </div>
 
-            {!hasApiKey() && (
+            {configLoaded && !hasApiKey() && (
               <div className="flex items-center space-x-2 p-3 border border-red-200 rounded-lg bg-red-50">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
                 <span className="text-sm text-red-700">
-                  Please configure your {config.provider} API key in Configuration Management before running embeddings.
+                  Please configure your {loadedConfig?.provider || "provider"} API key in Configuration Management before running embeddings.
                 </span>
               </div>
             )}
@@ -359,13 +404,13 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
             
             <Button
               onClick={handleGenerateEmbeddings}
-              disabled={!chunks || chunks.length === 0 || isGenerating || !hasApiKey()}
+              disabled={!chunks || chunks.length === 0 || isGenerating || !configLoaded || !hasApiKey()}
               className="w-full"
             >
               {isGenerating ? (
                 <>
                   <Zap className="h-4 w-4 mr-2 animate-pulse" />
-                  Generating Embeddings... ({Math.ceil((chunks?.length || 0) / parseInt(config.embeddingBatchSize))} batches)
+                  Generating Embeddings... ({Math.ceil((chunks?.length || 0) / parseInt(loadedConfig?.embeddingBatchSize || "10"))} batches)
                 </>
               ) : (
                 <>
@@ -409,12 +454,12 @@ export function EmbeddingsTab({ isLoading, onRunTest, chunks, sourceDocument }: 
                   </div>
                   <div className="p-3 border rounded-lg">
                     <div className="text-2xl font-bold">
-                      {embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(config.specificModelId)}
+                      {embeddingResults.length > 0 ? embeddingResults[0].embedding.length : getDimensionsForModel(loadedConfig?.specificModelId || "text-embedding-ada-002")}
                     </div>
                     <div className="text-sm text-muted-foreground">Dimensions</div>
                   </div>
                   <div className="p-3 border rounded-lg">
-                    <div className="text-2xl font-bold">{config.vectorStorage}</div>
+                    <div className="text-2xl font-bold">{loadedConfig?.vectorStorage || "supabase"}</div>
                     <div className="text-sm text-muted-foreground">Storage</div>
                   </div>
                 </div>
