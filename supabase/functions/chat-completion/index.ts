@@ -128,21 +128,34 @@ serve(async (req) => {
         'search_similar_embeddings',
         { 
           query_embedding: queryEmbedding,
-          similarity_threshold: 0.7,
+          similarity_threshold: 0.3,
           match_count: 5
         }
       )
       
       if (searchError) {
         console.warn('Vector search failed:', searchError)
+        console.warn('Search error details:', JSON.stringify(searchError))
       } else if (searchResults && searchResults.length > 0) {
         relevantDocs = searchResults
         contextText = searchResults
           .map(doc => `Document: ${doc.document_title}\n${doc.chunk_content}`)
           .join('\n\n')
         console.log('Found relevant documents:', searchResults.length)
+        console.log('First document title:', searchResults[0]?.document_title)
       } else {
         console.log('No relevant documents found')
+        // Let's also check if there are any embeddings in the database at all
+        const { data: embeddingCount, error: countError } = await supabase
+          .from('document_embeddings')
+          .select('id', { count: 'exact' })
+          .limit(1)
+        
+        if (countError) {
+          console.warn('Error checking embeddings:', countError)
+        } else {
+          console.log('Total embeddings in database:', embeddingCount?.length || 0)
+        }
       }
     } catch (searchErr) {
       console.warn('Vector search error:', searchErr)
