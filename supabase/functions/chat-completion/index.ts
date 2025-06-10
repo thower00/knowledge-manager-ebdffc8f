@@ -1,8 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
-import { Anthropic } from 'https://esm.sh/@anthropic-ai/sdk@0.12.0'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 interface ChatMessage {
@@ -18,14 +16,11 @@ interface ChatRequest {
 
 interface ChatConfig {
   chatProvider: string
-  model: string
+  chatModel: string
   apiKey: string
-  temperature: number
-  maxTokens: number
-  topP: number
-  frequencyPenalty: number
-  presencePenalty: number
-  systemPrompt: string
+  chatTemperature: string
+  chatMaxTokens: string
+  chatSystemPrompt: string
 }
 
 serve(async (req) => {
@@ -36,10 +31,12 @@ serve(async (req) => {
 
   try {
     const { sessionId, messages, question } = await req.json() as ChatRequest
+    console.log('Chat request received:', { sessionId, messageCount: messages.length, question: question.slice(0, 50) + '...' })
     
     // Get Supabase client with auth context
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('Missing Authorization header')
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -55,120 +52,132 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     
     if (userError || !user) {
+      console.error('Invalid user token:', userError)
       return new Response(
         JSON.stringify({ error: 'Invalid user token' }),
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       )
     }
     
+    console.log('User authenticated:', user.id)
+    
     // Load chat configuration from database
-    const { data: configData } = await supabase
+    const { data: configData, error: configError } = await supabase
       .from('configurations')
       .select('value')
       .eq('key', 'chat_settings')
       .maybeSingle()
       
-    if (!configData?.value) {
+    if (configError) {
+      console.error('Error loading chat config:', configError)
       return new Response(
-        JSON.stringify({ error: 'Chat configuration not found' }),
+        JSON.stringify({ error: 'Error loading chat configuration' }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      )
+    }
+      
+    if (!configData?.value) {
+      console.error('Chat configuration not found')
+      return new Response(
+        JSON.stringify({ error: 'Chat configuration not found. Please configure your AI provider in the admin settings.' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       )
     }
     
     const config = configData.value as ChatConfig
+    console.log('Config loaded:', { provider: config.chatProvider, model: config.chatModel })
     
     if (!config.apiKey) {
+      console.error('API key not configured')
       return new Response(
-        JSON.stringify({ error: 'API key not configured for chat provider' }),
+        JSON.stringify({ error: 'API key not configured for chat provider. Please add your API key in the admin settings.' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       )
     }
     
     // Use vector search to find relevant document chunks for the question
-    const { data: relevantDocs, error: searchError } = await supabase.rpc(
-      'search_similar_embeddings',
-      { 
-        query_embedding: `[0.1, 0.2]`, // Placeholder - in a real implementation we'd get embeddings for the query
-        similarity_threshold: 0.7,
-        match_count: 5
-      }
-    )
-    
-    if (searchError) {
-      console.error('Error searching embeddings:', searchError)
-      // Continue without context if search fails
-    }
-    
-    // Prepare context from relevant documents
     let contextText = ''
-    if (relevantDocs && relevantDocs.length > 0) {
-      contextText = relevantDocs
-        .map(doc => `Document: ${doc.document_title}\n${doc.chunk_content}`)
-        .join('\n\n')
+    let relevantDocs: any[] = []
+    
+    try {
+      const { data: searchResults, error: searchError } = await supabase.rpc(
+        'search_similar_embeddings',
+        { 
+          query_embedding: Array(1536).fill(0.1), // Placeholder embedding for now
+          similarity_threshold: 0.7,
+          match_count: 5
+        }
+      )
+      
+      if (searchError) {
+        console.warn('Vector search failed:', searchError)
+      } else if (searchResults && searchResults.length > 0) {
+        relevantDocs = searchResults
+        contextText = searchResults
+          .map(doc => `Document: ${doc.document_title}\n${doc.chunk_content}`)
+          .join('\n\n')
+        console.log('Found relevant documents:', searchResults.length)
+      }
+    } catch (searchErr) {
+      console.warn('Vector search error:', searchErr)
     }
     
     // Prepare system message with context
-    const systemMessage = `${config.systemPrompt || 'You are a helpful assistant.'}\n\n` +
+    const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
       (contextText ? `Context information from knowledge base:\n${contextText}\n\n` +
       'Use this context to answer the user query. If the context doesn\'t contain relevant information, respond based on your general knowledge.' : '')
     
-    // Prepare messages array based on the provider
+    // Prepare messages array
     const promptMessages: ChatMessage[] = [
       { role: 'system', content: systemMessage },
-      ...messages
+      ...messages,
+      { role: 'user', content: question }
     ]
     
-    // Send to appropriate chat provider
+    // Send to OpenAI (simplified for now - only supporting OpenAI)
     let assistantResponse = ''
     
     if (config.chatProvider === 'openai') {
-      const openai = new OpenAIApi(new Configuration({ apiKey: config.apiKey }))
-      const response = await openai.createChatCompletion({
-        model: config.model || 'gpt-3.5-turbo',
-        messages: promptMessages,
-        temperature: config.temperature || 0.7,
-        max_tokens: config.maxTokens || 1000,
-        top_p: config.topP || 1,
-        frequency_penalty: config.frequencyPenalty || 0,
-        presence_penalty: config.presencePenalty || 0,
+      console.log('Calling OpenAI API...')
+      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: config.chatModel || 'gpt-4o-mini',
+          messages: promptMessages,
+          temperature: parseFloat(config.chatTemperature) || 0.7,
+          max_tokens: parseInt(config.chatMaxTokens) || 1000,
+        }),
       })
       
-      assistantResponse = response.data.choices[0]?.message?.content || 'No response generated.'
+      if (!openaiResponse.ok) {
+        const errorData = await openaiResponse.text()
+        console.error('OpenAI API error:', openaiResponse.status, errorData)
+        throw new Error(`OpenAI API error: ${openaiResponse.status}`)
+      }
+      
+      const openaiData = await openaiResponse.json()
+      assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
+      console.log('OpenAI response received')
     } 
-    else if (config.chatProvider === 'anthropic') {
-      const anthropic = new Anthropic({ apiKey: config.apiKey })
-      
-      // Convert the messages to Anthropic format
-      const combinedPrompt = promptMessages.map(msg => {
-        if (msg.role === 'system') return msg.content
-        return msg.role === 'user' ? `Human: ${msg.content}` : `Assistant: ${msg.content}`
-      }).join('\n\n')
-      
-      const response = await anthropic.completions.create({
-        model: config.model || 'claude-2',
-        prompt: `${combinedPrompt}\n\nHuman: ${question}\n\nAssistant:`,
-        max_tokens_to_sample: config.maxTokens || 1000,
-        temperature: config.temperature || 0.7,
-        top_p: config.topP || 1,
-      })
-      
-      assistantResponse = response.completion || 'No response generated.'
-    }
     else {
+      console.error('Unsupported chat provider:', config.chatProvider)
       return new Response(
-        JSON.stringify({ error: `Unsupported chat provider: ${config.chatProvider}` }),
+        JSON.stringify({ error: `Unsupported chat provider: ${config.chatProvider}. Please configure OpenAI in the admin settings.` }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       )
     }
     
     // Store messages in database
-    
     let messageId: string | null = null
-    
-    // If no session exists yet, create one
     let currentSessionId = sessionId
     
+    // If no session exists yet, create one
     if (!currentSessionId) {
+      console.log('Creating new chat session...')
       const { data: sessionData, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({ 
@@ -180,14 +189,17 @@ serve(async (req) => {
       
       if (sessionError) {
         console.error('Error creating chat session:', sessionError)
-        // Continue without session if creation fails
       } else {
         currentSessionId = sessionData.id
+        console.log('New session created:', currentSessionId)
       }
     }
     
-    // Store user message
+    // Store user message and assistant response
     if (currentSessionId) {
+      console.log('Storing messages to database...')
+      
+      // Store user message
       const { error: userMsgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -215,38 +227,24 @@ serve(async (req) => {
         console.error('Error saving assistant message:', assistantMsgError)
       } else {
         messageId = assistantMsgData.id
-        
-        // Store message context links to relevant documents
-        if (messageId && relevantDocs && relevantDocs.length > 0) {
-          const contextRecords = relevantDocs.map(doc => ({
-            message_id: messageId,
-            document_id: doc.document_id,
-            chunk_id: doc.chunk_id,
-            similarity_score: doc.similarity
-          }))
-          
-          const { error: contextError } = await supabase
-            .from('chat_contexts')
-            .insert(contextRecords)
-            
-          if (contextError) {
-            console.error('Error saving message context:', contextError)
-          }
-        }
+        console.log('Messages saved successfully')
       }
     }
     
     // Return the response
+    const response = {
+      response: assistantResponse,
+      sessionId: currentSessionId,
+      messageId,
+      context: relevantDocs ? relevantDocs.map(d => ({
+        title: d.document_title,
+        content: d.chunk_content
+      })) : []
+    }
+    
+    console.log('Chat completion successful')
     return new Response(
-      JSON.stringify({ 
-        response: assistantResponse,
-        sessionId: currentSessionId,
-        messageId,
-        context: relevantDocs ? relevantDocs.map(d => ({
-          title: d.document_title,
-          content: d.chunk_content
-        })) : []
-      }),
+      JSON.stringify(response),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     )
   } catch (error) {
