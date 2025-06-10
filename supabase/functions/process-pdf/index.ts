@@ -1,409 +1,228 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-// Define proper CORS headers
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { testAdobeCredentials, testAdobeUpload, testAdobeExtractJobWithFixedHandling } from './debug-tests.ts';
+import { extractWithAdobe } from './pdf-processor.ts';
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Client-Info,apikey,X-Check-Availability",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced PDF text extraction with multiple strategies and better debugging
-async function extractTextFromPdf(base64Data: string, options = {}) {
-  try {
-    // For checking availability, we return a success message without processing
-    if (!base64Data || base64Data === "check") {
-      return {
-        text: "PDF processing service is available",
-        success: true,
-        available: true,
-        message: "Service is ready",
-        pages: [],
-        totalPages: 0,
-        processedPages: 0
-      };
-    }
-    
-    // Convert base64 to Uint8Array
-    let pdfData;
-    try {
-      const binaryString = atob(base64Data);
-      pdfData = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        pdfData[i] = binaryString.charCodeAt(i);
-      }
-      console.log(`Successfully decoded base64 data, length: ${pdfData.length} bytes`);
-    } catch (decodeError) {
-      console.error("Error decoding base64 data:", decodeError);
-      return {
-        text: "Error decoding PDF data: " + decodeError.message,
-        success: false,
-        error: "Base64 decoding failed"
-      };
-    }
-    
-    // Convert to string for text extraction
-    const pdfString = new TextDecoder('latin1').decode(pdfData);
-    
-    // Check if it's a valid PDF
-    if (!pdfString.startsWith('%PDF-')) {
-      return {
-        text: "Invalid PDF format",
-        success: false,
-        error: "Not a valid PDF file"
-      };
-    }
-    
-    console.log("Valid PDF detected, starting enhanced text extraction...");
-    
-    // Initialize extracted text
-    let extractedText = "";
-    let debugInfo = [];
-    
-    // Strategy 1: Look for stream objects and decode them
-    console.log("Strategy 1: Looking for stream objects...");
-    const streamRegex = /stream\s*(.*?)\s*endstream/gs;
-    const streams = pdfString.match(streamRegex) || [];
-    console.log(`Found ${streams.length} stream objects`);
-    
-    for (let i = 0; i < streams.length; i++) {
-      const stream = streams[i];
-      // Remove 'stream' and 'endstream' markers
-      const streamContent = stream.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
-      
-      // Look for text in the stream
-      const textInStream = extractTextFromStream(streamContent);
-      if (textInStream) {
-        extractedText += textInStream + " ";
-        debugInfo.push(`Stream ${i + 1}: Found ${textInStream.length} characters`);
-      }
-    }
-    
-    // Strategy 2: Enhanced BT/ET block extraction
-    console.log("Strategy 2: Enhanced BT/ET block extraction...");
-    const textObjectRegex = /BT\s+(.*?)\s+ET/gs;
-    const textObjects = pdfString.match(textObjectRegex) || [];
-    console.log(`Found ${textObjects.length} BT/ET text objects`);
-    
-    for (let i = 0; i < textObjects.length; i++) {
-      const textObj = textObjects[i];
-      const textFromObj = extractTextFromBTET(textObj);
-      if (textFromObj) {
-        extractedText += textFromObj + " ";
-        debugInfo.push(`BT/ET ${i + 1}: Found ${textFromObj.length} characters`);
-      }
-    }
-    
-    // Strategy 3: Look for Tj and TJ operators with enhanced patterns
-    console.log("Strategy 3: Enhanced Tj/TJ operator extraction...");
-    
-    // Tj operators
-    const tjRegex = /\(((?:[^()\\]|\\.)*)\)\s*Tj/g;
-    let match;
-    let tjCount = 0;
-    while ((match = tjRegex.exec(pdfString)) !== null) {
-      const text = decodeTextContent(match[1]);
-      if (text && text.length > 0) {
-        extractedText += text + " ";
-        tjCount++;
-      }
-    }
-    console.log(`Found ${tjCount} Tj operators with text`);
-    
-    // TJ arrays
-    const tjArrayRegex = /\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g;
-    let tjArrayCount = 0;
-    while ((match = tjArrayRegex.exec(pdfString)) !== null) {
-      const arrayContent = match[1];
-      const textMatches = arrayContent.match(/\(((?:[^()\\]|\\.)*)\)/g) || [];
-      for (const textMatch of textMatches) {
-        const text = decodeTextContent(textMatch.slice(1, -1)); // Remove parentheses
-        if (text && text.length > 0) {
-          extractedText += text + " ";
-          tjArrayCount++;
-        }
-      }
-    }
-    console.log(`Found ${tjArrayCount} TJ array elements with text`);
-    
-    // Strategy 4: Look for hex-encoded text
-    console.log("Strategy 4: Hex-encoded text extraction...");
-    const hexTextRegex = /<([0-9A-Fa-f]+)>\s*(?:Tj|TJ)/g;
-    let hexCount = 0;
-    while ((match = hexTextRegex.exec(pdfString)) !== null) {
-      const hexText = match[1];
-      try {
-        const decodedHex = hexText.replace(/../g, (hex) => String.fromCharCode(parseInt(hex, 16)));
-        if (decodedHex.match(/[a-zA-Z]/)) {
-          extractedText += decodedHex + " ";
-          hexCount++;
-        }
-      } catch (e) {
-        // Ignore conversion errors
-      }
-    }
-    console.log(`Found ${hexCount} hex-encoded text elements`);
-    
-    // Strategy 5: Direct search for readable text patterns
-    console.log("Strategy 5: Direct readable text pattern search...");
-    const readableTextRegex = /([A-Za-z]{3,}(?:\s+[A-Za-z]{3,}){2,})/g;
-    const readableMatches = pdfString.match(readableTextRegex) || [];
-    for (const readable of readableMatches) {
-      if (readable.length > 10 && !extractedText.includes(readable)) {
-        extractedText += readable + " ";
-      }
-    }
-    console.log(`Found ${readableMatches.length} readable text patterns`);
-    
-    // Clean up the extracted text
-    extractedText = cleanExtractedText(extractedText);
-    
-    console.log(`Final extracted text length: ${extractedText.length} characters`);
-    console.log(`Extraction strategies used: ${debugInfo.join(', ')}`);
-    
-    // Check if we actually extracted meaningful text
-    if (!extractedText || extractedText.length < 10) {
-      // Try one more desperate attempt - look for any sequences of letters
-      console.log("Desperate attempt: Looking for any letter sequences...");
-      const letterSequences = pdfString.match(/[A-Za-z]{3,}/g) || [];
-      if (letterSequences.length > 0) {
-        extractedText = letterSequences.slice(0, 50).join(' '); // Take first 50 sequences
-        console.log(`Desperate attempt found ${letterSequences.length} letter sequences`);
-      }
-    }
-    
-    if (!extractedText || extractedText.length < 10) {
-      extractedText = "No readable text could be extracted from this PDF. The document may be:\n- A scanned image (requires OCR)\n- Password protected\n- Corrupted\n- Using unsupported encoding\n- Entirely graphical content";
-    }
-    
-    return {
-      text: extractedText,
-      pages: [],
-      totalPages: 1,
-      processedPages: 1,
-      success: true,
-      available: true,
-      debugInfo: debugInfo
-    };
-    
-  } catch (error) {
-    console.error("Error extracting text:", error);
-    return {
-      text: `Error extracting text: ${error.message || "Unknown error"}`,
-      success: false,
-      error: error.message,
-      available: true
-    };
-  }
-}
-
-// Helper function to extract text from stream content
-function extractTextFromStream(streamContent: string): string {
-  let text = "";
-  
-  // Look for text operators in the stream
-  const operators = ['Tj', 'TJ', "'", '"'];
-  
-  for (const op of operators) {
-    const regex = new RegExp(`\\(((?:[^()\\\\]|\\\\.)*?)\\)\\s*${op}`, 'g');
-    let match;
-    while ((match = regex.exec(streamContent)) !== null) {
-      const decodedText = decodeTextContent(match[1]);
-      if (decodedText) {
-        text += decodedText + " ";
-      }
-    }
-  }
-  
-  return text.trim();
-}
-
-// Helper function to extract text from BT/ET blocks
-function extractTextFromBTET(textObj: string): string {
-  let text = "";
-  
-  // Extract text from parentheses
-  const textInParens = textObj.match(/\(((?:[^()\\]|\\.)*)\)/g) || [];
-  for (const match of textInParens) {
-    const content = match.slice(1, -1); // Remove parentheses
-    const decodedText = decodeTextContent(content);
-    if (decodedText) {
-      text += decodedText + " ";
-    }
-  }
-  
-  // Extract text from angle brackets (hex)
-  const textInAngles = textObj.match(/<([0-9A-Fa-f]+)>/g) || [];
-  for (const match of textInAngles) {
-    const hexContent = match.slice(1, -1); // Remove angle brackets
-    try {
-      const decodedHex = hexContent.replace(/../g, (hex) => String.fromCharCode(parseInt(hex, 16)));
-      if (decodedHex.match(/[a-zA-Z]/)) {
-        text += decodedHex + " ";
-      }
-    } catch (e) {
-      // Ignore conversion errors
-    }
-  }
-  
-  return text.trim();
-}
-
-// Helper function to decode text content
-function decodeTextContent(content: string): string {
-  if (!content) return "";
-  
-  try {
-    // Handle escaped characters
-    let decoded = content
-      .replace(/\\n/g, '\n')
-      .replace(/\\r/g, '\r')
-      .replace(/\\t/g, '\t')
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      .replace(/\\\\/g, '\\');
-    
-    // Filter out non-printable characters but keep spaces and common punctuation
-    decoded = decoded.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, ' ');
-    
-    // Only return if it contains actual letters
-    if (decoded.match(/[a-zA-Z]/)) {
-      return decoded;
-    }
-  } catch (e) {
-    // Ignore decode errors
-  }
-  
-  return "";
-}
-
-// Helper function to clean extracted text
-function cleanExtractedText(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')  // Normalize whitespace
-    .replace(/\s*\n\s*/g, '\n')  // Clean line breaks
-    .trim();
-}
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
-  
-  try {
-    // Check if this is just an availability check from request header
-    if (req.headers.get("x-check-availability") === "true") {
-      console.log("Availability check received via header");
-      return new Response(
-        JSON.stringify({ 
-          available: true, 
-          success: true,
-          message: "PDF processing service is available" 
-        }),
-        { 
-          status: 200, 
-          headers: { 
-            "Content-Type": "application/json", 
-            ...corsHeaders
-          } 
-        }
-      );
-    }
-    
-    // Parse the request body
-    let requestBody;
-    try {
-      requestBody = await req.json();
-    } catch (parseError) {
-      console.error("Error parsing request JSON:", parseError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid JSON in request body",
-          details: parseError.message
-        }),
-        { 
-          status: 400, 
-          headers: { 
-            "Content-Type": "application/json", 
-            ...corsHeaders
-          } 
-        }
-      );
-    }
-    
-    const { pdfBase64, options = {}, checkAvailability = false } = requestBody;
-    
-    // Handle simple availability check from request body
-    if (checkAvailability) {
-      console.log("Availability check received via request body");
-      return new Response(
-        JSON.stringify({ 
-          available: true, 
-          success: true,
-          message: "PDF processing service is available",
-          timestamp: new Date().toISOString()
-        }),
-        { 
-          status: 200, 
-          headers: { 
-            "Content-Type": "application/json", 
-            ...corsHeaders,
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0"
-          } 
-        }
-      );
-    }
-    
-    if (!pdfBase64 && !checkAvailability) {
-      return new Response(
-        JSON.stringify({ error: "No PDF data provided" }),
-        { 
-          status: 400, 
-          headers: { 
-            "Content-Type": "application/json", 
-            ...corsHeaders
-          } 
-        }
-      );
-    }
-    
-    console.log("Received PDF processing request with enhanced multi-strategy extraction");
 
-    // Process the PDF with our enhanced extraction
-    const result = await extractTextFromPdf(pdfBase64, options);
+  try {
+    console.log(`🚀 === EDGE FUNCTION STARTED ===`);
+    console.log(`Method: ${req.method}`);
+    console.log(`URL: ${req.url}`);
+    console.log(`Headers:`, Object.fromEntries(req.headers.entries()));
+
+    if (req.method !== 'POST') {
+      console.log('❌ Method not allowed');
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+        status: 405, 
+        headers: corsHeaders 
+      });
+    }
+
+    let formData;
+    let file;
+    let testStep;
     
-    // Return the extracted text
-    return new Response(
-      JSON.stringify(result),
-      { 
-        status: 200, 
-        headers: { 
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store, no-cache", 
-          ...corsHeaders
-        } 
+    try {
+      console.log('📥 Parsing form data...');
+      formData = await req.formData();
+      file = formData.get('file') as File;
+      testStep = formData.get('testStep') as string || 'full';
+      console.log(`✅ Form data parsed. testStep: ${testStep}, file: ${file ? file.name : 'none'}`);
+    } catch (error) {
+      console.error('❌ Failed to parse form data:', error);
+      return new Response(JSON.stringify({
+        status: 'error',
+        error: 'Failed to parse form data',
+        details: error.message
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`=== STARTING TEST STEP: ${testStep} ===`);
+
+    // Step 1: Basic function test
+    if (testStep === 'basic') {
+      console.log('✅ Basic edge function is working!');
+      return new Response(JSON.stringify({
+        status: 'success',
+        message: 'Basic edge function test passed',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Step 2: Test Adobe credentials only
+    if (testStep === 'credentials') {
+      try {
+        console.log('🔐 Starting credentials test...');
+        const result = await testAdobeCredentials();
+        console.log('✅ Credentials test completed successfully');
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('❌ Credentials test failed:', error);
+        return new Response(JSON.stringify({
+          status: 'error',
+          error: error.message,
+          details: error.stack
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
-    );
+    }
+
+    // Step 3: Test file upload to Adobe
+    if (testStep === 'upload') {
+      if (!file) {
+        console.log('❌ No file provided for upload test');
+        return new Response(JSON.stringify({ 
+          status: 'error',
+          error: 'No file provided for upload test' 
+        }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      try {
+        console.log('📤 Starting upload test...');
+        const result = await testAdobeUpload(file);
+        console.log('✅ Upload test completed successfully');
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('❌ Upload test failed:', error);
+        return new Response(JSON.stringify({
+          status: 'error',
+          error: error.message,
+          details: error.stack
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Step 4: Test extract job creation
+    if (testStep === 'extract') {
+      if (!file) {
+        console.log('❌ No file provided for extract test');
+        return new Response(JSON.stringify({ 
+          status: 'error',
+          error: 'No file provided for extract test' 
+        }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      try {
+        console.log('🔍 Starting extract test...');
+        const result = await testAdobeExtractJobWithFixedHandling(file);
+        console.log('✅ Extract test completed');
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('❌ Extract test failed:', error);
+        return new Response(JSON.stringify({
+          status: 'error',
+          error: error.message,
+          details: error.stack
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Default: Full processing
+    if (!file) {
+      console.log('❌ No file provided for full processing');
+      return new Response(JSON.stringify({ 
+        status: 'error',
+        error: 'No file provided' 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (file.type !== 'application/pdf') {
+      console.log(`❌ Invalid file type: ${file.type}`);
+      return new Response(JSON.stringify({ 
+        status: 'error',
+        error: 'File must be a PDF' 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`🔄 STARTING FULL PROCESSING for: ${file.name}, size: ${file.size} bytes`);
+    
+    try {
+      const extractedText = await extractWithAdobe(file);
+      console.log(`✅ FULL PROCESSING COMPLETED for: ${file.name}`);
+      console.log(`✅ Extracted text length: ${extractedText.length} characters`);
+
+      return new Response(JSON.stringify({
+        filename: file.name,
+        size: file.size,
+        extractedText: extractedText,
+        status: 'completed'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } catch (extractError) {
+      console.error(`❌ FULL PROCESSING FAILED for: ${file.name}`);
+      console.error(`❌ Extract error:`, extractError);
+      console.error(`❌ Extract error message:`, extractError.message);
+      console.error(`❌ Extract error stack:`, extractError.stack);
+      
+      return new Response(JSON.stringify({
+        status: 'error',
+        error: `Full processing failed: ${extractError.message}`,
+        details: extractError.stack,
+        filename: file.name
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
   } catch (error) {
-    console.error("Error processing PDF:", error);
+    console.error('❌ TOP LEVEL CRITICAL ERROR:', error);
+    console.error('❌ ERROR MESSAGE:', error.message);
+    console.error('❌ ERROR STACK:', error.stack);
+    console.error('❌ ERROR NAME:', error.name);
+    console.error('❌ ERROR CONSTRUCTOR:', error.constructor.name);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : "Unknown error processing PDF",
-        details: error instanceof Error ? error.stack : undefined
-      }),
-      { 
-        status: 500, 
-        headers: { 
-          "Content-Type": "application/json", 
-          ...corsHeaders
-        } 
-      }
-    );
+    return new Response(JSON.stringify({
+      status: 'error',
+      error: error.message || 'Unknown error occurred',
+      errorType: error.constructor.name,
+      timestamp: new Date().toISOString(),
+      stack: error.stack
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
