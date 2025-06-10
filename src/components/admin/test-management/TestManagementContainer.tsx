@@ -18,12 +18,18 @@ export function TestManagement() {
     setIsLoading(false);
   };
 
+  // For tabs that need the callback pattern (ChunkingTab, EmbeddingsTab)
   const handleRunTest = (callback: () => Promise<any>) => {
     setIsLoading(true);
     callback().then(handleTestComplete).catch((error) => {
       console.error('Test failed:', error);
       setIsLoading(false);
     });
+  };
+
+  // For tabs that handle their own loading and just pass results (ExtractionTab)
+  const handleDirectResult = (results: any) => {
+    setTestResults(results);
   };
 
   return (
@@ -43,7 +49,7 @@ export function TestManagement() {
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
-                <ExtractionTab isLoading={isLoading} onRunTest={handleRunTest} />
+                <ExtractionTab isLoading={false} onRunTest={handleDirectResult} />
               </TabsContent>
               
               <TabsContent value="chunking" className="mt-6">
