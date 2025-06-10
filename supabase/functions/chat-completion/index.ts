@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -122,96 +123,102 @@ serve(async (req) => {
       const queryEmbedding = embeddingData.data[0].embedding
       console.log('Generated embedding with dimensions:', queryEmbedding.length)
       
-      // Get some sample embeddings to check what we have
-      const { data: embeddingCount, error: countError } = await supabase
-        .from('document_embeddings')
-        .select('*', { count: 'exact' })
-        .limit(5)
-        
-      if (countError) {
-        console.error('Error getting embeddings:', countError)
+      // First, get available documents
+      const { data: availableDocuments, error: docError } = await supabase
+        .from('processed_documents')
+        .select('id, title, url, status')
+        .eq('status', 'completed')
+      
+      if (docError) {
+        console.error('Error fetching documents:', docError)
       } else {
-        console.log('Total embeddings in database:', embeddingCount?.length || 0)
-        if (embeddingCount && embeddingCount.length > 0) {
-          console.log('Sample embedding structure:', {
-            id: embeddingCount[0].id,
-            document_id: embeddingCount[0].document_id,
-            chunk_id: embeddingCount[0].chunk_id,
-            has_embedding: !!embeddingCount[0].embedding_vector,
-            embedding_type: typeof embeddingCount[0].embedding_vector
-          })
-        }
+        console.log('Available documents:', availableDocuments?.map(d => d.title) || [])
       }
       
-      // Try direct database query first to understand the data structure
-      console.log('Querying embeddings directly with document info...')
-      const { data: embeddingsWithDocs, error: directError } = await supabase
-        .from('document_embeddings')
-        .select(`
-          id,
-          document_id,
-          chunk_id,
-          embedding_vector,
-          processed_documents!inner(title, content, url)
-        `)
-        .limit(10)
+      // Try to use vector search function
+      console.log('Attempting vector search...')
+      const { data: searchResults, error: searchError } = await supabase
+        .rpc('search_similar_embeddings', {
+          query_embedding: queryEmbedding,
+          similarity_threshold: 0.1, // Very low threshold to get any results
+          match_count: 5
+        })
       
-      console.log('Direct query result:', {
-        error: directError,
-        count: embeddingsWithDocs?.length || 0,
-        sample: embeddingsWithDocs?.[0] ? {
-          document_title: embeddingsWithDocs[0].processed_documents?.title,
-          has_content: !!embeddingsWithDocs[0].processed_documents?.content
-        } : null
-      })
-      
-      if (embeddingsWithDocs && embeddingsWithDocs.length > 0) {
-        // Use the first few embeddings as context regardless of similarity for now
-        console.log('Using direct document content as context')
-        
-        // Get actual document content chunks
-        const contextChunks = embeddingsWithDocs.slice(0, 3).map(item => {
-          const doc = item.processed_documents
-          if (doc?.content) {
-            // Extract a meaningful chunk from the document content
-            const content = doc.content
-            const chunkSize = 500 // Use first 500 characters
-            const chunk = content.substring(0, chunkSize) + (content.length > chunkSize ? '...' : '')
-            return {
-              document_title: doc.title,
-              chunk_content: chunk,
-              document_url: doc.url
-            }
-          }
-          return null
-        }).filter(Boolean)
-        
-        if (contextChunks.length > 0) {
-          relevantDocs = contextChunks
-          contextText = contextChunks
-            .map(doc => `Document: ${doc.document_title}\nContent: ${doc.chunk_content}`)
-            .join('\n\n')
-          console.log('Using document content as context, chunks:', contextChunks.length)
-        }
-      }
-      
-      // Fallback to document list if no content found
-      if (!contextText) {
-        const { data: sampleDocs, error: sampleError } = await supabase
-          .from('processed_documents')
-          .select('title, content, url')
-          .limit(5)
-          
-        if (!sampleError && sampleDocs && sampleDocs.length > 0) {
-          const docInfo = sampleDocs.map(d => ({
-            title: d.title,
-            hasContent: !!d.content,
-            contentLength: d.content?.length || 0
+      if (searchError) {
+        console.error('Vector search error:', searchError)
+      } else {
+        console.log('Vector search results:', searchResults?.length || 0)
+        if (searchResults && searchResults.length > 0) {
+          relevantDocs = searchResults.map(result => ({
+            document_title: result.document_title,
+            chunk_content: result.chunk_content,
+            similarity: result.similarity
           }))
           
-          console.log('Available documents:', docInfo)
-          contextText = `I have access to documents including: ${sampleDocs.map(d => d.title).join(', ')}. Let me search for specific content from these documents.`
+          contextText = searchResults
+            .map(result => `Document: ${result.document_title}\nContent: ${result.chunk_content}`)
+            .join('\n\n')
+          
+          console.log('Found relevant content via vector search')
         }
+      }
+      
+      // If vector search didn't work, try to get document content directly
+      if (!contextText && availableDocuments && availableDocuments.length > 0) {
+        console.log('Fallback: Getting document content directly from chunks...')
+        
+        // Get document chunks for available documents
+        const { data: documentChunks, error: chunksError } = await supabase
+          .from('document_chunks')
+          .select(`
+            content,
+            processed_documents!inner(title, url)
+          `)
+          .in('document_id', availableDocuments.map(d => d.id))
+          .limit(10)
+        
+        if (chunksError) {
+          console.error('Error fetching document chunks:', chunksError)
+        } else {
+          console.log('Found document chunks:', documentChunks?.length || 0)
+          
+          if (documentChunks && documentChunks.length > 0) {
+            // Group chunks by document
+            const documentContentMap = new Map()
+            
+            documentChunks.forEach(chunk => {
+              const docTitle = chunk.processed_documents?.title
+              if (docTitle && chunk.content) {
+                if (!documentContentMap.has(docTitle)) {
+                  documentContentMap.set(docTitle, [])
+                }
+                documentContentMap.get(docTitle).push(chunk.content)
+              }
+            })
+            
+            // Create context from document chunks
+            const contextParts = []
+            for (const [title, chunks] of documentContentMap.entries()) {
+              const combinedContent = chunks.slice(0, 3).join(' ').substring(0, 1000)
+              contextParts.push(`Document: ${title}\nContent: ${combinedContent}`)
+              
+              relevantDocs.push({
+                document_title: title,
+                chunk_content: combinedContent
+              })
+            }
+            
+            contextText = contextParts.join('\n\n')
+            console.log('Using direct document chunks as context')
+          }
+        }
+      }
+      
+      // Final fallback - just list available documents
+      if (!contextText && availableDocuments && availableDocuments.length > 0) {
+        const docList = availableDocuments.map(d => d.title).join(', ')
+        contextText = `I have access to the following documents: ${docList}. I can search through their content to answer questions about them.`
+        console.log('Using document list as context')
       }
       
     } catch (searchErr) {
@@ -222,7 +229,7 @@ serve(async (req) => {
     // Prepare system message with context
     const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
       `Document Context:\n${contextText}\n\n` +
-      'Use the provided document context to answer questions about the documents. If you have specific content from documents, use it to provide detailed answers.'
+      'Use the provided document context to answer questions about the documents. If you have specific content from documents, use it to provide detailed answers. If you can see document titles but no content, let the user know what documents are available and suggest they ask specific questions about topics that might be covered in those documents.'
     
     // Prepare messages array
     const promptMessages: ChatMessage[] = [
