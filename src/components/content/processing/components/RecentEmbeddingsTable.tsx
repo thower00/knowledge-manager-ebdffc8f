@@ -1,6 +1,8 @@
 
 import React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 interface EmbeddingRecord {
   id: string;
@@ -15,14 +17,57 @@ interface EmbeddingRecord {
 
 interface RecentEmbeddingsTableProps {
   embeddings: EmbeddingRecord[];
+  onClearDocument: (documentId: string) => Promise<void>;
+  isClearing: boolean;
 }
 
-export function RecentEmbeddingsTable({ embeddings }: RecentEmbeddingsTableProps) {
+export function RecentEmbeddingsTable({ embeddings, onClearDocument, isClearing }: RecentEmbeddingsTableProps) {
   if (embeddings.length === 0) return null;
+
+  // Get unique documents from embeddings
+  const uniqueDocuments = embeddings.reduce((acc, embedding) => {
+    if (!acc.find(doc => doc.document_id === embedding.document_id)) {
+      acc.push({
+        document_id: embedding.document_id,
+        count: embeddings.filter(e => e.document_id === embedding.document_id).length
+      });
+    }
+    return acc;
+  }, [] as Array<{ document_id: string; count: number }>);
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-medium">Recent Embeddings (Last 50):</h4>
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium">Recent Embeddings (Last 50):</h4>
+        {uniqueDocuments.length > 0 && (
+          <div className="text-xs text-muted-foreground">
+            {uniqueDocuments.length} document(s) with embeddings
+          </div>
+        )}
+      </div>
+      
+      {/* Document-level actions */}
+      {uniqueDocuments.length > 0 && (
+        <div className="space-y-2">
+          <h5 className="text-xs font-medium text-muted-foreground">Clear by Document:</h5>
+          <div className="flex flex-wrap gap-2">
+            {uniqueDocuments.map(doc => (
+              <Button
+                key={doc.document_id}
+                variant="outline"
+                size="sm"
+                onClick={() => onClearDocument(doc.document_id)}
+                disabled={isClearing}
+                className="text-xs"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Doc {doc.document_id.slice(0, 8)}... ({doc.count})
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="border rounded-lg overflow-hidden">
         <div className="max-h-64 overflow-y-auto">
           <table className="w-full text-xs">
