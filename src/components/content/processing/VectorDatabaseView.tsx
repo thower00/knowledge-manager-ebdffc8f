@@ -44,67 +44,99 @@ export function VectorDatabaseView() {
 
   const clearCompleteDatabase = async () => {
     try {
-      console.log('Starting complete database reset with direct queries...');
+      console.log('Starting aggressive complete database reset...');
       
-      // Get initial counts for detailed reporting
-      const { count: initialEmbeddings } = await supabase
-        .from('document_embeddings')
-        .select('*', { count: 'exact', head: true });
-      
-      const { count: initialChunks } = await supabase
-        .from('document_chunks')
-        .select('*', { count: 'exact', head: true });
-      
-      const { count: initialDocs } = await supabase
+      // First, get all document IDs for tracking
+      const { data: documents } = await supabase
         .from('processed_documents')
-        .select('*', { count: 'exact', head: true });
+        .select('id, title');
 
-      console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
+      console.log(`Found ${documents?.length || 0} documents to delete:`, documents?.map(d => d.title));
 
       let deletedEmbeddings = 0;
       let deletedChunks = 0;
       let deletedDocs = 0;
 
-      // Step 1: Delete all embeddings using direct query
+      // Step 1: Delete all embeddings with aggressive approach
       console.log('Step 1: Deleting all embeddings...');
-      const { error: embeddingError, count: embeddingDeleteCount } = await supabase
-        .from('document_embeddings')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      try {
+        const { error: embeddingError, count: embeddingDeleteCount } = await supabase
+          .from('document_embeddings')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (embeddingError) {
-        throw new Error(`Failed to delete embeddings: ${embeddingError.message}`);
+        if (embeddingError) {
+          console.error('Embedding deletion error:', embeddingError);
+        } else {
+          deletedEmbeddings = embeddingDeleteCount || 0;
+          console.log(`Successfully deleted ${deletedEmbeddings} embeddings`);
+        }
+      } catch (error) {
+        console.error('Exception deleting embeddings:', error);
       }
-      deletedEmbeddings = embeddingDeleteCount || 0;
-      console.log(`Deleted ${deletedEmbeddings} embeddings`);
 
-      // Step 2: Delete all chunks using direct query
+      // Step 2: Delete all chunks with aggressive approach
       console.log('Step 2: Deleting all chunks...');
-      const { error: chunkError, count: chunkDeleteCount } = await supabase
-        .from('document_chunks')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      try {
+        const { error: chunkError, count: chunkDeleteCount } = await supabase
+          .from('document_chunks')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (chunkError) {
-        throw new Error(`Failed to delete chunks: ${chunkError.message}`);
+        if (chunkError) {
+          console.error('Chunk deletion error:', chunkError);
+        } else {
+          deletedChunks = chunkDeleteCount || 0;
+          console.log(`Successfully deleted ${deletedChunks} chunks`);
+        }
+      } catch (error) {
+        console.error('Exception deleting chunks:', error);
       }
-      deletedChunks = chunkDeleteCount || 0;
-      console.log(`Deleted ${deletedChunks} chunks`);
 
-      // Step 3: Delete all documents using direct query
-      console.log('Step 3: Deleting all documents...');
-      const { error: docError, count: docDeleteCount } = await supabase
-        .from('processed_documents')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      // Step 3: Multiple approaches to delete documents
+      console.log('Step 3: Attempting to delete all documents...');
+      
+      // Approach 1: Try mass deletion
+      try {
+        const { error: docError1, count: docDeleteCount1 } = await supabase
+          .from('processed_documents')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (docError) {
-        throw new Error(`Failed to delete documents: ${docError.message}`);
+        if (docError1) {
+          console.error('Mass deletion error:', docError1);
+        } else {
+          deletedDocs = docDeleteCount1 || 0;
+          console.log(`Mass deletion: ${deletedDocs} documents deleted`);
+        }
+      } catch (error) {
+        console.error('Mass deletion exception:', error);
       }
-      deletedDocs = docDeleteCount || 0;
-      console.log(`Deleted ${deletedDocs} documents`);
 
-      // Step 4: Verify deletion by counting remaining records
+      // Approach 2: If mass deletion failed, try individual deletion
+      if (deletedDocs === 0 && documents && documents.length > 0) {
+        console.log('Mass deletion failed, trying individual document deletion...');
+        
+        for (const doc of documents) {
+          try {
+            const { error: individualError } = await supabase
+              .from('processed_documents')
+              .delete()
+              .eq('id', doc.id);
+
+            if (individualError) {
+              console.error(`Failed to delete document ${doc.title} (${doc.id}):`, individualError);
+            } else {
+              deletedDocs++;
+              console.log(`Successfully deleted document: ${doc.title}`);
+            }
+          } catch (error) {
+            console.error(`Exception deleting document ${doc.title}:`, error);
+          }
+        }
+      }
+
+      // Final verification
       const { count: remainingEmbeddings } = await supabase
         .from('document_embeddings')
         .select('*', { count: 'exact', head: true });
@@ -117,20 +149,22 @@ export function VectorDatabaseView() {
         .from('processed_documents')
         .select('*', { count: 'exact', head: true });
 
-      console.log(`Verification - Remaining counts: Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
+      console.log(`Final verification - Remaining: Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
 
-      if (remainingEmbeddings === 0 && remainingChunks === 0 && remainingDocs === 0) {
-        console.log('Database reset completed successfully');
+      const totalRemaining = (remainingEmbeddings || 0) + (remainingChunks || 0) + (remainingDocs || 0);
+
+      if (totalRemaining === 0) {
+        console.log('Complete database reset completed successfully');
         toast({
           title: "Complete Database Reset Successful",
           description: `Successfully deleted ${deletedDocs} documents, ${deletedChunks} chunks, and ${deletedEmbeddings} embeddings`
         });
       } else {
-        console.warn(`Warning: Some records remain - Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
+        console.warn(`Warning: ${totalRemaining} records still remain after deletion attempt`);
         toast({
           variant: "destructive",
           title: "Partial Reset",
-          description: `Deleted some records but ${remainingDocs + remainingChunks + remainingEmbeddings} records remain`
+          description: `Deleted some records but ${totalRemaining} records remain. Check console for details.`
         });
       }
       
