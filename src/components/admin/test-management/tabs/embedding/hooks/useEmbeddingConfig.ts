@@ -48,35 +48,11 @@ export function useEmbeddingConfig() {
     loadConfiguration();
   }, [config]);
 
-  const getApiKey = () => {
-    if (!loadedConfig) return "";
-    
-    // First try provider-specific key, then fall back to general API key
-    const providerKey = loadedConfig.providerApiKeys?.[loadedConfig.provider];
-    const generalKey = loadedConfig.apiKey;
-    
-    console.log("Getting API key:");
-    console.log("Provider:", loadedConfig.provider);
-    console.log("Provider-specific key exists:", !!providerKey);
-    console.log("General API key exists:", !!generalKey);
-    
-    return providerKey || generalKey || "";
-  };
-
-  const hasApiKey = () => {
-    const apiKey = getApiKey();
-    const hasKey = !!apiKey && apiKey.trim().length > 0;
-    console.log("hasApiKey check:", hasKey, "API key length:", apiKey?.length || 0);
-    return hasKey;
-  };
-
   return {
     isGenerating,
     setIsGenerating,
     configLoaded,
     loadedConfig,
-    getApiKey,
-    hasApiKey,
     toast
   };
 }

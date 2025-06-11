@@ -2,16 +2,7 @@
 import { useState, useEffect } from "react";
 import { ChunkingConfig } from "@/types/chunking";
 import { supabase } from "@/integrations/supabase/client";
-
-interface EmbeddingConfig {
-  provider: "openai" | "cohere" | "huggingface";
-  model: string;
-  apiKey: string;
-  batchSize: number;
-  similarityThreshold: string;
-  embeddingMetadata?: Record<string, any>;
-  vectorStorage?: string;
-}
+import { mapDatabaseConfigToEmbeddingConfig, type EmbeddingConfig } from "@/utils/embeddingConfigMapper";
 
 interface ProcessingConfig {
   chunking: ChunkingConfig;
@@ -24,18 +15,16 @@ const DEFAULT_CHUNKING_CONFIG: ChunkingConfig = {
   chunkStrategy: "recursive"
 };
 
-const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
-  provider: "openai",
-  model: "text-embedding-3-small",
-  apiKey: "",
-  batchSize: 100,
-  similarityThreshold: "0.7"
-};
-
 export function useProcessingConfiguration() {
   const [config, setConfig] = useState<ProcessingConfig>({
     chunking: DEFAULT_CHUNKING_CONFIG,
-    embedding: DEFAULT_EMBEDDING_CONFIG
+    embedding: {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      apiKey: "",
+      batchSize: 100,
+      similarityThreshold: "0.7"
+    }
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -66,17 +55,11 @@ export function useProcessingConfiguration() {
               chunkOverlap: parseInt(dbConfig.chunkOverlap) || DEFAULT_CHUNKING_CONFIG.chunkOverlap,
               chunkStrategy: dbConfig.chunkStrategy || DEFAULT_CHUNKING_CONFIG.chunkStrategy
             },
-            embedding: {
-              provider: dbConfig.provider || DEFAULT_EMBEDDING_CONFIG.provider,
-              model: dbConfig.specificModelId || DEFAULT_EMBEDDING_CONFIG.model,
-              apiKey: dbConfig.providerApiKeys?.[dbConfig.provider] || dbConfig.apiKey || "",
-              batchSize: parseInt(dbConfig.embeddingBatchSize) || DEFAULT_EMBEDDING_CONFIG.batchSize,
-              similarityThreshold: dbConfig.similarityThreshold || DEFAULT_EMBEDDING_CONFIG.similarityThreshold,
-              embeddingMetadata: dbConfig.embeddingMetadata,
-              vectorStorage: dbConfig.vectorStorage
-            }
+            // Use the configuration mapper for consistent embedding config
+            embedding: mapDatabaseConfigToEmbeddingConfig(dbConfig)
           };
           
+          console.log("Mapped processing configuration:", mappedConfig);
           setConfig(mappedConfig);
         } else {
           console.log("No configuration found in Configuration Management, using defaults");
