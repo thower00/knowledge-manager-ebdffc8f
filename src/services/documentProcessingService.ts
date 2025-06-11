@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
@@ -51,8 +52,69 @@ export class DocumentProcessingService {
     });
   }
 
+  async syncDocumentStatuses(): Promise<void> {
+    console.log('Syncing document statuses...');
+    
+    try {
+      // Get all pending documents
+      const { data: pendingDocuments, error } = await supabase
+        .from('processed_documents')
+        .select('id, title')
+        .eq('status', 'pending');
+
+      if (error) {
+        console.error('Error fetching pending documents:', error);
+        return;
+      }
+
+      if (!pendingDocuments || pendingDocuments.length === 0) {
+        console.log('No pending documents found');
+        return;
+      }
+
+      console.log(`Found ${pendingDocuments.length} pending documents to check`);
+
+      for (const doc of pendingDocuments) {
+        const { count: chunksCount } = await supabase
+          .from('document_chunks')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', doc.id);
+
+        const { count: embeddingsCount } = await supabase
+          .from('document_embeddings')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', doc.id);
+
+        if (chunksCount && chunksCount > 0 && embeddingsCount && embeddingsCount > 0) {
+          console.log(`Document "${doc.title}" has ${chunksCount} chunks and ${embeddingsCount} embeddings - updating to completed`);
+          
+          await this.updateDocumentStatus(doc.id, 'completed');
+          
+          if (this.onProgress) {
+            this.onProgress({
+              documentId: doc.id,
+              documentTitle: doc.title,
+              stage: 'completed',
+              progress: 100,
+              chunksGenerated: chunksCount,
+              embeddingsGenerated: embeddingsCount,
+            });
+          }
+        }
+      }
+
+      console.log('Document status synchronization completed');
+    } catch (error) {
+      console.error('Error during document status sync:', error);
+    }
+  }
+
   async processDocuments(documentIds: string[]): Promise<ProcessingResult[]> {
     console.log(`Starting batch processing of ${documentIds.length} documents`);
+    
+    // First, sync any existing document statuses
+    await this.syncDocumentStatuses();
+    
     const results: ProcessingResult[] = [];
     
     for (const documentId of documentIds) {
