@@ -1,3 +1,4 @@
+
 import { ChatConfig, ContextSource } from './types.ts'
 
 export async function performVectorSearch(
@@ -32,16 +33,17 @@ export async function performVectorSearch(
       })) || [])
     }
 
-    // For document listing queries, return information about document access
+    // For document listing queries, return specific count and clear capabilities
     if (isDocumentSpecific && /\b(list.*documents|what.*documents|documents.*access)\b/i.test(question)) {
       console.log('Processing document listing query...')
       
       if (availableDocuments && availableDocuments.length > 0) {
-        contextText = `I have access to ${availableDocuments.length} processed document${availableDocuments.length > 1 ? 's' : ''}. I can answer questions about their content, provide summaries, or help you find specific information from these documents. You can ask me about any topics covered in the documents, and I'll search through their content to provide relevant answers.`
-        console.log('Using document access info as context')
+        const docCount = availableDocuments.length
+        contextText = `I have access to ${docCount} processed document${docCount > 1 ? 's' : ''} that ${docCount > 1 ? 'have' : 'has'} been successfully uploaded and processed. I can help you with:\n\n• Answering questions about the content in these documents\n• Providing summaries of the documents\n• Finding specific information across all documents\n• Explaining key concepts or topics covered\n\nSimply ask me questions about any topics you're interested in, and I'll search through the document content to provide relevant, detailed answers based on what's available.`
+        console.log('Using detailed document access info as context')
         return { contextText, relevantDocs }
       } else {
-        contextText = 'I do not have access to any processed documents at the moment. Please ensure documents have been uploaded and processed successfully.'
+        contextText = 'I currently do not have access to any processed documents. No documents have been successfully uploaded and processed yet. Please upload and process documents first, then I\'ll be able to help answer questions about their content.'
         console.log('No documents available')
         return { contextText, relevantDocs }
       }
