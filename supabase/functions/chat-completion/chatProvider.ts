@@ -21,18 +21,19 @@ export async function generateChatResponse(
   console.log('Current context documents:', currentDocuments)
   console.log('All relevant documents for this response:', allRelevantDocs)
   
-  // Enhanced system message with better context handling and document listing support
+  // Enhanced system message with better context handling and comprehensive document listing
   const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
     `Document Context:\n${contextText}\n\n` +
     `IMPORTANT INSTRUCTIONS:\n` +
     `1. You have access to specific document content provided above. Use this content to answer questions directly and comprehensively.\n` +
-    `2. When users ask about "the documents", "what documents", or request to "list documents", provide a complete list of ALL documents you have access to: ${allRelevantDocs.length > 0 ? allRelevantDocs.join(', ') : 'the available documents'}.\n` +
-    `3. When listing documents, format them clearly with bullet points or numbered lists for better readability.\n` +
+    `2. When users ask about "the documents", "what documents", or request to "list documents", provide a complete list of ALL documents you have access to. Based on the context provided, you have access to: ${allRelevantDocs.length > 0 ? allRelevantDocs.join(', ') : 'the available documents'}.\n` +
+    `3. When listing documents, format them clearly with bullet points or numbered lists for better readability. ALWAYS list ALL documents mentioned in the context, not just some of them.\n` +
     `4. If you have document content, provide detailed answers based on that content. Include specific information, key points, and relevant details.\n` +
-    `5. If multiple documents are available, mention all of them when asked about document access.\n` +
+    `5. If multiple documents are available, mention ALL of them when asked about document access. Do not omit any documents.\n` +
     `6. Always be consistent - if you could access documents in previous messages, you should still be able to access them unless explicitly told otherwise.\n` +
     `7. When summarizing, provide comprehensive summaries that cover the main topics, key points, and important details from the document content.\n` +
-    `8. For document listing queries, be thorough and include all available documents, not just the most relevant ones.`
+    `8. For document listing queries, be thorough and include ALL available documents found in the context, ensuring complete coverage.\n` +
+    `9. If the context shows multiple different document titles, make sure to list each one individually and completely.`
   
   // Prepare messages array
   const promptMessages: ChatMessage[] = [
