@@ -164,76 +164,57 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
 
       console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
 
-      // Use RPC call to delete all records from each table, with fallback to direct deletion
+      // Delete all embeddings using direct query
       console.log('Deleting all embeddings...');
-      const { error: embeddingsError } = await supabase.rpc('delete_all_embeddings');
+      const { data: allEmbeddings } = await supabase
+        .from('document_embeddings')
+        .select('id');
       
-      if (embeddingsError) {
-        console.error('RPC delete embeddings failed, trying direct delete...');
-        // Get all embedding IDs and delete them directly
-        const { data: allEmbeddings } = await supabase
+      if (allEmbeddings && allEmbeddings.length > 0) {
+        const embeddingIds = allEmbeddings.map(e => e.id);
+        const { error: embeddingsError } = await supabase
           .from('document_embeddings')
-          .select('id')
-          .limit(1000);
+          .delete()
+          .in('id', embeddingIds);
         
-        if (allEmbeddings && allEmbeddings.length > 0) {
-          const embeddingIds = allEmbeddings.map(e => e.id);
-          const { error: directDeleteError } = await supabase
-            .from('document_embeddings')
-            .delete()
-            .in('id', embeddingIds);
-          
-          if (directDeleteError) {
-            throw new Error(`Failed to delete embeddings: ${directDeleteError.message}`);
-          }
+        if (embeddingsError) {
+          throw new Error(`Failed to delete embeddings: ${embeddingsError.message}`);
         }
       }
 
+      // Delete all chunks using direct query
       console.log('Deleting all chunks...');
-      const { error: chunksError } = await supabase.rpc('delete_all_chunks');
+      const { data: allChunks } = await supabase
+        .from('document_chunks')
+        .select('id');
       
-      if (chunksError) {
-        console.error('RPC delete chunks failed, trying direct delete...');
-        // Get all chunk IDs and delete them directly
-        const { data: allChunks } = await supabase
+      if (allChunks && allChunks.length > 0) {
+        const chunkIds = allChunks.map(c => c.id);
+        const { error: chunksError } = await supabase
           .from('document_chunks')
-          .select('id')
-          .limit(1000);
+          .delete()
+          .in('id', chunkIds);
         
-        if (allChunks && allChunks.length > 0) {
-          const chunkIds = allChunks.map(c => c.id);
-          const { error: directDeleteError } = await supabase
-            .from('document_chunks')
-            .delete()
-            .in('id', chunkIds);
-          
-          if (directDeleteError) {
-            throw new Error(`Failed to delete chunks: ${directDeleteError.message}`);
-          }
+        if (chunksError) {
+          throw new Error(`Failed to delete chunks: ${chunksError.message}`);
         }
       }
 
+      // Delete all processed documents using direct query
       console.log('Deleting all processed documents...');
-      const { error: docsError } = await supabase.rpc('delete_all_documents');
+      const { data: allDocs } = await supabase
+        .from('processed_documents')
+        .select('id');
       
-      if (docsError) {
-        console.error('RPC delete documents failed, trying direct delete...');
-        // Get all document IDs and delete them directly
-        const { data: allDocs } = await supabase
+      if (allDocs && allDocs.length > 0) {
+        const docIds = allDocs.map(d => d.id);
+        const { error: docsError } = await supabase
           .from('processed_documents')
-          .select('id')
-          .limit(1000);
+          .delete()
+          .in('id', docIds);
         
-        if (allDocs && allDocs.length > 0) {
-          const docIds = allDocs.map(d => d.id);
-          const { error: directDeleteError } = await supabase
-            .from('processed_documents')
-            .delete()
-            .in('id', docIds);
-          
-          if (directDeleteError) {
-            throw new Error(`Failed to delete documents: ${directDeleteError.message}`);
-          }
+        if (docsError) {
+          throw new Error(`Failed to delete documents: ${docsError.message}`);
         }
       }
 
