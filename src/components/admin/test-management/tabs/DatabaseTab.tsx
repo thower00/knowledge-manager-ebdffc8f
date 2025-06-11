@@ -153,25 +153,34 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
       const { error: embeddingsError } = await supabase
         .from('document_embeddings')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null); // Delete all records
       
-      if (embeddingsError) throw embeddingsError;
+      if (embeddingsError) {
+        console.error('Error deleting embeddings:', embeddingsError);
+        throw new Error(`Failed to delete embeddings: ${embeddingsError.message}`);
+      }
 
       // Delete chunks
       const { error: chunksError } = await supabase
         .from('document_chunks')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null); // Delete all records
       
-      if (chunksError) throw chunksError;
+      if (chunksError) {
+        console.error('Error deleting chunks:', chunksError);
+        throw new Error(`Failed to delete chunks: ${chunksError.message}`);
+      }
 
       // Delete processed documents
       const { error: docsError } = await supabase
         .from('processed_documents')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null); // Delete all records
       
-      if (docsError) throw docsError;
+      if (docsError) {
+        console.error('Error deleting documents:', docsError);
+        throw new Error(`Failed to delete documents: ${docsError.message}`);
+      }
 
       // Reset stats
       setStats({
@@ -197,6 +206,9 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
         title: "Database Reset Complete",
         description: "All processed documents, chunks, and embeddings have been cleared"
       });
+      
+      // Reload stats to show empty database
+      await loadDatabaseStats();
       
     } catch (error) {
       console.error('Error clearing database:', error);
