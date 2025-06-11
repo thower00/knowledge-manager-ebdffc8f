@@ -24,6 +24,7 @@ export function VectorDatabaseView() {
     isDeleteAllDialogOpen,
     isDeleteDocumentDialogOpen,
     selectedDocumentId,
+    setSelectedDocumentId, // Added this missing destructuring
     loadStats,
     loadEmbeddings,
     loadVectorData,
