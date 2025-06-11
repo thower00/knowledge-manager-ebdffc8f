@@ -33,65 +33,19 @@ export async function performVectorSearch(
       })) || [])
     }
 
-    // For document listing queries, return ALL documents immediately
+    // For document listing queries, return information about document access without listing them
     if (isDocumentSpecific && /\b(list.*documents|what.*documents|documents.*access)\b/i.test(question)) {
       console.log('Processing document listing query...')
       
       if (availableDocuments && availableDocuments.length > 0) {
-        // Get sample content from each document to provide context
-        const documentSummaries = []
-        
-        for (const doc of availableDocuments) {
-          const { data: sampleChunks, error: sampleError } = await supabase
-            .from('document_chunks')
-            .select('content')
-            .eq('document_id', doc.id)
-            .order('chunk_index', { ascending: true })
-            .limit(3) // Get first 3 chunks for each document
-          
-          if (!sampleError && sampleChunks && sampleChunks.length > 0) {
-            const sampleContent = sampleChunks.map(chunk => chunk.content).join(' ').substring(0, 500)
-            documentSummaries.push({
-              title: doc.title,
-              content: sampleContent,
-              processed_at: doc.processed_at,
-              mime_type: doc.mime_type,
-              id: doc.id
-            })
-          } else {
-            // Include document even if no chunks found
-            documentSummaries.push({
-              title: doc.title,
-              content: 'Document processed but content not available for preview.',
-              processed_at: doc.processed_at,
-              mime_type: doc.mime_type,
-              id: doc.id
-            })
-          }
-        }
-        
-        if (documentSummaries.length > 0) {
-          contextText = documentSummaries.map(doc => 
-            `Document: ${doc.title}\nType: ${doc.mime_type}\nProcessed: ${doc.processed_at}\nContent Preview: ${doc.content}...`
-          ).join('\n\n')
-          
-          relevantDocs = documentSummaries.map(doc => ({
-            document_title: doc.title,
-            chunk_content: doc.content
-          }))
-          
-          console.log(`Retrieved content for document listing from ${documentSummaries.length} documents`)
-          return { contextText, relevantDocs }
-        }
+        contextText = `I have access to ${availableDocuments.length} processed document(s). I can answer questions about their content, provide summaries, or help you find specific information from these documents.`
+        console.log('Using document access info as context')
+        return { contextText, relevantDocs }
+      } else {
+        contextText = 'I do not have access to any processed documents at the moment.'
+        console.log('No documents available')
+        return { contextText, relevantDocs }
       }
-      
-      // If no documents found or no content available
-      contextText = availableDocuments && availableDocuments.length > 0 
-        ? `I have access to ${availableDocuments.length} document(s): ${availableDocuments.map(d => `"${d.title}"`).join(', ')}. However, I was unable to retrieve content from these documents.`
-        : 'I do not have access to any processed documents at the moment.'
-      
-      console.log('Using document list as context')
-      return { contextText, relevantDocs }
     }
     
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -309,14 +263,15 @@ export async function performVectorSearch(
       }
     }
     
-    // Final fallback - comprehensive document listing
-    if (!contextText && availableDocuments && availableDocuments.length > 0) {
-      const docList = availableDocuments.map(d => `"${d.title}" (${d.mime_type})`).join(', ')
-      contextText = `I have access to the following ${availableDocuments.length} document(s): ${docList}. However, I was unable to retrieve the content from these documents. This could be due to processing issues or empty content. The documents were processed successfully but may need re-processing to generate proper embeddings.`
-      console.log('Using comprehensive document list as context')
-    } else if (!contextText) {
-      contextText = 'I do not have access to any processed documents at the moment.'
-      console.log('No documents or content available')
+    // Final fallback - provide information about document availability without listing them
+    if (!contextText) {
+      if (availableDocuments && availableDocuments.length > 0) {
+        contextText = `I have access to ${availableDocuments.length} processed document(s), but I was unable to retrieve the content at the moment. This could be due to processing issues or empty content. The documents were processed successfully but may need re-processing to generate proper embeddings.`
+        console.log('Using document availability info as context')
+      } else {
+        contextText = 'I do not have access to any processed documents at the moment.'
+        console.log('No documents or content available')
+      }
     }
     
   } catch (searchErr) {
