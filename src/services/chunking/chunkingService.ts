@@ -1,4 +1,3 @@
-
 import { ChunkingConfig, ChunkResult } from "@/types/chunking";
 
 export class ChunkingService {
@@ -226,4 +225,4 @@ export class ChunkingService {
   }
 }
 
-export { ChunkResult };
+export type { ChunkResult };
