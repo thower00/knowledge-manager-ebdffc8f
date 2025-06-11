@@ -1,4 +1,3 @@
-
 import { ChatConfig, ContextSource } from './types.ts'
 
 export async function performVectorSearch(
@@ -33,16 +32,16 @@ export async function performVectorSearch(
       })) || [])
     }
 
-    // For document listing queries, return information about document access without listing them
+    // For document listing queries, return information about document access
     if (isDocumentSpecific && /\b(list.*documents|what.*documents|documents.*access)\b/i.test(question)) {
       console.log('Processing document listing query...')
       
       if (availableDocuments && availableDocuments.length > 0) {
-        contextText = `I have access to ${availableDocuments.length} processed document(s). I can answer questions about their content, provide summaries, or help you find specific information from these documents.`
+        contextText = `I have access to ${availableDocuments.length} processed document${availableDocuments.length > 1 ? 's' : ''}. I can answer questions about their content, provide summaries, or help you find specific information from these documents. You can ask me about any topics covered in the documents, and I'll search through their content to provide relevant answers.`
         console.log('Using document access info as context')
         return { contextText, relevantDocs }
       } else {
-        contextText = 'I do not have access to any processed documents at the moment.'
+        contextText = 'I do not have access to any processed documents at the moment. Please ensure documents have been uploaded and processed successfully.'
         console.log('No documents available')
         return { contextText, relevantDocs }
       }
@@ -263,10 +262,10 @@ export async function performVectorSearch(
       }
     }
     
-    // Final fallback - provide information about document availability without listing them
+    // Final fallback - provide information about document availability
     if (!contextText) {
       if (availableDocuments && availableDocuments.length > 0) {
-        contextText = `I have access to ${availableDocuments.length} processed document(s), but I was unable to retrieve the content at the moment. This could be due to processing issues or empty content. The documents were processed successfully but may need re-processing to generate proper embeddings.`
+        contextText = `I have access to ${availableDocuments.length} processed document${availableDocuments.length > 1 ? 's' : ''}, but I was unable to retrieve the content at the moment. This could be due to processing issues or empty content. The documents were processed successfully but may need re-processing to generate proper embeddings.`
         console.log('Using document availability info as context')
       } else {
         contextText = 'I do not have access to any processed documents at the moment.'
