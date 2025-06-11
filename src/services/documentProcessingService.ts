@@ -163,7 +163,8 @@ export class DocumentProcessingService {
       console.log(`Generated ${embeddingCount} embeddings`);
       this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
-      // Step 5: Update document status to completed
+      // Step 5: Update document status to completed - this is the critical fix
+      console.log(`Updating document ${documentId} status to completed`);
       await this.updateDocumentStatus(documentId, 'completed');
       console.log(`Document ${typedDocument.title} processing completed successfully`);
       this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
@@ -312,6 +313,9 @@ export class DocumentProcessingService {
       // Clear error when resetting to pending
       updateData.error = null;
       updateData.processed_at = null;
+    } else if (status === 'completed') {
+      // Ensure error is cleared when completed
+      updateData.error = null;
     }
     
     const { error: updateError } = await supabase
@@ -324,6 +328,6 @@ export class DocumentProcessingService {
       throw new Error(`Failed to update document status: ${updateError.message}`);
     }
     
-    console.log(`Document ${documentId} status updated to ${status}`);
+    console.log(`Document ${documentId} status successfully updated to ${status}`);
   }
 }
