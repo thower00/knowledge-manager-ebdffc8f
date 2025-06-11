@@ -17,12 +17,18 @@ interface EmbeddingRecord {
 
 interface RecentEmbeddingsTableProps {
   embeddings: EmbeddingRecord[];
-  onClearDocument: (documentId: string) => Promise<void>;
-  isClearing: boolean;
+  isLoading: boolean;
+  onDeleteDocument: (documentId: string) => void;
 }
 
-export function RecentEmbeddingsTable({ embeddings, onClearDocument, isClearing }: RecentEmbeddingsTableProps) {
-  if (embeddings.length === 0) return null;
+export function RecentEmbeddingsTable({ embeddings, isLoading, onDeleteDocument }: RecentEmbeddingsTableProps) {
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground">Loading embeddings...</div>;
+  }
+
+  if (embeddings.length === 0) {
+    return <div className="text-sm text-muted-foreground">No embeddings found.</div>;
+  }
 
   // Get unique documents from embeddings
   const uniqueDocuments = embeddings.reduce((acc, embedding) => {
@@ -56,8 +62,7 @@ export function RecentEmbeddingsTable({ embeddings, onClearDocument, isClearing 
                 key={doc.document_id}
                 variant="outline"
                 size="sm"
-                onClick={() => onClearDocument(doc.document_id)}
-                disabled={isClearing}
+                onClick={() => onDeleteDocument(doc.document_id)}
                 className="text-xs"
               >
                 <Trash2 className="h-3 w-3 mr-1" />

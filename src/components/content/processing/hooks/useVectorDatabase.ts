@@ -26,19 +26,31 @@ export function useVectorDatabase() {
   const [stats, setStats] = useState<VectorStats | null>(null);
   const [embeddings, setEmbeddings] = useState<EmbeddingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+  const [isDeleteDocumentDialogOpen, setIsDeleteDocumentDialogOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const { toast } = useToast();
 
-  const loadVectorData = async () => {
-    setIsLoading(true);
+  const loadStats = async () => {
     try {
-      console.log("Loading vector database statistics and records...");
-      
-      // Load statistics
+      console.log("Loading vector database statistics...");
       const statsData = await EmbeddingDbService.getEmbeddingStats();
       setStats(statsData);
-      
-      // Load recent embeddings for verification
+    } catch (error) {
+      console.error("Error loading vector stats:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading vector stats",
+        description: error instanceof Error ? error.message : "Failed to load vector stats",
+      });
+    }
+  };
+
+  const loadEmbeddings = async () => {
+    try {
+      console.log("Loading recent embeddings...");
       const { data: embeddingData, error } = await supabase
         .from('document_embeddings')
         .select(`
@@ -91,10 +103,24 @@ export function useVectorDatabase() {
       });
 
       setEmbeddings(processedEmbeddings);
+    } catch (error) {
+      console.error("Error loading embeddings:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading embeddings",
+        description: error instanceof Error ? error.message : "Failed to load embeddings",
+      });
+    }
+  };
+
+  const loadVectorData = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([loadStats(), loadEmbeddings()]);
       
       toast({
         title: "Vector Data Loaded",
-        description: `Found ${statsData.total_embeddings} embeddings across ${statsData.unique_documents} documents`,
+        description: `Vector database data refreshed successfully`,
       });
     } catch (error) {
       console.error("Error loading vector data:", error);
@@ -108,8 +134,17 @@ export function useVectorDatabase() {
     }
   };
 
-  const clearAllEmbeddings = async () => {
-    setIsClearing(true);
+  const handleDeleteAll = () => {
+    setIsDeleteAllDialogOpen(true);
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    setSelectedDocumentId(documentId);
+    setIsDeleteDocumentDialogOpen(true);
+  };
+
+  const confirmDeleteAll = async () => {
+    setIsDeleting(true);
     try {
       console.log("Clearing all embeddings from vector database...");
       
@@ -136,16 +171,19 @@ export function useVectorDatabase() {
         description: error instanceof Error ? error.message : "Failed to clear embeddings",
       });
     } finally {
-      setIsClearing(false);
+      setIsDeleting(false);
+      setIsDeleteAllDialogOpen(false);
     }
   };
 
-  const clearDocumentEmbeddings = async (documentId: string) => {
-    setIsClearing(true);
+  const confirmDeleteDocument = async () => {
+    if (!selectedDocumentId) return;
+
+    setIsDeleting(true);
     try {
-      console.log(`Clearing embeddings for document: ${documentId}`);
+      console.log(`Clearing embeddings for document: ${selectedDocumentId}`);
       
-      const success = await EmbeddingDbService.deleteDocumentEmbeddings(documentId);
+      const success = await EmbeddingDbService.deleteDocumentEmbeddings(selectedDocumentId);
       
       if (success) {
         await loadVectorData();
@@ -165,8 +203,17 @@ export function useVectorDatabase() {
         description: error instanceof Error ? error.message : "Failed to clear document embeddings",
       });
     } finally {
-      setIsClearing(false);
+      setIsDeleting(false);
+      setIsDeleteDocumentDialogOpen(false);
+      setSelectedDocumentId("");
     }
+  };
+
+  // Legacy methods for compatibility
+  const clearAllEmbeddings = confirmDeleteAll;
+  const clearDocumentEmbeddings = async (documentId: string) => {
+    setSelectedDocumentId(documentId);
+    await confirmDeleteDocument();
   };
 
   useEffect(() => {
@@ -177,8 +224,21 @@ export function useVectorDatabase() {
     stats,
     embeddings,
     isLoading,
-    isClearing,
+    isDeleting,
+    isDeleteDialogOpen,
+    isDeleteAllDialogOpen,
+    isDeleteDocumentDialogOpen,
+    selectedDocumentId,
+    loadStats,
+    loadEmbeddings,
     loadVectorData,
+    handleDeleteAll,
+    handleDeleteDocument,
+    setIsDeleteDialogOpen,
+    setIsDeleteAllDialogOpen,
+    setIsDeleteDocumentDialogOpen,
+    confirmDeleteAll,
+    confirmDeleteDocument,
     clearAllEmbeddings,
     clearDocumentEmbeddings,
   };

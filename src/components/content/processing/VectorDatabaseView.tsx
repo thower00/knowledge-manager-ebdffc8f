@@ -26,6 +26,7 @@ export function VectorDatabaseView() {
     selectedDocumentId,
     loadStats,
     loadEmbeddings,
+    loadVectorData,
     handleDeleteAll,
     handleDeleteDocument,
     setIsDeleteDialogOpen,
@@ -33,6 +34,7 @@ export function VectorDatabaseView() {
     setIsDeleteDocumentDialogOpen,
     confirmDeleteAll,
     confirmDeleteDocument,
+    clearDocumentEmbeddings,
   } = useVectorDatabase();
 
   const handleResetFailedDocuments = async () => {
@@ -89,10 +91,7 @@ export function VectorDatabaseView() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                loadStats();
-                loadEmbeddings();
-              }}
+              onClick={loadVectorData}
               disabled={isLoading}
             >
               {isLoading ? (
@@ -109,8 +108,11 @@ export function VectorDatabaseView() {
         <VectorStats stats={stats} isLoading={isLoading} />
         
         <VectorControls 
+          onRefresh={loadVectorData}
           onDeleteAll={handleDeleteAll}
+          isLoading={isLoading}
           isDeleting={isDeleting}
+          totalEmbeddings={stats?.total_embeddings}
         />
         
         <RecentEmbeddingsTable 
@@ -119,19 +121,22 @@ export function VectorDatabaseView() {
           onDeleteDocument={handleDeleteDocument}
         />
         
-        <DocumentCleanup />
+        <DocumentCleanup 
+          embeddings={embeddings}
+          onClearDocument={clearDocumentEmbeddings}
+          isClearing={isDeleting}
+        />
         
         <VectorDatabaseDialogs
-          isDeleteDialogOpen={isDeleteDialogOpen}
-          isDeleteAllDialogOpen={isDeleteAllDialogOpen}
-          isDeleteDocumentDialogOpen={isDeleteDocumentDialogOpen}
+          showClearAllDialog={isDeleteAllDialogOpen}
+          showClearDocDialog={isDeleteDocumentDialogOpen}
           selectedDocumentId={selectedDocumentId}
-          isDeleting={isDeleting}
-          onDeleteDialogChange={setIsDeleteDialogOpen}
-          onDeleteAllDialogChange={setIsDeleteAllDialogOpen}
-          onDeleteDocumentDialogChange={setIsDeleteDocumentDialogOpen}
-          onConfirmDeleteAll={confirmDeleteAll}
-          onConfirmDeleteDocument={confirmDeleteDocument}
+          totalEmbeddings={stats?.total_embeddings}
+          onClearAllDialogChange={setIsDeleteAllDialogOpen}
+          onClearDocDialogChange={setIsDeleteDocumentDialogOpen}
+          onClearAllEmbeddings={confirmDeleteAll}
+          onClearDocumentEmbeddings={clearDocumentEmbeddings}
+          onClearSelectedDocument={() => setSelectedDocumentId("")}
         />
       </CardContent>
     </Card>

@@ -5,17 +5,17 @@ import { RotateCcw, Trash2 } from "lucide-react";
 
 interface VectorControlsProps {
   onRefresh: () => void;
-  onClearAll: () => void;
+  onDeleteAll: () => void;
   isLoading: boolean;
-  isClearing: boolean;
+  isDeleting: boolean;
   totalEmbeddings?: number;
 }
 
 export function VectorControls({ 
   onRefresh, 
-  onClearAll, 
+  onDeleteAll, 
   isLoading, 
-  isClearing, 
+  isDeleting, 
   totalEmbeddings 
 }: VectorControlsProps) {
   return (
@@ -30,8 +30,8 @@ export function VectorControls({
       </Button>
       
       <Button
-        onClick={onClearAll}
-        disabled={isClearing || !totalEmbeddings}
+        onClick={onDeleteAll}
+        disabled={isDeleting || !totalEmbeddings}
         variant="destructive"
       >
         <Trash2 className="h-4 w-4 mr-2" />

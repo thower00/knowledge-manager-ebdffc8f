@@ -1,7 +1,10 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, RefreshCw } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface EmbeddingRecord {
@@ -17,120 +20,125 @@ interface EmbeddingRecord {
 
 interface DocumentCleanupProps {
   embeddings: EmbeddingRecord[];
-  onClearDocument: (documentId: string) => void;
+  onClearDocument: (documentId: string) => Promise<void>;
   isClearing: boolean;
 }
 
-interface DocumentInfo {
-  id: string;
-  title: string;
-  embeddingCount: number;
-}
-
 export function DocumentCleanup({ embeddings, onClearDocument, isClearing }: DocumentCleanupProps) {
-  const [documentsWithNames, setDocumentsWithNames] = useState<DocumentInfo[]>([]);
+  const [documentNames, setDocumentNames] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchDocumentNames = async () => {
+    if (!embeddings || embeddings.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      const uniqueDocIds = [...new Set(embeddings.map(e => e.document_id))];
+      
+      const { data, error } = await supabase
+        .from('processed_documents')
+        .select('id, title')
+        .in('id', uniqueDocIds);
+
+      if (error) throw error;
+
+      const nameMap = (data || []).reduce((acc, doc) => {
+        acc[doc.id] = doc.title || `Document ${doc.id.slice(0, 8)}`;
+        return acc;
+      }, {} as Record<string, string>);
+
+      setDocumentNames(nameMap);
+    } catch (error) {
+      console.error('Error fetching document names:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load document names"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDocumentNames = async () => {
-      const uniqueDocuments = [...new Set(embeddings.map(e => e.document_id))];
-      
-      if (uniqueDocuments.length === 0) {
-        setDocumentsWithNames([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('processed_documents')
-          .select('id, title')
-          .in('id', uniqueDocuments);
-
-        if (error) {
-          console.error('Error fetching document names:', error);
-          // Fallback to showing just IDs if we can't fetch names
-          const fallbackDocs = uniqueDocuments.map(docId => ({
-            id: docId,
-            title: `Document ${docId.slice(0, 8)}...`,
-            embeddingCount: embeddings.filter(e => e.document_id === docId).length
-          }));
-          setDocumentsWithNames(fallbackDocs);
-          return;
-        }
-
-        // Combine document info with embedding counts
-        const docsWithInfo = (data || []).map(doc => ({
-          id: doc.id,
-          title: doc.title || `Document ${doc.id.slice(0, 8)}...`,
-          embeddingCount: embeddings.filter(e => e.document_id === doc.id).length
-        }));
-
-        // Add any documents that weren't found in processed_documents (orphaned embeddings)
-        const foundDocIds = new Set((data || []).map(d => d.id));
-        const orphanedDocs = uniqueDocuments
-          .filter(docId => !foundDocIds.has(docId))
-          .map(docId => ({
-            id: docId,
-            title: `Unknown Document (${docId.slice(0, 8)}...)`,
-            embeddingCount: embeddings.filter(e => e.document_id === docId).length
-          }));
-
-        setDocumentsWithNames([...docsWithInfo, ...orphanedDocs]);
-      } catch (err) {
-        console.error('Exception fetching document names:', err);
-        // Fallback to showing just IDs
-        const fallbackDocs = uniqueDocuments.map(docId => ({
-          id: docId,
-          title: `Document ${docId.slice(0, 8)}...`,
-          embeddingCount: embeddings.filter(e => e.document_id === docId).length
-        }));
-        setDocumentsWithNames(fallbackDocs);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchDocumentNames();
   }, [embeddings]);
 
-  if (documentsWithNames.length === 0 && !isLoading) return null;
+  // Get unique documents from embeddings
+  const uniqueDocuments = embeddings.reduce((acc, embedding) => {
+    if (!acc.find(doc => doc.document_id === embedding.document_id)) {
+      acc.push({
+        document_id: embedding.document_id,
+        count: embeddings.filter(e => e.document_id === embedding.document_id).length
+      });
+    }
+    return acc;
+  }, [] as Array<{ document_id: string; count: number }>);
+
+  if (uniqueDocuments.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Document Cleanup</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No documents with embeddings found.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      <h4 className="text-sm font-medium">Clear Embeddings by Document:</h4>
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading document names...</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-2">
-          {documentsWithNames.slice(0, 10).map(doc => (
-            <div key={doc.id} className="flex items-center justify-between p-3 border rounded">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate" title={doc.title}>
-                  {doc.title}
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Document Cleanup</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchDocumentNames}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Clear embeddings for individual documents. This will remove all vector embeddings for the selected document.
+        </p>
+        
+        <div className="space-y-2">
+          {uniqueDocuments.map(doc => (
+            <div key={doc.document_id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="font-medium text-sm">
+                  {documentNames[doc.document_id] || `Document ${doc.document_id.slice(0, 8)}...`}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {doc.embeddingCount} embeddings • ID: {doc.id.slice(0, 8)}...
-                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {doc.count} embeddings
+                </Badge>
               </div>
+              
               <Button
-                size="sm"
                 variant="outline"
-                onClick={() => onClearDocument(doc.id)}
+                size="sm"
+                onClick={() => onClearDocument(doc.document_id)}
                 disabled={isClearing}
-                className="ml-2"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
               </Button>
             </div>
           ))}
-          {documentsWithNames.length > 10 && (
-            <div className="text-xs text-muted-foreground text-center">
-              Showing first 10 documents with embeddings
-            </div>
-          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
