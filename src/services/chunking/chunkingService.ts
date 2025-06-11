@@ -1,164 +1,198 @@
 
 import { ChunkingConfig } from "@/types/chunking";
 
-export interface ChunkResult {
-  id: string;
-  content: string;
-  index: number;
-  startPosition?: number;
-  endPosition?: number;
-  size: number;
-}
-
 export class ChunkingService {
   private config: ChunkingConfig;
 
   constructor(config: ChunkingConfig) {
     this.config = config;
+    console.log('ChunkingService initialized with config:', {
+      strategy: config.chunkStrategy,
+      size: config.chunkSize,
+      overlap: config.chunkOverlap,
+      preserveSentences: config.preserveSentences,
+      minChunkSize: config.minChunkSize
+    });
   }
 
-  generateChunks(content: string): string[] {
-    console.log(`Starting chunking with strategy: ${this.config.chunkStrategy}, size: ${this.config.chunkSize}, overlap: ${this.config.chunkOverlap}`);
+  generateChunks(text: string): string[] {
+    if (!text || text.trim().length === 0) {
+      console.warn('ChunkingService: Empty text provided for chunking');
+      return [];
+    }
+
+    console.log(`Starting chunking process for text of ${text.length} characters`);
     
+    // Clean up the text first
+    const cleanedText = this.cleanText(text);
+    console.log(`Text cleaned: ${cleanedText.length} characters (${text.length - cleanedText.length} removed)`);
+    
+    if (cleanedText.length === 0) {
+      console.warn('ChunkingService: Text became empty after cleaning');
+      return [];
+    }
+
+    let chunks: string[];
+
     switch (this.config.chunkStrategy) {
-      case "fixed_size":
-        return this.fixedSizeChunking(content, this.config.chunkSize, this.config.chunkOverlap);
-      case "paragraph":
-        return this.paragraphChunking(content, this.config.chunkSize);
-      case "sentence":
-        return this.sentenceChunking(content, this.config.chunkSize);
-      case "recursive":
-        return this.recursiveChunking(content, this.config.chunkSize, this.config.chunkOverlap);
-      case "semantic":
-        // For now, fall back to fixed size for semantic chunking
-        console.warn("Semantic chunking not fully implemented, using fixed size");
-        return this.fixedSizeChunking(content, this.config.chunkSize, this.config.chunkOverlap);
+      case 'sentence':
+        chunks = this.chunkBySentence(cleanedText);
+        break;
+      case 'paragraph':
+        chunks = this.chunkByParagraph(cleanedText);
+        break;
+      case 'fixed':
       default:
-        return this.fixedSizeChunking(content, this.config.chunkSize, this.config.chunkOverlap);
+        chunks = this.chunkByFixedSize(cleanedText);
+        break;
     }
+
+    // Filter out chunks that are too small
+    const minSize = this.config.minChunkSize || 50;
+    const filteredChunks = chunks.filter(chunk => chunk.trim().length >= minSize);
+    
+    console.log(`Chunking completed: ${chunks.length} initial chunks, ${filteredChunks.length} chunks after filtering (min size: ${minSize})`);
+    
+    if (filteredChunks.length === 0) {
+      console.warn('ChunkingService: No chunks met minimum size requirement');
+      // If all chunks are too small, return the original text as a single chunk
+      return [cleanedText];
+    }
+
+    return filteredChunks;
   }
 
-  generateDetailedChunks(content: string): ChunkResult[] {
-    const chunks = this.generateChunks(content);
-    return chunks.map((chunk, index) => ({
-      id: `chunk_${index}`,
-      content: chunk,
-      index,
-      size: chunk.length
-    }));
+  private cleanText(text: string): string {
+    return text
+      // Remove excessive whitespace
+      .replace(/\s+/g, ' ')
+      // Remove page markers that might have been added during extraction
+      .replace(/--- Page \d+ ---/g, '')
+      .replace(/--- Page \d+ - Error ---/g, '')
+      // Remove common PDF artifacts
+      .replace(/\u0000/g, '') // Null characters
+      .replace(/\uFFFD/g, '') // Replacement characters
+      // Normalize line breaks
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      // Remove excessive line breaks
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
-  private fixedSizeChunking(content: string, chunkSize: number, overlap: number): string[] {
+  private chunkByFixedSize(text: string): string[] {
     const chunks: string[] = [];
+    const chunkSize = this.config.chunkSize;
+    const overlap = this.config.chunkOverlap || 0;
+    
+    console.log(`Chunking by fixed size: ${chunkSize} chars with ${overlap} overlap`);
+
     let start = 0;
-    
-    while (start < content.length) {
-      const end = Math.min(start + chunkSize, content.length);
-      chunks.push(content.slice(start, end));
-      start = end - overlap;
+    while (start < text.length) {
+      let end = start + chunkSize;
       
-      if (start >= content.length) break;
-    }
-    
-    return chunks.filter(chunk => chunk.trim().length > 0);
-  }
-
-  private paragraphChunking(content: string, maxSize: number): string[] {
-    const paragraphs = content.split(/\n\s*\n/);
-    const chunks: string[] = [];
-    let currentChunk = '';
-    
-    for (const paragraph of paragraphs) {
-      if (currentChunk.length + paragraph.length <= maxSize) {
-        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
-      } else {
-        if (currentChunk) chunks.push(currentChunk);
-        currentChunk = paragraph;
+      // If we're not at the end of the text and preserveSentences is enabled
+      if (end < text.length && this.config.preserveSentences) {
+        // Try to end at a sentence boundary
+        const sentenceEnd = this.findSentenceEnd(text, end);
+        if (sentenceEnd > start && sentenceEnd - start < chunkSize * 1.2) {
+          end = sentenceEnd;
+        }
       }
+      
+      const chunk = text.slice(start, end).trim();
+      if (chunk.length > 0) {
+        chunks.push(chunk);
+      }
+      
+      start = Math.max(start + 1, end - overlap);
     }
-    
-    if (currentChunk) chunks.push(currentChunk);
-    return chunks.filter(chunk => chunk.trim().length > 0);
+
+    return chunks;
   }
 
-  private sentenceChunking(content: string, maxSize: number): string[] {
-    const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
+  private chunkBySentence(text: string): string[] {
+    console.log('Chunking by sentence boundaries');
+    
+    // Split by sentence-ending punctuation
+    const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
     const chunks: string[] = [];
+    const chunkSize = this.config.chunkSize;
+    
     let currentChunk = '';
     
     for (const sentence of sentences) {
-      const sentenceWithPunct = sentence + '.';
-      
-      if (currentChunk.length + sentenceWithPunct.length <= maxSize) {
-        currentChunk += (currentChunk ? ' ' : '') + sentenceWithPunct;
-      } else {
-        if (currentChunk) chunks.push(currentChunk + '.');
-        currentChunk = sentence;
-      }
-    }
-    
-    if (currentChunk) chunks.push(currentChunk + '.');
-    return chunks.filter(chunk => chunk.trim().length > 0);
-  }
-
-  private recursiveChunking(content: string, chunkSize: number, overlap: number): string[] {
-    // Split by paragraphs first, then sentences, then words if needed
-    const separators = ['\n\n', '\n', '. ', ' '];
-    return this.recursiveTextSplitter(content, chunkSize, overlap, separators, 0);
-  }
-
-  private recursiveTextSplitter(
-    text: string,
-    chunkSize: number,
-    overlap: number,
-    separators: string[],
-    separatorIndex: number
-  ): string[] {
-    if (text.length <= chunkSize) {
-      return [text];
-    }
-
-    if (separatorIndex >= separators.length) {
-      // If no separators work, fall back to fixed size
-      return this.fixedSizeChunking(text, chunkSize, overlap);
-    }
-
-    const separator = separators[separatorIndex];
-    const splits = text.split(separator);
-    
-    if (splits.length === 1) {
-      // Current separator doesn't help, try next one
-      return this.recursiveTextSplitter(text, chunkSize, overlap, separators, separatorIndex + 1);
-    }
-
-    const chunks: string[] = [];
-    let currentChunk = '';
-    
-    for (const split of splits) {
-      const potentialChunk = currentChunk + (currentChunk ? separator : '') + split;
+      const potentialChunk = currentChunk ? `${currentChunk}. ${sentence}` : sentence;
       
       if (potentialChunk.length <= chunkSize) {
         currentChunk = potentialChunk;
       } else {
         if (currentChunk) {
-          chunks.push(currentChunk);
+          chunks.push(currentChunk.trim());
         }
-        
-        if (split.length > chunkSize) {
-          // Split is too large, recursively split it
-          const subChunks = this.recursiveTextSplitter(split, chunkSize, overlap, separators, separatorIndex + 1);
-          chunks.push(...subChunks);
+        // If single sentence is longer than chunk size, split it
+        if (sentence.length > chunkSize) {
+          chunks.push(...this.chunkByFixedSize(sentence));
           currentChunk = '';
         } else {
-          currentChunk = split;
+          currentChunk = sentence;
         }
       }
     }
     
     if (currentChunk) {
-      chunks.push(currentChunk);
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  private chunkByParagraph(text: string): string[] {
+    console.log('Chunking by paragraph boundaries');
+    
+    // Split by paragraph breaks
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0);
+    const chunks: string[] = [];
+    const chunkSize = this.config.chunkSize;
+    
+    let currentChunk = '';
+    
+    for (const paragraph of paragraphs) {
+      const potentialChunk = currentChunk ? `${currentChunk}\n\n${paragraph}` : paragraph;
+      
+      if (potentialChunk.length <= chunkSize) {
+        currentChunk = potentialChunk;
+      } else {
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+        }
+        // If single paragraph is longer than chunk size, split it
+        if (paragraph.length > chunkSize) {
+          chunks.push(...this.chunkByFixedSize(paragraph));
+          currentChunk = '';
+        } else {
+          currentChunk = paragraph;
+        }
+      }
     }
     
-    return chunks.filter(chunk => chunk.trim().length > 0);
+    if (currentChunk) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  private findSentenceEnd(text: string, start: number): number {
+    // Look for sentence-ending punctuation within a reasonable range
+    const searchRange = Math.min(200, text.length - start);
+    const searchText = text.slice(start, start + searchRange);
+    
+    const match = searchText.match(/[.!?]+\s/);
+    if (match && match.index !== undefined) {
+      return start + match.index + match[0].length;
+    }
+    
+    return start;
   }
 }

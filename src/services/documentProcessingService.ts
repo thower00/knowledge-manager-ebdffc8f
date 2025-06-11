@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
@@ -41,17 +42,32 @@ export class DocumentProcessingService {
     this.textExtractionService = new TextExtractionService();
     this.chunkingService = new ChunkingService(config.chunking);
     this.embeddingService = new EmbeddingService(config.embedding);
+    
+    console.log('DocumentProcessingService initialized with config:', {
+      chunkStrategy: config.chunking.chunkStrategy,
+      chunkSize: config.chunking.chunkSize,
+      embeddingProvider: config.embedding.provider,
+      embeddingModel: config.embedding.model,
+      hasApiKey: !!config.embedding.apiKey
+    });
   }
 
   async processDocuments(documentIds: string[]): Promise<ProcessingResult[]> {
+    console.log(`Starting batch processing of ${documentIds.length} documents`);
     const results: ProcessingResult[] = [];
     
     for (const documentId of documentIds) {
       try {
+        console.log(`Processing document ${documentId}`);
         const result = await this.processDocument(documentId);
         results.push(result);
+        console.log(`Document ${documentId} processed successfully:`, result);
       } catch (error) {
         console.error(`Error processing document ${documentId}:`, error);
+        
+        // Update document status to failed
+        await this.updateDocumentStatus(documentId, 'failed');
+        
         results.push({
           documentId,
           success: false,
@@ -62,10 +78,13 @@ export class DocumentProcessingService {
       }
     }
     
+    console.log(`Batch processing completed. Results:`, results);
     return results;
   }
 
   private async processDocument(documentId: string): Promise<ProcessingResult> {
+    console.log(`Starting processing for document ${documentId}`);
+    
     // Get document details
     const { data: document, error: docError } = await supabase
       .from('processed_documents')
@@ -74,66 +93,88 @@ export class DocumentProcessingService {
       .single();
 
     if (docError || !document) {
+      console.error(`Failed to fetch document ${documentId}:`, docError);
       throw new Error(`Failed to fetch document: ${docError?.message}`);
     }
 
     const typedDocument = document as ProcessedDocument;
+    console.log(`Processing document: ${typedDocument.title}`);
     this.updateProgress(documentId, typedDocument.title, 'extraction', 10);
 
-    // Step 1: Extract document content using shared extraction service
+    // Step 1: Extract document content
     let content: string;
     try {
+      console.log(`Starting content extraction for ${typedDocument.title}`);
       content = await this.extractDocumentContent(typedDocument);
+      
+      if (!content || content.trim().length === 0) {
+        throw new Error('Extracted content is empty');
+      }
+      
+      console.log(`Content extracted successfully: ${content.length} characters`);
       this.updateProgress(documentId, typedDocument.title, 'extraction', 30);
     } catch (error) {
-      // If extraction fails, mark document as failed and don't proceed
+      console.error(`Content extraction failed for ${typedDocument.title}:`, error);
       await this.updateDocumentStatus(documentId, 'failed');
       throw new Error(`Failed to extract content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    // Validate that we got actual content, not error messages
-    if (!content || content.trim().length === 0) {
+    // Step 2: Generate chunks
+    try {
+      console.log(`Starting chunking for ${typedDocument.title}`);
+      this.updateProgress(documentId, typedDocument.title, 'chunking', 40);
+      
+      const chunks = this.chunkingService.generateChunks(content);
+      
+      if (!chunks || chunks.length === 0) {
+        throw new Error('No chunks were generated from the content');
+      }
+      
+      console.log(`Generated ${chunks.length} chunks for ${typedDocument.title}`);
+      this.updateProgress(documentId, typedDocument.title, 'chunking', 60, chunks.length);
+
+      // Step 3: Store chunks in database
+      console.log(`Storing ${chunks.length} chunks in database`);
+      const chunkIds = await this.storeChunks(documentId, chunks);
+      
+      if (chunkIds.length !== chunks.length) {
+        throw new Error(`Failed to store all chunks. Expected ${chunks.length}, stored ${chunkIds.length}`);
+      }
+      
+      console.log(`Successfully stored ${chunkIds.length} chunks`);
+      this.updateProgress(documentId, typedDocument.title, 'embedding', 70, chunks.length);
+
+      // Step 4: Generate embeddings
+      console.log(`Starting embedding generation for ${chunks.length} chunks`);
+      const embeddingCount = await this.embeddingService.generateEmbeddingsInBatches(
+        documentId,
+        chunkIds,
+        chunks
+      );
+      
+      if (embeddingCount === 0) {
+        throw new Error('No embeddings were generated');
+      }
+      
+      console.log(`Generated ${embeddingCount} embeddings`);
+      this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
+
+      // Step 5: Update document status
+      await this.updateDocumentStatus(documentId, 'completed');
+      console.log(`Document ${typedDocument.title} processing completed successfully`);
+      this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
+
+      return {
+        documentId,
+        success: true,
+        chunksGenerated: chunks.length,
+        embeddingsGenerated: embeddingCount,
+      };
+    } catch (error) {
+      console.error(`Processing failed after extraction for ${typedDocument.title}:`, error);
       await this.updateDocumentStatus(documentId, 'failed');
-      throw new Error('Document content is empty or unavailable');
+      throw error;
     }
-
-    // Check if the content looks like an error message
-    if (content.includes('Unable to extract text') || 
-        content.includes('Server-side error') || 
-        content.includes('Cannot connect to PDF processing')) {
-      await this.updateDocumentStatus(documentId, 'failed');
-      throw new Error('PDF extraction failed - only error messages were returned instead of actual content');
-    }
-
-    console.log(`Successfully extracted ${content.length} characters from ${typedDocument.title}`);
-    this.updateProgress(documentId, typedDocument.title, 'chunking', 40);
-
-    // Step 2: Generate chunks using shared chunking service
-    const chunks = this.chunkingService.generateChunks(content);
-    this.updateProgress(documentId, typedDocument.title, 'chunking', 60, chunks.length);
-
-    // Step 3: Store chunks in database
-    const chunkIds = await this.storeChunks(documentId, chunks);
-    this.updateProgress(documentId, typedDocument.title, 'embedding', 70, chunks.length);
-
-    // Step 4: Generate embeddings using shared embedding service
-    const embeddingCount = await this.embeddingService.generateEmbeddingsInBatches(
-      documentId,
-      chunkIds,
-      chunks
-    );
-    this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
-
-    // Step 5: Update document status
-    await this.updateDocumentStatus(documentId, 'completed');
-    this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
-
-    return {
-      documentId,
-      success: true,
-      chunksGenerated: chunks.length,
-      embeddingsGenerated: embeddingCount,
-    };
   }
 
   private async extractDocumentContent(document: ProcessedDocument): Promise<string> {
@@ -156,22 +197,35 @@ export class DocumentProcessingService {
           timeout: 60
         },
         (progress) => {
-          // Map extraction progress to our 10-30% range
           const mappedProgress = 10 + Math.floor((progress / 100) * 20);
           this.updateProgress(document.id, document.title, 'extraction', mappedProgress);
         }
       );
 
-      // Validate extracted content
+      // Validate extracted content more thoroughly
       if (!extractedContent || extractedContent.trim().length === 0) {
         throw new Error('No content could be extracted from the document');
       }
 
-      // Check if we got error messages instead of content
-      if (extractedContent.includes('Unable to extract text') || 
-          extractedContent.includes('Server-side error') || 
-          extractedContent.includes('Cannot connect to PDF processing')) {
-        throw new Error(`PDF extraction service failed: ${extractedContent}`);
+      // Check for common error patterns
+      const errorPatterns = [
+        'Unable to extract text',
+        'Server-side error',
+        'Cannot connect to PDF processing',
+        'PDF extraction failed',
+        'Service temporarily unavailable',
+        'Network connectivity issues'
+      ];
+
+      for (const pattern of errorPatterns) {
+        if (extractedContent.includes(pattern)) {
+          throw new Error(`PDF extraction service failed: Content contains error message - ${pattern}`);
+        }
+      }
+
+      // Check minimum content length
+      if (extractedContent.trim().length < 50) {
+        console.warn(`Warning: Extracted content is very short (${extractedContent.length} chars) for ${document.title}`);
       }
 
       console.log(`Successfully extracted ${extractedContent.length} characters from ${document.title}`);
@@ -191,19 +245,25 @@ export class DocumentProcessingService {
     chunksGenerated?: number,
     embeddingsGenerated?: number
   ) {
+    const progressInfo = {
+      documentId,
+      documentTitle,
+      stage,
+      progress,
+      chunksGenerated,
+      embeddingsGenerated,
+    };
+    
+    console.log(`Progress update:`, progressInfo);
+    
     if (this.onProgress) {
-      this.onProgress({
-        documentId,
-        documentTitle,
-        stage,
-        progress,
-        chunksGenerated,
-        embeddingsGenerated,
-      });
+      this.onProgress(progressInfo);
     }
   }
 
   private async storeChunks(documentId: string, chunks: string[]): Promise<string[]> {
+    console.log(`Storing ${chunks.length} chunks for document ${documentId}`);
+    
     const chunkRecords = chunks.map((content, index) => ({
       document_id: documentId,
       chunk_index: index,
@@ -211,6 +271,8 @@ export class DocumentProcessingService {
       metadata: {
         chunk_size: content.length,
         strategy: this.config.chunking.chunkStrategy,
+        chunk_overlap: this.config.chunking.chunkOverlap || 0,
+        created_at: new Date().toISOString()
       },
     }));
 
@@ -220,13 +282,21 @@ export class DocumentProcessingService {
       .select('id');
 
     if (error) {
+      console.error('Failed to store chunks:', error);
       throw new Error(`Failed to store chunks: ${error.message}`);
     }
 
+    if (!data || data.length === 0) {
+      throw new Error('No chunk IDs returned after insertion');
+    }
+
+    console.log(`Successfully stored ${data.length} chunks`);
     return data.map(record => record.id);
   }
 
   private async updateDocumentStatus(documentId: string, status: string): Promise<void> {
+    console.log(`Updating document ${documentId} status to: ${status}`);
+    
     const { error } = await supabase
       .from('processed_documents')
       .update({ 
@@ -236,7 +306,10 @@ export class DocumentProcessingService {
       .eq('id', documentId);
 
     if (error) {
+      console.error(`Failed to update document status:`, error);
       throw new Error(`Failed to update document status: ${error.message}`);
     }
+    
+    console.log(`Document ${documentId} status updated to ${status}`);
   }
 }
