@@ -57,106 +57,70 @@ export function VectorDatabaseView() {
       let deletedChunks = 0;
       let deletedDocs = 0;
 
-      // Step 1: Delete all embeddings using SQL function
+      // Step 1: Delete all embeddings
       console.log('=== STEP 1: DELETING EMBEDDINGS ===');
       try {
-        const { data: embeddingResult, error: embeddingError } = await supabase.rpc('sql', {
-          query: 'DELETE FROM document_embeddings; SELECT 1 as success;'
-        });
+        const { error: embeddingError, count: embeddingCount } = await supabase
+          .from('document_embeddings')
+          .delete()
+          .gte('id', '00000000-0000-0000-0000-000000000000');
 
         if (embeddingError) {
-          console.error('SQL function error for embeddings:', embeddingError);
-          // Fallback to direct delete
-          const { error: fallbackError, count } = await supabase
-            .from('document_embeddings')
-            .delete()
-            .neq('id', '');
-          
-          if (!fallbackError) {
-            deletedEmbeddings = count || 0;
-          }
+          console.error('Error deleting embeddings:', embeddingError);
         } else {
-          console.log('✓ Embeddings deleted via SQL function');
-          deletedEmbeddings = 999; // We don't know the exact count but it worked
+          deletedEmbeddings = embeddingCount || 0;
+          console.log(`✓ Successfully deleted ${deletedEmbeddings} embeddings`);
         }
       } catch (error) {
         console.error('Exception deleting embeddings:', error);
       }
 
-      // Step 2: Delete all chunks using SQL function
+      // Step 2: Delete all chunks
       console.log('=== STEP 2: DELETING CHUNKS ===');
       try {
-        const { data: chunkResult, error: chunkError } = await supabase.rpc('sql', {
-          query: 'DELETE FROM document_chunks; SELECT 1 as success;'
-        });
+        const { error: chunkError, count: chunkCount } = await supabase
+          .from('document_chunks')
+          .delete()
+          .gte('id', '00000000-0000-0000-0000-000000000000');
 
         if (chunkError) {
-          console.error('SQL function error for chunks:', chunkError);
-          // Fallback to direct delete
-          const { error: fallbackError, count } = await supabase
-            .from('document_chunks')
-            .delete()
-            .neq('id', '');
-          
-          if (!fallbackError) {
-            deletedChunks = count || 0;
-          }
+          console.error('Error deleting chunks:', chunkError);
         } else {
-          console.log('✓ Chunks deleted via SQL function');
-          deletedChunks = 999; // We don't know the exact count but it worked
+          deletedChunks = chunkCount || 0;
+          console.log(`✓ Successfully deleted ${deletedChunks} chunks`);
         }
       } catch (error) {
         console.error('Exception deleting chunks:', error);
       }
 
-      // Step 3: Delete all documents using SQL function
+      // Step 3: Delete all documents using the existing delete_documents function
       console.log('=== STEP 3: DELETING DOCUMENTS ===');
       try {
-        const { data: docResult, error: docError } = await supabase.rpc('sql', {
-          query: 'DELETE FROM processed_documents; SELECT 1 as success;'
-        });
+        if (documents && documents.length > 0) {
+          const documentIds = documents.map(doc => doc.id);
+          const { data: deleteResult, error: deleteError } = await supabase
+            .rpc('delete_documents', { doc_ids: documentIds });
 
-        if (docError) {
-          console.error('SQL function error for documents:', docError);
-          
-          // Fallback 1: Try direct delete without any conditions
-          console.log('Trying direct delete for documents...');
-          const { error: directError, count: directCount } = await supabase
-            .from('processed_documents')
-            .delete()
-            .neq('id', '');
-
-          if (directError) {
-            console.error('Direct delete failed:', directError);
+          if (deleteError) {
+            console.error('Error with delete_documents function:', deleteError);
             
-            // Fallback 2: Delete individual documents
-            console.log('Trying individual document deletion...');
-            if (documents && documents.length > 0) {
-              for (const doc of documents) {
-                try {
-                  const { error: individualError } = await supabase
-                    .from('processed_documents')
-                    .delete()
-                    .eq('id', doc.id);
+            // Fallback: try direct delete
+            console.log('Trying direct delete for documents...');
+            const { error: directError, count: directCount } = await supabase
+              .from('processed_documents')
+              .delete()
+              .gte('id', '00000000-0000-0000-0000-000000000000');
 
-                  if (individualError) {
-                    console.error(`Failed to delete document ${doc.title}:`, individualError);
-                  } else {
-                    deletedDocs++;
-                    console.log(`✓ Successfully deleted document: ${doc.title}`);
-                  }
-                } catch (error) {
-                  console.error(`Exception deleting document ${doc.title}:`, error);
-                }
-              }
+            if (directError) {
+              console.error('Direct delete failed:', directError);
+            } else {
+              deletedDocs = directCount || 0;
+              console.log(`✓ Direct delete succeeded: ${deletedDocs} documents`);
             }
-          } else {
-            deletedDocs = directCount || 0;
-            console.log(`✓ Direct delete succeeded: ${deletedDocs} documents`);
+          } else if (deleteResult) {
+            deletedDocs = documents.length;
+            console.log(`✓ Successfully deleted ${deletedDocs} documents using RPC function`);
           }
-        } else {
-          console.log('✓ Documents deleted via SQL function');
-          deletedDocs = documents?.length || 999; // Use known count or assume success
         }
       } catch (error) {
         console.error('Exception deleting documents:', error);
