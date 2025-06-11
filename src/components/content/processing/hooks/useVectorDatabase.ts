@@ -1,8 +1,7 @@
 
-import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { EmbeddingDbService } from "@/components/content/utils/embeddingDbService";
+import { useToast } from "@/components/ui/use-toast";
 
 interface VectorStats {
   total_embeddings: number;
@@ -26,209 +25,145 @@ export function useVectorDatabase() {
   const [stats, setStats] = useState<VectorStats | null>(null);
   const [embeddings, setEmbeddings] = useState<EmbeddingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isDeleteDocumentDialogOpen, setIsDeleteDocumentDialogOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const { toast } = useToast();
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
-      console.log("Loading vector database statistics...");
-      const statsData = await EmbeddingDbService.getEmbeddingStats();
-      setStats(statsData);
+      const { data, error } = await supabase.rpc('get_vector_stats');
+      if (error) throw error;
+      setStats(data);
     } catch (error) {
-      console.error("Error loading vector stats:", error);
+      console.error('Error loading vector stats:', error);
       toast({
         variant: "destructive",
-        title: "Error loading vector stats",
-        description: error instanceof Error ? error.message : "Failed to load vector stats",
+        title: "Error",
+        description: "Failed to load vector database statistics"
       });
     }
-  };
+  }, [toast]);
 
-  const loadEmbeddings = async () => {
+  const loadEmbeddings = useCallback(async () => {
     try {
-      console.log("Loading recent embeddings...");
-      const { data: embeddingData, error } = await supabase
+      const { data, error } = await supabase
         .from('document_embeddings')
-        .select(`
-          id,
-          document_id,
-          chunk_id,
-          embedding_model,
-          embedding_provider,
-          similarity_threshold,
-          created_at,
-          embedding_vector
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
-
-      if (error) {
-        throw new Error(`Failed to load embeddings: ${error.message}`);
-      }
-
-      // Process embeddings to include vector dimensions with proper type checking
-      const processedEmbeddings = (embeddingData || []).map(item => {
-        let vectorDimensions = 0;
-        
-        // Handle the embedding_vector which could be string, array, or null/undefined
-        const embeddingVector = item.embedding_vector as any;
-        
-        if (embeddingVector) {
-          if (typeof embeddingVector === 'string') {
-            try {
-              const parsed = JSON.parse(embeddingVector);
-              vectorDimensions = Array.isArray(parsed) ? parsed.length : 0;
-            } catch {
-              vectorDimensions = 0;
-            }
-          } else if (Array.isArray(embeddingVector)) {
-            vectorDimensions = embeddingVector.length;
-          }
-        }
-
-        return {
-          id: item.id,
-          document_id: item.document_id,
-          chunk_id: item.chunk_id,
-          embedding_model: item.embedding_model,
-          embedding_provider: item.embedding_provider,
-          similarity_threshold: item.similarity_threshold,
-          created_at: item.created_at,
-          vector_dimensions: vectorDimensions
-        };
-      });
-
-      setEmbeddings(processedEmbeddings);
+      
+      if (error) throw error;
+      setEmbeddings(data || []);
     } catch (error) {
-      console.error("Error loading embeddings:", error);
+      console.error('Error loading embeddings:', error);
       toast({
         variant: "destructive",
-        title: "Error loading embeddings",
-        description: error instanceof Error ? error.message : "Failed to load embeddings",
+        title: "Error",
+        description: "Failed to load recent embeddings"
       });
     }
-  };
+  }, [toast]);
 
-  const loadVectorData = async () => {
+  const loadVectorData = useCallback(async () => {
     setIsLoading(true);
     try {
       await Promise.all([loadStats(), loadEmbeddings()]);
-      
-      toast({
-        title: "Vector Data Loaded",
-        description: `Vector database data refreshed successfully`,
-      });
-    } catch (error) {
-      console.error("Error loading vector data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error loading vector data",
-        description: error instanceof Error ? error.message : "Failed to load vector data",
-      });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadStats, loadEmbeddings]);
 
-  const handleDeleteAll = () => {
-    setIsDeleteAllDialogOpen(true);
-  };
-
-  const handleDeleteDocument = (documentId: string) => {
-    setSelectedDocumentId(documentId);
-    setIsDeleteDocumentDialogOpen(true);
-  };
-
-  const confirmDeleteAll = async () => {
-    setIsDeleting(true);
+  const clearAllEmbeddings = useCallback(async () => {
+    setIsClearing(true);
     try {
-      console.log("Clearing all embeddings from vector database...");
+      const { error } = await supabase.rpc('clear_all_embeddings');
+      if (error) throw error;
       
+      toast({
+        title: "Success",
+        description: "All embeddings cleared successfully"
+      });
+      
+      await loadVectorData();
+    } catch (error) {
+      console.error('Error clearing embeddings:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to clear embeddings"
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  }, [toast, loadVectorData]);
+
+  const clearDocumentEmbeddings = useCallback(async (documentId: string) => {
+    setIsClearing(true);
+    try {
       const { error } = await supabase
         .from('document_embeddings')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (error) {
-        throw new Error(`Failed to clear embeddings: ${error.message}`);
-      }
-
+        .eq('document_id', documentId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Document embeddings cleared successfully"
+      });
+      
       await loadVectorData();
-      
-      toast({
-        title: "Vector Database Cleared",
-        description: "All embeddings have been successfully removed",
-      });
     } catch (error) {
-      console.error("Error clearing embeddings:", error);
+      console.error('Error clearing document embeddings:', error);
       toast({
         variant: "destructive",
-        title: "Error clearing embeddings",
-        description: error instanceof Error ? error.message : "Failed to clear embeddings",
+        title: "Error",
+        description: "Failed to clear document embeddings"
       });
     } finally {
-      setIsDeleting(false);
-      setIsDeleteAllDialogOpen(false);
+      setIsClearing(false);
     }
-  };
+  }, [toast, loadVectorData]);
 
-  const confirmDeleteDocument = async () => {
-    if (!selectedDocumentId) return;
+  const handleDeleteAll = useCallback(() => {
+    setIsDeleteAllDialogOpen(true);
+  }, []);
 
-    setIsDeleting(true);
-    try {
-      console.log(`Clearing embeddings for document: ${selectedDocumentId}`);
-      
-      const success = await EmbeddingDbService.deleteDocumentEmbeddings(selectedDocumentId);
-      
-      if (success) {
-        await loadVectorData();
-        
-        toast({
-          title: "Document Embeddings Cleared",
-          description: "Embeddings for the selected document have been removed",
-        });
-      } else {
-        throw new Error("No embeddings found for the document");
-      }
-    } catch (error) {
-      console.error("Error clearing document embeddings:", error);
-      toast({
-        variant: "destructive",
-        title: "Error clearing document embeddings",
-        description: error instanceof Error ? error.message : "Failed to clear document embeddings",
-      });
-    } finally {
-      setIsDeleting(false);
+  const handleDeleteDocument = useCallback((documentId: string) => {
+    setSelectedDocumentId(documentId);
+    setIsDeleteDocumentDialogOpen(true);
+  }, []);
+
+  const confirmDeleteAll = useCallback(async () => {
+    await clearAllEmbeddings();
+    setIsDeleteAllDialogOpen(false);
+  }, [clearAllEmbeddings]);
+
+  const confirmDeleteDocument = useCallback(async () => {
+    if (selectedDocumentId) {
+      await clearDocumentEmbeddings(selectedDocumentId);
       setIsDeleteDocumentDialogOpen(false);
       setSelectedDocumentId("");
     }
-  };
-
-  // Legacy methods for compatibility
-  const clearAllEmbeddings = confirmDeleteAll;
-  const clearDocumentEmbeddings = async (documentId: string) => {
-    setSelectedDocumentId(documentId);
-    await confirmDeleteDocument();
-  };
+  }, [selectedDocumentId, clearDocumentEmbeddings]);
 
   useEffect(() => {
     loadVectorData();
-  }, []);
+  }, [loadVectorData]);
 
   return {
     stats,
     embeddings,
     isLoading,
-    isDeleting,
+    isClearing,
     isDeleteDialogOpen,
     isDeleteAllDialogOpen,
     isDeleteDocumentDialogOpen,
     selectedDocumentId,
+    setSelectedDocumentId,
     loadStats,
     loadEmbeddings,
     loadVectorData,
@@ -239,7 +174,7 @@ export function useVectorDatabase() {
     setIsDeleteDocumentDialogOpen,
     confirmDeleteAll,
     confirmDeleteDocument,
-    clearAllEmbeddings,
     clearDocumentEmbeddings,
+    clearAllEmbeddings
   };
 }
