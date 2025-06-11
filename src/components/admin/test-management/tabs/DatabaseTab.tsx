@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,45 +163,39 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
 
       console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
 
-      // Delete embeddings first (due to foreign key constraints)
-      // Using a more reliable delete approach with timestamp comparison
-      const { error: embeddingsError, count: deletedEmbeddings } = await supabase
+      // Use a more aggressive deletion approach - delete everything by not filtering
+      console.log('Deleting all embeddings...');
+      const { error: embeddingsError } = await supabase
         .from('document_embeddings')
-        .delete({ count: 'exact' })
-        .gt('created_at', '1900-01-01T00:00:00Z');
-      
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // This will match all UUIDs
+
       if (embeddingsError) {
         console.error('Error deleting embeddings:', embeddingsError);
         throw new Error(`Failed to delete embeddings: ${embeddingsError.message}`);
       }
 
-      console.log(`Deleted ${deletedEmbeddings} embeddings`);
-
-      // Delete chunks
-      const { error: chunksError, count: deletedChunks } = await supabase
+      console.log('Deleting all chunks...');
+      const { error: chunksError } = await supabase
         .from('document_chunks')
-        .delete({ count: 'exact' })
-        .gt('created_at', '1900-01-01T00:00:00Z');
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
       
       if (chunksError) {
         console.error('Error deleting chunks:', chunksError);
         throw new Error(`Failed to delete chunks: ${chunksError.message}`);
       }
 
-      console.log(`Deleted ${deletedChunks} chunks`);
-
-      // Delete processed documents
-      const { error: docsError, count: deletedDocs } = await supabase
+      console.log('Deleting all processed documents...');
+      const { error: docsError } = await supabase
         .from('processed_documents')
-        .delete({ count: 'exact' })
-        .gt('created_at', '1900-01-01T00:00:00Z');
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
       
       if (docsError) {
         console.error('Error deleting documents:', docsError);
         throw new Error(`Failed to delete documents: ${docsError.message}`);
       }
-
-      console.log(`Deleted ${deletedDocs} documents`);
 
       // Verify deletion by counting remaining records
       const { count: remainingEmbeddings } = await supabase
@@ -217,49 +210,56 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
         .from('processed_documents')
         .select('*', { count: 'exact', head: true });
 
-      console.log(`Remaining counts - Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
+      console.log(`Verification - Remaining counts: Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
 
-      if (remainingEmbeddings > 0 || remainingChunks > 0 || remainingDocs > 0) {
-        console.warn('Some records may not have been deleted. Attempting fallback deletion...');
+      if (remainingEmbeddings === 0 && remainingChunks === 0 && remainingDocs === 0) {
+        console.log('Database reset completed successfully');
         
-        // Fallback: delete any remaining records using alternative method
-        if (remainingEmbeddings > 0) {
-          await supabase.from('document_embeddings').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
-        }
-        if (remainingChunks > 0) {
-          await supabase.from('document_chunks').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
-        }
-        if (remainingDocs > 0) {
-          await supabase.from('processed_documents').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
-        }
+        // Reset stats to reflect empty database
+        setStats({
+          totalDocuments: 0,
+          totalChunks: 0,
+          totalEmbeddings: 0,
+          documentsWithIssues: 0,
+          providers: [],
+          models: []
+        });
+
+        const result = {
+          status: 'success',
+          message: 'Database cleared successfully',
+          deletedDocuments: initialDocs || 0,
+          deletedChunks: initialChunks || 0,
+          deletedEmbeddings: initialEmbeddings || 0
+        };
+        
+        onRunTest(result);
+
+        toast({
+          title: "Database Reset Complete",
+          description: `Successfully cleared all data from the database`
+        });
+      } else {
+        console.warn(`Warning: Some records remain - Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
+        
+        const result = {
+          status: 'warning',
+          message: 'Partial database reset',
+          remainingEmbeddings,
+          remainingChunks,
+          remainingDocs
+        };
+        
+        onRunTest(result);
+
+        toast({
+          variant: "destructive",
+          title: "Partial Reset",
+          description: `Some records may remain. Check console for details.`
+        });
       }
-
-      // Reset stats
-      setStats({
-        totalDocuments: 0,
-        totalChunks: 0,
-        totalEmbeddings: 0,
-        documentsWithIssues: 0,
-        providers: [],
-        models: []
-      });
-
-      const result = {
-        status: 'success',
-        message: 'Database cleared successfully',
-        deletedDocuments: deletedDocs || 0,
-        deletedChunks: deletedChunks || 0,
-        deletedEmbeddings: deletedEmbeddings || 0
-      };
       
-      onRunTest(result);
-
-      toast({
-        title: "Database Reset Complete",
-        description: `Cleared ${deletedDocs || 0} documents, ${deletedChunks || 0} chunks, and ${deletedEmbeddings || 0} embeddings`
-      });
-      
-      // Reload stats to show empty database
+      // Reload stats to show current database state
       await loadDatabaseStats();
       
     } catch (error) {
