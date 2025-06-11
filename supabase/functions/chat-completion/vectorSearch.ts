@@ -1,4 +1,3 @@
-
 import { ChatConfig, ContextSource } from './types.ts'
 
 export async function performVectorSearch(
@@ -16,20 +15,50 @@ export async function performVectorSearch(
     const isDocumentSpecific = /\b(the document|this document|document|summarize|summary|list.*documents|what.*documents|documents.*access)\b/i.test(question)
     console.log('Query is document-specific:', isDocumentSpecific)
     
-    // Enhanced document discovery - get ALL available documents with their processing details
-    const { data: availableDocuments, error: docError } = await supabase
+    // Enhanced document discovery - get documents with completed status OR those with actual content/embeddings
+    const { data: allDocuments, error: docError } = await supabase
       .from('processed_documents')
       .select('id, title, url, status, processed_at, mime_type')
-      .eq('status', 'completed')
+      .in('status', ['completed', 'pending'])
+    
+    let availableDocuments = []
+    
+    if (!docError && allDocuments) {
+      // Check which documents actually have embeddings/chunks available
+      for (const doc of allDocuments) {
+        const { data: embeddingCount, error: embeddingError } = await supabase
+          .from('document_embeddings')
+          .select('id', { count: 'exact' })
+          .eq('document_id', doc.id)
+        
+        const { data: chunkCount, error: chunkError } = await supabase
+          .from('document_chunks')
+          .select('id', { count: 'exact' })
+          .eq('document_id', doc.id)
+        
+        // Document is available if it has both chunks and embeddings
+        if (!embeddingError && !chunkError && 
+            embeddingCount && embeddingCount.length > 0 && 
+            chunkCount && chunkCount.length > 0) {
+          availableDocuments.push({
+            ...doc,
+            chunksCount: chunkCount.length,
+            embeddingsCount: embeddingCount.length
+          })
+          console.log(`Document "${doc.title}" is available with ${chunkCount.length} chunks and ${embeddingCount.length} embeddings`)
+        }
+      }
+    }
     
     if (docError) {
       console.error('Error fetching documents:', docError)
     } else {
-      console.log('Available completed documents:', availableDocuments?.map(d => ({ 
+      console.log('Available documents with content:', availableDocuments?.map(d => ({ 
         id: d.id, 
         title: d.title, 
-        processed_at: d.processed_at,
-        mime_type: d.mime_type
+        status: d.status,
+        chunksCount: d.chunksCount,
+        embeddingsCount: d.embeddingsCount
       })) || [])
     }
 
@@ -39,8 +68,8 @@ export async function performVectorSearch(
       
       if (availableDocuments && availableDocuments.length > 0) {
         const docCount = availableDocuments.length
-        contextText = `I have access to ${docCount} processed document${docCount > 1 ? 's' : ''} that ${docCount > 1 ? 'have' : 'has'} been successfully uploaded and processed. I can help you with:\n\n• Answering questions about the content in these documents\n• Providing summaries of the documents\n• Finding specific information across all documents\n• Explaining key concepts or topics covered\n\nSimply ask me questions about any topics you're interested in, and I'll search through the document content to provide relevant, detailed answers based on what's available.`
-        console.log('Using detailed document access info as context')
+        contextText = `I have access to ${docCount} processed document${docCount > 1 ? 's' : ''} that ${docCount > 1 ? 'have' : 'has'} been successfully uploaded and processed:\n\n${availableDocuments.map((doc, index) => `${index + 1}. ${doc.title} (${doc.chunksCount} chunks)`).join('\n')}\n\nI can help you with:\n• Answering questions about the content in these documents\n• Providing summaries of the documents\n• Finding specific information across all documents\n• Explaining key concepts or topics covered\n\nSimply ask me questions about any topics you're interested in, and I'll search through the document content to provide relevant, detailed answers based on what's available.`
+        console.log('Using detailed document access info with document list as context')
         return { contextText, relevantDocs }
       } else {
         contextText = 'I currently do not have access to any processed documents. No documents have been successfully uploaded and processed yet. Please upload and process documents first, then I\'ll be able to help answer questions about their content.'
@@ -74,24 +103,7 @@ export async function performVectorSearch(
     // Check document chunks availability for each document
     if (availableDocuments && availableDocuments.length > 0) {
       for (const doc of availableDocuments) {
-        const { data: chunkCount, error: chunkError } = await supabase
-          .from('document_chunks')
-          .select('id', { count: 'exact' })
-          .eq('document_id', doc.id)
-        
-        if (!chunkError) {
-          console.log(`Document "${doc.title}" has ${chunkCount?.length || 0} chunks`)
-        }
-
-        // Check embeddings for each document
-        const { data: embeddingCount, error: embeddingError } = await supabase
-          .from('document_embeddings')
-          .select('id', { count: 'exact' })
-          .eq('document_id', doc.id)
-        
-        if (!embeddingError) {
-          console.log(`Document "${doc.title}" has ${embeddingCount?.length || 0} embeddings`)
-        }
+        console.log(`Document "${doc.title}" has ${doc.chunksCount} chunks and ${doc.embeddingsCount} embeddings`)
       }
     }
     
