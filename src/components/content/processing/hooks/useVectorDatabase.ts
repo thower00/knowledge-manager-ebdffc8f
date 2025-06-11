@@ -34,9 +34,23 @@ export function useVectorDatabase() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('get_vector_stats');
+      // Get basic stats from document_embeddings table
+      const { data, error } = await supabase
+        .from('document_embeddings')
+        .select('document_id, embedding_provider, embedding_model');
+      
       if (error) throw error;
-      setStats(data);
+      
+      const uniqueDocuments = new Set(data?.map(item => item.document_id) || []).size;
+      const providers = [...new Set(data?.map(item => item.embedding_provider) || [])];
+      const models = [...new Set(data?.map(item => item.embedding_model) || [])];
+
+      setStats({
+        total_embeddings: data?.length || 0,
+        unique_documents: uniqueDocuments,
+        providers,
+        models,
+      });
     } catch (error) {
       console.error('Error loading vector stats:', error);
       toast({
@@ -51,12 +65,19 @@ export function useVectorDatabase() {
     try {
       const { data, error } = await supabase
         .from('document_embeddings')
-        .select('*')
+        .select('id, document_id, chunk_id, embedding_model, embedding_provider, similarity_threshold, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
       
       if (error) throw error;
-      setEmbeddings(data || []);
+      
+      // Transform the data to match EmbeddingRecord interface
+      const transformedData: EmbeddingRecord[] = (data || []).map(item => ({
+        ...item,
+        vector_dimensions: 0 // Default value since we can't easily get dimensions from stored vectors
+      }));
+      
+      setEmbeddings(transformedData);
     } catch (error) {
       console.error('Error loading embeddings:', error);
       toast({
@@ -79,7 +100,11 @@ export function useVectorDatabase() {
   const clearAllEmbeddings = useCallback(async () => {
     setIsClearing(true);
     try {
-      const { error } = await supabase.rpc('clear_all_embeddings');
+      const { error } = await supabase
+        .from('document_embeddings')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+      
       if (error) throw error;
       
       toast({
@@ -159,6 +184,7 @@ export function useVectorDatabase() {
     embeddings,
     isLoading,
     isClearing,
+    isDeleting: isClearing, // Alias for backward compatibility
     isDeleteDialogOpen,
     isDeleteAllDialogOpen,
     isDeleteDocumentDialogOpen,
