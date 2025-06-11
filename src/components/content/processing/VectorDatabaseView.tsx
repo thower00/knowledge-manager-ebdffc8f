@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +44,9 @@ export function VectorDatabaseView() {
 
   const clearCompleteDatabase = async () => {
     try {
-      console.log('Starting complete database reset from VectorDatabaseView...');
+      console.log('Starting complete database reset with direct queries...');
       
-      // Get initial counts for verification
+      // Get initial counts for detailed reporting
       const { count: initialEmbeddings } = await supabase
         .from('document_embeddings')
         .select('*', { count: 'exact', head: true });
@@ -60,31 +61,50 @@ export function VectorDatabaseView() {
 
       console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
 
-      // Get all document IDs first
-      const { data: allDocs } = await supabase
-        .from('processed_documents')
-        .select('id');
+      let deletedEmbeddings = 0;
+      let deletedChunks = 0;
+      let deletedDocs = 0;
 
-      if (allDocs && allDocs.length > 0) {
-        console.log('Using delete_documents RPC to clear all documents...');
-        const docIds = allDocs.map(d => d.id);
-        
-        // Use the existing delete_documents RPC function
-        const { data: deleteResult, error: deleteError } = await supabase.rpc(
-          'delete_documents',
-          { doc_ids: docIds }
-        );
-        
-        if (deleteError) {
-          throw new Error(`Failed to delete documents: ${deleteError.message}`);
-        }
-        
-        console.log('Delete documents RPC result:', deleteResult);
-      } else {
-        console.log('No documents found to delete');
+      // Step 1: Delete all embeddings using direct query
+      console.log('Step 1: Deleting all embeddings...');
+      const { error: embeddingError, count: embeddingDeleteCount } = await supabase
+        .from('document_embeddings')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (embeddingError) {
+        throw new Error(`Failed to delete embeddings: ${embeddingError.message}`);
       }
+      deletedEmbeddings = embeddingDeleteCount || 0;
+      console.log(`Deleted ${deletedEmbeddings} embeddings`);
 
-      // Verify deletion by counting remaining records
+      // Step 2: Delete all chunks using direct query
+      console.log('Step 2: Deleting all chunks...');
+      const { error: chunkError, count: chunkDeleteCount } = await supabase
+        .from('document_chunks')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (chunkError) {
+        throw new Error(`Failed to delete chunks: ${chunkError.message}`);
+      }
+      deletedChunks = chunkDeleteCount || 0;
+      console.log(`Deleted ${deletedChunks} chunks`);
+
+      // Step 3: Delete all documents using direct query
+      console.log('Step 3: Deleting all documents...');
+      const { error: docError, count: docDeleteCount } = await supabase
+        .from('processed_documents')
+        .delete()
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (docError) {
+        throw new Error(`Failed to delete documents: ${docError.message}`);
+      }
+      deletedDocs = docDeleteCount || 0;
+      console.log(`Deleted ${deletedDocs} documents`);
+
+      // Step 4: Verify deletion by counting remaining records
       const { count: remainingEmbeddings } = await supabase
         .from('document_embeddings')
         .select('*', { count: 'exact', head: true });
@@ -103,14 +123,14 @@ export function VectorDatabaseView() {
         console.log('Database reset completed successfully');
         toast({
           title: "Complete Database Reset Successful",
-          description: `Successfully cleared all documents, chunks, and embeddings from the database`
+          description: `Successfully deleted ${deletedDocs} documents, ${deletedChunks} chunks, and ${deletedEmbeddings} embeddings`
         });
       } else {
         console.warn(`Warning: Some records remain - Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
         toast({
           variant: "destructive",
           title: "Partial Reset",
-          description: `Some records may remain. Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`
+          description: `Deleted some records but ${remainingDocs + remainingChunks + remainingEmbeddings} records remain`
         });
       }
       
