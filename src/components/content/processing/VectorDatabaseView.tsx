@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,58 +60,28 @@ export function VectorDatabaseView() {
 
       console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
 
-      // Delete all embeddings using direct query
-      console.log('Deleting all embeddings...');
-      const { data: allEmbeddings } = await supabase
-        .from('document_embeddings')
-        .select('id');
-      
-      if (allEmbeddings && allEmbeddings.length > 0) {
-        const embeddingIds = allEmbeddings.map(e => e.id);
-        const { error: embeddingsError } = await supabase
-          .from('document_embeddings')
-          .delete()
-          .in('id', embeddingIds);
-        
-        if (embeddingsError) {
-          throw new Error(`Failed to delete embeddings: ${embeddingsError.message}`);
-        }
-      }
-
-      // Delete all chunks using direct query
-      console.log('Deleting all chunks...');
-      const { data: allChunks } = await supabase
-        .from('document_chunks')
-        .select('id');
-      
-      if (allChunks && allChunks.length > 0) {
-        const chunkIds = allChunks.map(c => c.id);
-        const { error: chunksError } = await supabase
-          .from('document_chunks')
-          .delete()
-          .in('id', chunkIds);
-        
-        if (chunksError) {
-          throw new Error(`Failed to delete chunks: ${chunksError.message}`);
-        }
-      }
-
-      // Delete all processed documents using direct query
-      console.log('Deleting all processed documents...');
+      // Get all document IDs first
       const { data: allDocs } = await supabase
         .from('processed_documents')
         .select('id');
-      
+
       if (allDocs && allDocs.length > 0) {
+        console.log('Using delete_documents RPC to clear all documents...');
         const docIds = allDocs.map(d => d.id);
-        const { error: docsError } = await supabase
-          .from('processed_documents')
-          .delete()
-          .in('id', docIds);
         
-        if (docsError) {
-          throw new Error(`Failed to delete documents: ${docsError.message}`);
+        // Use the existing delete_documents RPC function
+        const { data: deleteResult, error: deleteError } = await supabase.rpc(
+          'delete_documents',
+          { doc_ids: docIds }
+        );
+        
+        if (deleteError) {
+          throw new Error(`Failed to delete documents: ${deleteError.message}`);
         }
+        
+        console.log('Delete documents RPC result:', deleteResult);
+      } else {
+        console.log('No documents found to delete');
       }
 
       // Verify deletion by counting remaining records
