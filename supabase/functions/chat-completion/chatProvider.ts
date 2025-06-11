@@ -7,10 +7,29 @@ export async function generateChatResponse(
   contextText: string,
   config: ChatConfig
 ): Promise<string> {
-  // Prepare system message with context
+  // Extract document context from previous messages to maintain context memory
+  const previousContext = messages
+    .filter(msg => msg.role === 'assistant')
+    .map(msg => msg.content)
+    .join(' ')
+  
+  const mentionedDocuments = extractDocumentNames(previousContext)
+  const currentDocuments = extractDocumentNames(contextText)
+  const allRelevantDocs = [...new Set([...mentionedDocuments, ...currentDocuments])]
+  
+  console.log('Context memory - previously mentioned documents:', mentionedDocuments)
+  console.log('Current context documents:', currentDocuments)
+  
+  // Enhanced system message with better context handling
   const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
     `Document Context:\n${contextText}\n\n` +
-    'Use the provided document context to answer questions about the documents. If you have specific content from documents, use it to provide detailed answers. If no content is available, explain what documents are available and suggest the user contact support if documents should contain content but appear empty.'
+    `IMPORTANT INSTRUCTIONS:\n` +
+    `1. You have access to specific document content provided above. Use this content to answer questions directly and comprehensively.\n` +
+    `2. When users ask about "the document" or request summaries, always refer to the documents you have access to: ${allRelevantDocs.length > 0 ? allRelevantDocs.join(', ') : 'the available documents'}.\n` +
+    `3. If you have document content, provide detailed answers based on that content. Include specific information, key points, and relevant details.\n` +
+    `4. If no specific content is available but documents exist, explain what documents are available and suggest the user ask more specific questions.\n` +
+    `5. Always be consistent - if you could access a document in previous messages, you should still be able to access it unless explicitly told otherwise.\n` +
+    `6. When summarizing, provide comprehensive summaries that cover the main topics, key points, and important details from the document content.`
   
   // Prepare messages array
   const promptMessages: ChatMessage[] = [
@@ -20,7 +39,7 @@ export async function generateChatResponse(
   ]
   
   if (config.chatProvider === 'openai') {
-    console.log('Calling OpenAI API with configured parameters...')
+    console.log('Calling OpenAI API with enhanced context and configuration...')
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -43,10 +62,21 @@ export async function generateChatResponse(
     
     const openaiData = await openaiResponse.json()
     const assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
-    console.log('OpenAI response received')
+    console.log('OpenAI response received with enhanced context')
     return assistantResponse
   } else {
     console.error('Unsupported chat provider:', config.chatProvider)
     throw new Error(`Unsupported chat provider: ${config.chatProvider}. Please configure OpenAI in the admin settings.`)
   }
+}
+
+// Helper function to extract document names from text
+function extractDocumentNames(text: string): string[] {
+  const docRegex = /Document:\s*([^:\n]+)/g
+  const matches = []
+  let match
+  while ((match = docRegex.exec(text)) !== null) {
+    matches.push(match[1].trim())
+  }
+  return [...new Set(matches)] // Remove duplicates
 }

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState } from "react";
 import { Json } from "@/integrations/supabase/types";
 
@@ -46,7 +47,7 @@ interface ConfigContextType {
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-// Default configuration settings
+// Default configuration settings with improved defaults
 export const DEFAULT_CONFIG: ConfigSettings = {
   apiKey: "",
   provider: "openai",
@@ -58,9 +59,9 @@ export const DEFAULT_CONFIG: ConfigSettings = {
   storagePath: "/data/documents",
   customConfiguration: "{\n  \"advanced\": {\n    \"cache\": true\n  }\n}",
   providerApiKeys: {},
-  // New embedding defaults
+  // Improved embedding defaults for better search performance
   embeddingBatchSize: "10",
-  similarityThreshold: "0.7",
+  similarityThreshold: "0.5", // Lowered from 0.7 to 0.5 for better recall
   vectorStorage: "supabase",
   embeddingMetadata: {
     includeSource: true,
@@ -68,12 +69,12 @@ export const DEFAULT_CONFIG: ConfigSettings = {
     includeModelInfo: true,
     includeChunkIndex: true
   },
-  // New chat defaults
+  // Chat defaults
   chatProvider: "openai",
   chatModel: "gpt-4o-mini",
   chatTemperature: "0.7",
   chatMaxTokens: "2000",
-  chatSystemPrompt: "You are a helpful assistant answering questions based on the provided context.",
+  chatSystemPrompt: "You are a helpful assistant answering questions based on the provided context. Always use the document content when available and provide comprehensive, detailed responses.",
   chatProviderApiKeys: {}
 };
 
