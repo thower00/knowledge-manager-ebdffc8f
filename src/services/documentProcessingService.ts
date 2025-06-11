@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
@@ -105,6 +104,32 @@ export class DocumentProcessingService {
     console.log(`Processing document: ${typedDocument.title}`);
     this.updateProgress(documentId, typedDocument.title, 'extraction', 10);
 
+    // Check if document already has chunks and embeddings (skip extraction if already processed)
+    const { count: existingChunks } = await supabase
+      .from('document_chunks')
+      .select('*', { count: 'exact', head: true })
+      .eq('document_id', documentId);
+
+    const { count: existingEmbeddings } = await supabase
+      .from('document_embeddings')
+      .select('*', { count: 'exact', head: true })
+      .eq('document_id', documentId);
+
+    if (existingChunks && existingChunks > 0 && existingEmbeddings && existingEmbeddings > 0) {
+      console.log(`Document ${typedDocument.title} already has ${existingChunks} chunks and ${existingEmbeddings} embeddings - updating status to completed`);
+      
+      // Update status to completed since processing is already done
+      await this.updateDocumentStatus(documentId, 'completed');
+      this.updateProgress(documentId, typedDocument.title, 'completed', 100, existingChunks, existingEmbeddings);
+
+      return {
+        documentId,
+        success: true,
+        chunksGenerated: existingChunks,
+        embeddingsGenerated: existingEmbeddings,
+      };
+    }
+
     // Step 1: Extract document content
     let content: string;
     try {
@@ -163,7 +188,7 @@ export class DocumentProcessingService {
       console.log(`Generated ${embeddingCount} embeddings`);
       this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
-      // Step 5: Update document status to completed - this is the critical fix
+      // Step 5: Update document status to completed
       console.log(`Updating document ${documentId} status to completed`);
       await this.updateDocumentStatus(documentId, 'completed');
       console.log(`Document ${typedDocument.title} processing completed successfully`);
