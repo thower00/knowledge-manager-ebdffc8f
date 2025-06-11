@@ -153,7 +153,7 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
       const { error: embeddingsError } = await supabase
         .from('document_embeddings')
         .delete()
-        .not('id', 'is', null); // Delete all records
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
       
       if (embeddingsError) {
         console.error('Error deleting embeddings:', embeddingsError);
@@ -164,7 +164,7 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
       const { error: chunksError } = await supabase
         .from('document_chunks')
         .delete()
-        .not('id', 'is', null); // Delete all records
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
       
       if (chunksError) {
         console.error('Error deleting chunks:', chunksError);
@@ -175,7 +175,7 @@ export function DatabaseTab({ isLoading, onRunTest }: DatabaseTabProps) {
       const { error: docsError } = await supabase
         .from('processed_documents')
         .delete()
-        .not('id', 'is', null); // Delete all records
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
       
       if (docsError) {
         console.error('Error deleting documents:', docsError);
