@@ -1,17 +1,21 @@
 
-import { ChunkingConfig } from "@/types/chunking";
+import { ChunkingConfig, ChunkResult } from "@/types/chunking";
 
 export class ChunkingService {
   private config: ChunkingConfig;
 
   constructor(config: ChunkingConfig) {
-    this.config = config;
+    this.config = {
+      ...config,
+      preserveSentences: config.preserveSentences ?? true,
+      minChunkSize: config.minChunkSize ?? 50
+    };
     console.log('ChunkingService initialized with config:', {
-      strategy: config.chunkStrategy,
-      size: config.chunkSize,
-      overlap: config.chunkOverlap,
-      preserveSentences: config.preserveSentences,
-      minChunkSize: config.minChunkSize
+      strategy: this.config.chunkStrategy,
+      size: this.config.chunkSize,
+      overlap: this.config.chunkOverlap,
+      preserveSentences: this.config.preserveSentences,
+      minChunkSize: this.config.minChunkSize
     });
   }
 
@@ -41,7 +45,7 @@ export class ChunkingService {
       case 'paragraph':
         chunks = this.chunkByParagraph(cleanedText);
         break;
-      case 'fixed':
+      case 'fixed_size':
       default:
         chunks = this.chunkByFixedSize(cleanedText);
         break;
@@ -60,6 +64,31 @@ export class ChunkingService {
     }
 
     return filteredChunks;
+  }
+
+  generateDetailedChunks(text: string): ChunkResult[] {
+    const chunks = this.generateChunks(text);
+    let currentPosition = 0;
+    
+    return chunks.map((chunk, index) => {
+      const startPosition = currentPosition;
+      const endPosition = startPosition + chunk.length;
+      currentPosition = endPosition - (this.config.chunkOverlap || 0);
+      
+      return {
+        id: `chunk-${index}`,
+        index,
+        content: chunk,
+        size: chunk.length,
+        startPosition,
+        endPosition,
+        metadata: {
+          strategy: this.config.chunkStrategy,
+          chunkSize: this.config.chunkSize,
+          overlap: this.config.chunkOverlap || 0
+        }
+      };
+    });
   }
 
   private cleanText(text: string): string {
@@ -196,3 +225,5 @@ export class ChunkingService {
     return start;
   }
 }
+
+export { ChunkResult };

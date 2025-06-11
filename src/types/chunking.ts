@@ -3,6 +3,18 @@ export interface ChunkingConfig {
   chunkSize: number;
   chunkOverlap: number;
   chunkStrategy: "fixed_size" | "paragraph" | "sentence" | "recursive" | "semantic";
+  preserveSentences?: boolean;
+  minChunkSize?: number;
+}
+
+export interface ChunkResult {
+  id: string;
+  index: number;
+  content: string;
+  size: number;
+  startPosition?: number;
+  endPosition?: number;
+  metadata?: Record<string, any>;
 }
 
 export interface DocumentChunk {

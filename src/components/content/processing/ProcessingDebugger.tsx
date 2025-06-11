@@ -6,7 +6,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface DocumentStatus {
   id: string;
@@ -20,6 +31,7 @@ interface DocumentStatus {
 export function ProcessingDebugger() {
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const { toast } = useToast();
 
   const checkDocumentStatus = async () => {
@@ -80,6 +92,58 @@ export function ProcessingDebugger() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearCompleteDatabase = async () => {
+    setIsClearing(true);
+    try {
+      console.log('Starting complete database reset...');
+      
+      // Delete embeddings first (due to foreign key constraints)
+      const { error: embeddingsError } = await supabase
+        .from('document_embeddings')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (embeddingsError) throw embeddingsError;
+      console.log('All embeddings deleted');
+
+      // Delete chunks
+      const { error: chunksError } = await supabase
+        .from('document_chunks')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (chunksError) throw chunksError;
+      console.log('All chunks deleted');
+
+      // Delete processed documents
+      const { error: docsError } = await supabase
+        .from('processed_documents')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (docsError) throw docsError;
+      console.log('All processed documents deleted');
+
+      toast({
+        title: "Database Reset Complete",
+        description: "All processed documents, chunks, and embeddings have been cleared from the database"
+      });
+
+      // Refresh the status to show empty database
+      await checkDocumentStatus();
+      
+    } catch (error) {
+      console.error('Error clearing database:', error);
+      toast({
+        variant: "destructive",
+        title: "Reset failed",
+        description: error instanceof Error ? error.message : "Unknown error"
+      });
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -163,26 +227,62 @@ export function ProcessingDebugger() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button 
             onClick={checkDocumentStatus} 
-            disabled={isLoading}
+            disabled={isLoading || isClearing}
             variant="outline"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Check Status
           </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="destructive" 
+                disabled={isLoading || isClearing || documents.length === 0}
+              >
+                <Database className="h-4 w-4 mr-2" />
+                Clear Complete Database
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Clear Complete Database
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete ALL processed documents, chunks, and embeddings from the database. 
+                  This action cannot be undone. You will need to re-upload and reprocess all documents from scratch.
+                  
+                  Are you absolutely sure you want to proceed?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={clearCompleteDatabase}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={isClearing}
+                >
+                  {isClearing ? 'Clearing...' : 'Yes, Clear Everything'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {documents.length > 0 && (
           <div className="space-y-3">
-            <h4 className="font-medium">Document Processing Status</h4>
+            <h4 className="font-medium">Document Processing Status ({documents.length} documents)</h4>
             
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Documents marked as "completed" but with 0 chunks/embeddings indicate processing failures.
-                Use the reset button to clear their data and reprocess them.
+                Use the reset button to clear their data and reprocess them, or use "Clear Complete Database" to start fresh.
               </AlertDescription>
             </Alert>
 
@@ -222,6 +322,14 @@ export function ProcessingDebugger() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {documents.length === 0 && !isLoading && (
+          <div className="text-center py-8 text-muted-foreground">
+            <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No processed documents found. The database appears to be clean.</p>
+            <p className="text-sm mt-2">Upload and process some documents to see them here.</p>
           </div>
         )}
       </CardContent>

@@ -7,7 +7,7 @@ import { VectorDatabaseView } from "./VectorDatabaseView";
 import { useDocumentSelection } from "./hooks/useDocumentSelection";
 
 export function DocumentProcessingTab() {
-  const { selectedDocuments, documents, toggleDocumentSelection, toggleSelectAll } = useDocumentSelection();
+  const { selectedDocuments, documents, handleDocumentSelection, handleSelectAll } = useDocumentSelection();
 
   return (
     <div className="space-y-6">
