@@ -59,6 +59,10 @@ export class DocumentProcessingService {
     for (const documentId of documentIds) {
       try {
         console.log(`Processing document ${documentId}`);
+        
+        // Set status to processing at the start
+        await this.updateDocumentStatus(documentId, 'processing');
+        
         const result = await this.processDocument(documentId);
         results.push(result);
         console.log(`Document ${documentId} processed successfully:`, result);
@@ -66,7 +70,7 @@ export class DocumentProcessingService {
         console.error(`Error processing document ${documentId}:`, error);
         
         // Update document status to failed
-        await this.updateDocumentStatus(documentId, 'failed');
+        await this.updateDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
         
         results.push({
           documentId,
@@ -115,7 +119,7 @@ export class DocumentProcessingService {
       this.updateProgress(documentId, typedDocument.title, 'extraction', 30);
     } catch (error) {
       console.error(`Content extraction failed for ${typedDocument.title}:`, error);
-      await this.updateDocumentStatus(documentId, 'failed');
+      await this.updateDocumentStatus(documentId, 'failed', `Content extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw new Error(`Failed to extract content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
@@ -159,7 +163,7 @@ export class DocumentProcessingService {
       console.log(`Generated ${embeddingCount} embeddings`);
       this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
-      // Step 5: Update document status
+      // Step 5: Update document status to completed
       await this.updateDocumentStatus(documentId, 'completed');
       console.log(`Document ${typedDocument.title} processing completed successfully`);
       this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
@@ -172,7 +176,7 @@ export class DocumentProcessingService {
       };
     } catch (error) {
       console.error(`Processing failed after extraction for ${typedDocument.title}:`, error);
-      await this.updateDocumentStatus(documentId, 'failed');
+      await this.updateDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
@@ -294,20 +298,30 @@ export class DocumentProcessingService {
     return data.map(record => record.id);
   }
 
-  private async updateDocumentStatus(documentId: string, status: string): Promise<void> {
-    console.log(`Updating document ${documentId} status to: ${status}`);
+  private async updateDocumentStatus(documentId: string, status: string, error?: string): Promise<void> {
+    console.log(`Updating document ${documentId} status to: ${status}${error ? ` with error: ${error}` : ''}`);
     
-    const { error } = await supabase
+    const updateData: any = { 
+      status,
+      processed_at: new Date().toISOString(),
+    };
+    
+    if (error) {
+      updateData.error = error;
+    } else if (status === 'pending') {
+      // Clear error when resetting to pending
+      updateData.error = null;
+      updateData.processed_at = null;
+    }
+    
+    const { error: updateError } = await supabase
       .from('processed_documents')
-      .update({ 
-        status,
-        processed_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', documentId);
 
-    if (error) {
-      console.error(`Failed to update document status:`, error);
-      throw new Error(`Failed to update document status: ${error.message}`);
+    if (updateError) {
+      console.error(`Failed to update document status:`, updateError);
+      throw new Error(`Failed to update document status: ${updateError.message}`);
     }
     
     console.log(`Document ${documentId} status updated to ${status}`);

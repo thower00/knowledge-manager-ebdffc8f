@@ -17,9 +17,10 @@ export function useDocumentSelection() {
       const docs = await fetchProcessedDocuments();
       console.log(`useDocumentSelection - Fetched ${docs.length} documents`);
       
-      // Only show completed documents that can be processed
-      const completedDocs = docs.filter(doc => doc.status === 'completed');
-      setDocuments(completedDocs);
+      // Only show pending documents that are ready for processing
+      const pendingDocs = docs.filter(doc => doc.status === 'pending');
+      setDocuments(pendingDocs);
+      console.log(`useDocumentSelection - Filtered to ${pendingDocs.length} pending documents`);
     } catch (err) {
       console.error("Error loading documents for processing:", err);
       toast({

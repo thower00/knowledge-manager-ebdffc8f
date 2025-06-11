@@ -107,7 +107,7 @@ serve(async (req: Request) => {
         console.warn(`Warning: Found ${filesToProcess.length} files but expected ${documentIds.length}`);
       }
 
-      // Insert records into processed_documents table
+      // Insert records into processed_documents table with "pending" status
       for (const docId of documentIds) {
         // Find matching file from Drive API response
         const fileData = filesToProcess.find((f: any) => f.id === docId) || { 
@@ -120,7 +120,7 @@ serve(async (req: Request) => {
           title: fileData.name,
           source_type: "google-drive",
           mime_type: fileData.mimeType || "application/unknown",
-          status: "processing", // Initial status is processing
+          status: "pending", // Changed from "processing" to "pending"
           size: fileData.size || null,
           url: fileData.webViewLink || null
         };
@@ -137,28 +137,6 @@ serve(async (req: Request) => {
           console.log("Failed to insert document:", documentEntry);
         } else {
           console.log("Successfully inserted document record:", data);
-          
-          // Simulate processing completion after a short delay
-          // In a real implementation, this would be a more complex background task
-          setTimeout(async () => {
-            try {
-              const { error: updateError } = await supabase
-                .from("processed_documents")
-                .update({ 
-                  status: "completed", 
-                  processed_at: new Date().toISOString() 
-                })
-                .eq("source_id", docId);
-                
-              if (updateError) {
-                console.error("Error updating document status:", updateError);
-              } else {
-                console.log(`Document ${docId} marked as completed`);
-              }
-            } catch (err) {
-              console.error("Error in update timeout:", err);
-            }
-          }, 5000); // Complete after 5 seconds for demonstration
         }
       }
       
@@ -173,8 +151,8 @@ serve(async (req: Request) => {
     // Return success response with CORS headers
     return new Response(
       JSON.stringify({ 
-        status: "processing", 
-        message: `Started processing ${documentIds.length} documents`,
+        status: "pending", 
+        message: `Successfully added ${documentIds.length} documents to processing queue`,
         documentIds
       }),
       { 
