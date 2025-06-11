@@ -46,42 +46,94 @@ export function VectorDatabaseView() {
     try {
       console.log('Starting complete database reset from VectorDatabaseView...');
       
-      // Delete embeddings first (due to foreign key constraints)
-      const { error: embeddingsError } = await supabase
+      // Get initial counts for verification
+      const { count: initialEmbeddings } = await supabase
         .from('document_embeddings')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000');
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: initialChunks } = await supabase
+        .from('document_chunks')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: initialDocs } = await supabase
+        .from('processed_documents')
+        .select('*', { count: 'exact', head: true });
+
+      console.log(`Initial counts - Embeddings: ${initialEmbeddings}, Chunks: ${initialChunks}, Documents: ${initialDocs}`);
+
+      // Delete embeddings first (due to foreign key constraints)
+      // Using a more reliable delete approach with timestamp comparison
+      const { error: embeddingsError, count: deletedEmbeddings } = await supabase
+        .from('document_embeddings')
+        .delete({ count: 'exact' })
+        .gt('created_at', '1900-01-01T00:00:00Z');
       
       if (embeddingsError) {
         console.error('Error deleting embeddings:', embeddingsError);
         throw new Error(`Failed to delete embeddings: ${embeddingsError.message}`);
       }
 
+      console.log(`Deleted ${deletedEmbeddings} embeddings`);
+
       // Delete chunks
-      const { error: chunksError } = await supabase
+      const { error: chunksError, count: deletedChunks } = await supabase
         .from('document_chunks')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000');
+        .delete({ count: 'exact' })
+        .gt('created_at', '1900-01-01T00:00:00Z');
       
       if (chunksError) {
         console.error('Error deleting chunks:', chunksError);
         throw new Error(`Failed to delete chunks: ${chunksError.message}`);
       }
 
+      console.log(`Deleted ${deletedChunks} chunks`);
+
       // Delete processed documents
-      const { error: docsError } = await supabase
+      const { error: docsError, count: deletedDocs } = await supabase
         .from('processed_documents')
-        .delete()
-        .gte('id', '00000000-0000-0000-0000-000000000000');
+        .delete({ count: 'exact' })
+        .gt('created_at', '1900-01-01T00:00:00Z');
       
       if (docsError) {
         console.error('Error deleting documents:', docsError);
         throw new Error(`Failed to delete documents: ${docsError.message}`);
       }
 
+      console.log(`Deleted ${deletedDocs} documents`);
+
+      // Verify deletion by counting remaining records
+      const { count: remainingEmbeddings } = await supabase
+        .from('document_embeddings')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: remainingChunks } = await supabase
+        .from('document_chunks')
+        .select('*', { count: 'exact', head: true });
+      
+      const { count: remainingDocs } = await supabase
+        .from('processed_documents')
+        .select('*', { count: 'exact', head: true });
+
+      console.log(`Remaining counts - Embeddings: ${remainingEmbeddings}, Chunks: ${remainingChunks}, Documents: ${remainingDocs}`);
+
+      if (remainingEmbeddings > 0 || remainingChunks > 0 || remainingDocs > 0) {
+        console.warn('Some records may not have been deleted. Attempting fallback deletion...');
+        
+        // Fallback: delete any remaining records using alternative method
+        if (remainingEmbeddings > 0) {
+          await supabase.from('document_embeddings').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+        }
+        if (remainingChunks > 0) {
+          await supabase.from('document_chunks').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+        }
+        if (remainingDocs > 0) {
+          await supabase.from('processed_documents').delete().neq('id', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+        }
+      }
+
       toast({
-        title: "Complete Database Reset",
-        description: "All processed documents, chunks, and embeddings have been cleared"
+        title: "Complete Database Reset Successful",
+        description: `Cleared ${deletedDocs || 0} documents, ${deletedChunks || 0} chunks, and ${deletedEmbeddings || 0} embeddings`
       });
       
       // Reload data to show empty database
