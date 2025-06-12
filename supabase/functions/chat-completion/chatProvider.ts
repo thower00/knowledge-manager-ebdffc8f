@@ -35,7 +35,16 @@ export async function generateChatResponse(
   // Create document references section if we have relevant documents with URLs
   let documentReferences = ''
   if (relevantDocs && relevantDocs.length > 0) {
-    const docsWithUrls = relevantDocs.filter(doc => doc.document_url)
+    // Deduplicate documents by title and URL
+    const uniqueDocs = relevantDocs.reduce((acc, doc) => {
+      const key = `${doc.document_title}|${doc.document_url || 'no-url'}`
+      if (!acc.has(key)) {
+        acc.set(key, doc)
+      }
+      return acc
+    }, new Map())
+    
+    const docsWithUrls = Array.from(uniqueDocs.values()).filter(doc => doc.document_url)
     if (docsWithUrls.length > 0) {
       documentReferences = '\n\n**Sources:**\n' + 
         docsWithUrls.map(doc => `- [${doc.document_title}](${doc.document_url})`).join('\n')
