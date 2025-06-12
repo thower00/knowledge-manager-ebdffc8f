@@ -29,7 +29,7 @@ site_url = "http://localhost:3000"
 [auth.email]
 enabled = true
 double_confirm_changes = true
-enable_confirmations = false
+enable_confirmations = true
 
 [analytics]
 enabled = false
