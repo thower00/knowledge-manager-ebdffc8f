@@ -43,7 +43,16 @@ const loadChatConfig = async (supabaseClient: any) => {
   console.log('Has API key:', !!data.value.apiKey)
   console.log('API key length:', data.value.apiKey?.length || 0)
 
-  return data.value
+  // Fix embedding model configuration - use specificModelId if embeddingModel is just the provider
+  const embeddingModel = data.value.specificModelId || data.value.embeddingModel || 'text-embedding-3-small'
+  console.log('Original embeddingModel:', data.value.embeddingModel)
+  console.log('Specific model ID:', data.value.specificModelId)
+  console.log('Final embedding model to use:', embeddingModel)
+
+  return {
+    ...data.value,
+    embeddingModel: embeddingModel
+  }
 }
 
 const storeMessages = async (supabaseClient: any, sessionId: string, messages: { role: string; content: string }[], relevantDocs: any[]) => {
@@ -177,7 +186,7 @@ serve(async (req) => {
         temperature: config.chatTemperature,
         maxTokens: config.chatMaxTokens,
         embeddingProvider: config.provider,
-        embeddingModel: config.embeddingModel || config.specificModelId,
+        embeddingModel: config.embeddingModel,
         similarityThreshold: config.similarityThreshold
       });
 
@@ -195,9 +204,18 @@ serve(async (req) => {
         })
       }
 
-      // Add API key to config
+      // Add API key to config and validate embedding model
       config.apiKey = apiKey
+      
+      // Validate embedding model name
+      const validEmbeddingModels = ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002']
+      if (!validEmbeddingModels.includes(config.embeddingModel)) {
+        console.warn(`Invalid embedding model "${config.embeddingModel}", using default`)
+        config.embeddingModel = 'text-embedding-3-small'
+      }
+      
       console.log('API key configured successfully, length:', apiKey.length)
+      console.log('Validated embedding model:', config.embeddingModel)
 
       console.log('=== Managing chat session ===')
 
