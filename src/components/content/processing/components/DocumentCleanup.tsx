@@ -30,27 +30,39 @@ export function DocumentCleanup({ embeddings, onClearDocument, isClearing }: Doc
   const { toast } = useToast();
 
   const fetchDocumentNames = async () => {
-    if (!embeddings || embeddings.length === 0) return;
+    console.log("DocumentCleanup: Fetching document names for embeddings:", embeddings?.length || 0);
+    
+    if (!embeddings || embeddings.length === 0) {
+      console.log("DocumentCleanup: No embeddings provided");
+      return;
+    }
 
     setIsLoading(true);
     try {
       const uniqueDocIds = [...new Set(embeddings.map(e => e.document_id))];
+      console.log("DocumentCleanup: Unique document IDs found:", uniqueDocIds);
       
       const { data, error } = await supabase
         .from('processed_documents')
         .select('id, title')
         .in('id', uniqueDocIds);
 
-      if (error) throw error;
+      if (error) {
+        console.error("DocumentCleanup: Error fetching document names:", error);
+        throw error;
+      }
+
+      console.log("DocumentCleanup: Fetched documents from DB:", data);
 
       const nameMap = (data || []).reduce((acc, doc) => {
         acc[doc.id] = doc.title || `Document ${doc.id.slice(0, 8)}`;
         return acc;
       }, {} as Record<string, string>);
 
+      console.log("DocumentCleanup: Name map created:", nameMap);
       setDocumentNames(nameMap);
     } catch (error) {
-      console.error('Error fetching document names:', error);
+      console.error('DocumentCleanup: Error fetching document names:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -65,16 +77,33 @@ export function DocumentCleanup({ embeddings, onClearDocument, isClearing }: Doc
     fetchDocumentNames();
   }, [embeddings]);
 
-  // Get unique documents from embeddings
-  const uniqueDocuments = embeddings.reduce((acc, embedding) => {
-    if (!acc.find(doc => doc.document_id === embedding.document_id)) {
-      acc.push({
-        document_id: embedding.document_id,
-        count: embeddings.filter(e => e.document_id === embedding.document_id).length
-      });
+  // Get unique documents from embeddings with better logic
+  const uniqueDocuments = React.useMemo(() => {
+    if (!embeddings || embeddings.length === 0) {
+      console.log("DocumentCleanup: No embeddings to process");
+      return [];
     }
-    return acc;
-  }, [] as Array<{ document_id: string; count: number }>);
+
+    const documentMap = new Map<string, { document_id: string; count: number }>();
+    
+    embeddings.forEach(embedding => {
+      const existing = documentMap.get(embedding.document_id);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        documentMap.set(embedding.document_id, {
+          document_id: embedding.document_id,
+          count: 1
+        });
+      }
+    });
+
+    const result = Array.from(documentMap.values());
+    console.log("DocumentCleanup: Unique documents calculated:", result);
+    return result;
+  }, [embeddings]);
+
+  console.log("DocumentCleanup: Rendering with", uniqueDocuments.length, "unique documents");
 
   if (uniqueDocuments.length === 0) {
     return (
@@ -123,6 +152,9 @@ export function DocumentCleanup({ embeddings, onClearDocument, isClearing }: Doc
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {doc.count} embeddings
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  ID: {doc.document_id.slice(0, 8)}...
                 </Badge>
               </div>
               
