@@ -3,8 +3,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Download, FileText } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { ExternalLink, Download, FileText, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface DocumentReference {
   title: string;
@@ -45,42 +45,74 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
     }
 
     try {
-      console.log('Original URL for viewing:', url);
-      console.log('Is Google Drive:', isGoogleDrive);
-      
       let viewUrl = url;
       
-      // For Google Drive documents, ensure proper view URL format
+      // For Google Drive documents, use preview format for public access
       if (isGoogleDrive) {
-        // Extract file ID from various formats
         const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
                            url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
                            url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
         
         if (fileIdMatch) {
           const fileId = fileIdMatch[1];
-          viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
-          console.log('Converted to Google Drive view URL:', viewUrl);
-        } else {
-          console.warn('Could not extract file ID from Google Drive URL:', url);
+          // Use preview instead of view for better public access
+          viewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
         }
       }
 
-      console.log('Final view URL:', viewUrl);
+      // Try to open in new tab
+      const opened = window.open(viewUrl, '_blank', 'noopener,noreferrer');
       
-      // Use direct navigation instead of window.open to avoid popup blockers
-      window.location.href = viewUrl;
+      if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+        // Popup was blocked, show fallback options
+        toast({
+          variant: "destructive",
+          title: "Popup blocked",
+          description: "Please allow popups or use the copy link button below.",
+        });
+        return;
+      }
       
       toast({
         title: "Opening document",
-        description: `Opening "${title}" in current tab.`,
+        description: `Opening "${title}" in a new tab.`,
       });
     } catch (error) {
       console.error('Error opening document:', error);
       toast({
         variant: "destructive",
         title: "Error opening document",
-        description: "Failed to open the document. Please try again.",
+        description: "Failed to open the document. Please try the copy link option.",
+      });
+    }
+  };
+
+  const handleCopyLink = async (url: string, title: string, isGoogleDrive: boolean) => {
+    try {
+      let finalUrl = url;
+      
+      // For Google Drive, use preview format
+      if (isGoogleDrive) {
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                           url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                           url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+        
+        if (fileIdMatch) {
+          const fileId = fileIdMatch[1];
+          finalUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+      }
+
+      await navigator.clipboard.writeText(finalUrl);
+      toast({
+        title: "Link copied",
+        description: `Link to "${title}" copied to clipboard.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to copy link",
+        description: "Please copy the link manually from the browser.",
       });
     }
   };
@@ -96,9 +128,6 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
     }
 
     try {
-      console.log('Original download URL:', downloadUrl);
-      console.log('Is Google Drive:', isGoogleDrive);
-      
       let finalDownloadUrl = downloadUrl;
       
       // For Google Drive documents, convert to direct download URL
@@ -110,13 +139,8 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
         if (fileIdMatch) {
           const fileId = fileIdMatch[1];
           finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-          console.log('Converted to Google Drive download URL:', finalDownloadUrl);
-        } else {
-          console.warn('Could not extract file ID from Google Drive URL:', downloadUrl);
         }
       }
-
-      console.log('Final download URL:', finalDownloadUrl);
 
       // Use direct navigation for download
       window.location.href = finalDownloadUrl;
@@ -152,28 +176,29 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
               )}
             </div>
             
-            {/* Debug info for development */}
-            <div className="text-xs text-muted-foreground space-y-1">
-              {source.viewUrl && (
-                <div>View URL: {source.viewUrl}</div>
-              )}
-              {source.downloadUrl && (
-                <div>Download URL: {source.downloadUrl}</div>
-              )}
-            </div>
-            
             {(source.viewUrl || source.downloadUrl) && (
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 {source.viewUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewDocument(source.viewUrl!, source.title, source.isGoogleDrive || false)}
-                    className="text-xs"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewDocument(source.viewUrl!, source.title, source.isGoogleDrive || false)}
+                      className="text-xs"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyLink(source.viewUrl!, source.title, source.isGoogleDrive || false)}
+                      className="text-xs"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Link
+                    </Button>
+                  </>
                 )}
                 {source.downloadUrl && (
                   <Button
