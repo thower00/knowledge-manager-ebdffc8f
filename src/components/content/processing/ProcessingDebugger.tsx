@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { syncDocumentStatuses } from "../utils/statusSyncService";
@@ -40,27 +41,28 @@ export function ProcessingDebugger() {
     try {
       console.log('Checking document processing status...');
       
-      // Add a small delay and force fresh query if requested
+      // Create a completely fresh client instance to bypass caching
+      let clientToUse = supabase;
       if (forceFresh) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('Creating fresh Supabase client to bypass caching...');
+        clientToUse = createClient(
+          'https://sxrinuxxlmytddymjbmr.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
+          {
+            db: {
+              schema: 'public'
+            }
+          }
+        );
+        // Add a delay to ensure database has committed changes
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      // Create a new supabase client instance to avoid any potential caching
-      const freshClient = forceFresh ? 
-        supabase.from('processed_documents') : 
-        supabase.from('processed_documents');
-      
-      // Get all processed documents with explicit fresh query and cache busting
-      const queryBuilder = freshClient
+      // Get all processed documents with cache-busting query
+      const { data: docs, error: docsError } = await clientToUse
+        .from('processed_documents')
         .select('id, title, status')
         .order('created_at', { ascending: false });
-      
-      // Add a timestamp to force cache invalidation
-      if (forceFresh) {
-        console.log('Forcing fresh query with cache bust...');
-      }
-      
-      const { data: docs, error: docsError } = await queryBuilder;
 
       if (docsError) throw docsError;
 
@@ -70,8 +72,8 @@ export function ProcessingDebugger() {
       for (const doc of docs || []) {
         console.log(`Processing status check for document: ${doc.title} (${doc.id}) - Current status: ${doc.status}`);
         
-        // Count chunks with fresh queries
-        const { count: chunksCount, error: chunksError } = await supabase
+        // Count chunks with fresh client
+        const { count: chunksCount, error: chunksError } = await clientToUse
           .from('document_chunks')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
@@ -80,8 +82,8 @@ export function ProcessingDebugger() {
           console.error(`Error counting chunks for ${doc.title}:`, chunksError);
         }
 
-        // Count embeddings with fresh queries
-        const { count: embeddingsCount, error: embeddingsError } = await supabase
+        // Count embeddings with fresh client
+        const { count: embeddingsCount, error: embeddingsError } = await clientToUse
           .from('document_embeddings')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
@@ -90,8 +92,8 @@ export function ProcessingDebugger() {
           console.error(`Error counting embeddings for ${doc.title}:`, embeddingsError);
         }
 
-        // Check if chunks have content
-        const { data: sampleChunk, error: contentError } = await supabase
+        // Check if chunks have content with fresh client
+        const { data: sampleChunk, error: contentError } = await clientToUse
           .from('document_chunks')
           .select('content')
           .eq('document_id', doc.id)
@@ -143,18 +145,23 @@ export function ProcessingDebugger() {
       
       console.log(`Sync completed: ${result.updated} documents updated`);
       
-      // Wait longer and force multiple refreshes to ensure we get updated data
+      // Wait for database to commit and force multiple fresh refreshes
       console.log('Waiting for database to commit changes...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
-      console.log('Refreshing document status display with fresh data...');
+      console.log('Refreshing document status display with completely fresh data...');
       await checkDocumentStatus(true);
       
-      // Force one more refresh after another delay to be absolutely sure
+      // Force additional refreshes with delays to ensure UI updates
       setTimeout(async () => {
-        console.log('Final refresh to ensure UI is up to date...');
+        console.log('Second refresh to ensure UI is up to date...');
         await checkDocumentStatus(true);
-      }, 1000);
+      }, 2000);
+      
+      setTimeout(async () => {
+        console.log('Final refresh to guarantee UI shows correct status...');
+        await checkDocumentStatus(true);
+      }, 4000);
       
     } catch (error) {
       console.error('Error syncing document statuses:', error);
