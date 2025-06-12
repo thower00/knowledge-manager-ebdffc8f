@@ -178,20 +178,29 @@ serve(async (req) => {
     console.log('=== Chat completion request started ===')
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       console.error('Missing Supabase environment variables')
-      throw new Error('Missing Supabase URL or key')
+      throw new Error('Missing Supabase URL or keys')
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    // Create service role client for reading configurations (system data)
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false
       }
     })
 
-    // Authenticate the user
+    // Create anon client for user operations
+    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false
+      }
+    })
+
+    // Authenticate the user with the anon client
     console.log('=== Authenticating user ===')
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -203,7 +212,7 @@ serve(async (req) => {
     }
 
     const jwt = authHeader.split(' ')[1]
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt)
+    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser(jwt)
 
     if (userError) {
       console.error('Authentication error:', userError)
@@ -245,8 +254,8 @@ serve(async (req) => {
     try {
       console.log('=== Loading configuration ===')
       
-      // Load configuration from database with proper separation
-      const config = await loadChatConfig(supabase);
+      // Load configuration using service role client (has full database access)
+      const config = await loadChatConfig(supabaseService);
       
       console.log('Configuration loaded successfully:', {
         chatProvider: config.chatProvider,
@@ -261,11 +270,11 @@ serve(async (req) => {
 
       console.log('=== Managing chat session ===')
 
-      // Get or create chat session
+      // Get or create chat session using authenticated user client
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         console.log('Creating new chat session...')
-        const { data: newSession, error: sessionError } = await supabase
+        const { data: newSession, error: sessionError } = await supabaseAnon
           .from('chat_sessions')
           .insert({
             user_id: user.id,
@@ -286,8 +295,8 @@ serve(async (req) => {
 
       console.log('=== Loading conversation history ===')
       
-      // Load recent conversation context (last 10 messages)
-      const { data: recentMessages, error: messagesError } = await supabase
+      // Load recent conversation context (last 10 messages) using authenticated client
+      const { data: recentMessages, error: messagesError } = await supabaseAnon
         .from('chat_messages')
         .select('role, content')
         .eq('session_id', currentSessionId)
@@ -317,8 +326,9 @@ serve(async (req) => {
           similarityThreshold: config.similarityThreshold
         });
         
+        // Use service client for vector search as it needs to access embeddings
         const searchResult = await performVectorSearch(
-          supabase,
+          supabaseService,
           question,
           config
         );
@@ -366,7 +376,8 @@ serve(async (req) => {
       });
 
       console.log('=== Storing messages ===');
-      await storeMessages(supabase, currentSessionId, [
+      // Use authenticated client for storing user messages
+      await storeMessages(supabaseAnon, currentSessionId, [
         { role: 'user', content: question },
         { role: 'assistant', content: aiResponse }
       ], relevantDocs);
