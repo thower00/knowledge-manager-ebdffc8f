@@ -1,4 +1,3 @@
-
 import { ContextSource } from '../types.ts'
 
 export async function performSimilaritySearch(
@@ -14,8 +13,8 @@ export async function performSimilaritySearch(
   let baseThresholds
   
   if (isFactualQuestion) {
-    // More relaxed thresholds for factual questions to capture more potential matches
-    baseThresholds = isDocumentSpecific ? [0.1, 0.2, 0.3, 0.4, 0.5] : [0.15, 0.25, 0.35, 0.45, 0.55]
+    // More aggressive thresholds for factual questions to capture more potential matches
+    baseThresholds = isDocumentSpecific ? [0.05, 0.15, 0.25, 0.35, 0.45] : [0.1, 0.2, 0.3, 0.4, 0.5]
   } else if (isSummaryRequest) {
     // Relaxed thresholds for summary requests
     baseThresholds = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -34,7 +33,7 @@ export async function performSimilaritySearch(
     // Enhanced match count for different question types
     let matchCount
     if (isFactualQuestion) {
-      matchCount = 25  // More results for factual questions to ensure we capture details
+      matchCount = 40  // Significantly increased for factual questions to ensure complete coverage
     } else if (isSummaryRequest) {
       matchCount = isExtensiveSummary ? 30 : 25
     } else {
@@ -111,10 +110,10 @@ export async function performSimilaritySearch(
 }
 
 /**
- * Enhanced processing for factual questions - prioritizes relevance and completeness
+ * Enhanced processing for factual questions - prioritizes document coverage and time-related content
  */
 function processFactualQuestionResults(results: any[]): any[] {
-  console.log('Processing results for factual question request...')
+  console.log('Processing results for factual question request with enhanced document coverage...')
   
   // Group results by document to ensure comprehensive coverage
   const resultsByDocument = new Map()
@@ -129,12 +128,12 @@ function processFactualQuestionResults(results: any[]): any[] {
   console.log(`Factual question results found across ${resultsByDocument.size} different documents:`, 
     Array.from(resultsByDocument.keys()))
   
-  // For factual questions, prioritize getting detailed content from the most relevant documents
+  // For factual questions, prioritize getting comprehensive coverage from relevant documents
   const diverseResults = []
-  const chunksPerDocument = 6  // More chunks per document for factual questions
-  const totalChunksLimit = 20  // Higher total limit for factual questions
+  const chunksPerDocument = 15  // Significantly increased for better document coverage
+  const totalChunksLimit = 35   // Increased total limit
   
-  // Sort documents by average similarity and take best chunks from each
+  // Sort documents by relevance and ensure we get chunks from different parts of each document
   const documentsByRelevance = Array.from(resultsByDocument.entries())
     .map(([docTitle, docResults]) => ({
       docTitle,
@@ -142,9 +141,9 @@ function processFactualQuestionResults(results: any[]): any[] {
       avgSimilarity: docResults.reduce((sum, r) => sum + r.similarity, 0) / docResults.length,
       maxSimilarity: Math.max(...docResults.map(r => r.similarity))
     }))
-    .sort((a, b) => b.maxSimilarity - a.maxSimilarity)  // Sort by highest similarity rather than average
+    .sort((a, b) => b.maxSimilarity - a.maxSimilarity)
   
-  // Take chunks from the most relevant documents first
+  // Enhanced chunk selection to ensure document coverage
   for (const { docTitle, docResults } of documentsByRelevance) {
     if (diverseResults.length >= totalChunksLimit) break
     
@@ -154,13 +153,54 @@ function processFactualQuestionResults(results: any[]): any[] {
       totalChunksLimit - diverseResults.length
     )
     
-    diverseResults.push(...docResults.slice(0, chunksToTake))
-    console.log(`Added ${chunksToTake} chunks from document: ${docTitle} (max similarity: ${docResults[0].similarity})`)
+    // For factual questions, try to get chunks from different parts of the document
+    const selectedChunks = selectDistributedChunks(docResults, chunksToTake)
+    
+    diverseResults.push(...selectedChunks)
+    console.log(`Added ${selectedChunks.length} distributed chunks from document: ${docTitle} (max similarity: ${docResults[0].similarity})`)
   }
   
   return diverseResults
     .sort((a, b) => b.similarity - a.similarity) // Sort all results by similarity
     .slice(0, totalChunksLimit) // Final limit
+}
+
+/**
+ * Helper function to select chunks distributed across a document for better coverage
+ */
+function selectDistributedChunks(chunks: any[], count: number): any[] {
+  if (chunks.length <= count) {
+    return chunks
+  }
+  
+  // Sort by chunk_index if available to ensure document order
+  const sortedChunks = chunks.sort((a, b) => {
+    if (a.chunk_index !== undefined && b.chunk_index !== undefined) {
+      return a.chunk_index - b.chunk_index
+    }
+    return b.similarity - a.similarity // Fallback to similarity
+  })
+  
+  // Take chunks from beginning, middle, and end for better coverage
+  const selected = []
+  const step = Math.max(1, Math.floor(sortedChunks.length / count))
+  
+  for (let i = 0; i < count && i * step < sortedChunks.length; i++) {
+    selected.push(sortedChunks[i * step])
+  }
+  
+  // Fill remaining slots with highest similarity chunks
+  const remaining = count - selected.length
+  if (remaining > 0) {
+    const highestSimilarity = chunks
+      .filter(chunk => !selected.includes(chunk))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, remaining)
+    
+    selected.push(...highestSimilarity)
+  }
+  
+  return selected
 }
 
 /**

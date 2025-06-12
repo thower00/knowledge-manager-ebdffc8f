@@ -1,4 +1,3 @@
-
 import { ChatConfig } from './config.ts'
 import { ContextSource } from './types.ts'
 import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
@@ -35,18 +34,21 @@ function isExtensiveSummary(question: string): boolean {
          extensiveKeywords.some(keyword => questionLower.includes(keyword))
 }
 
-// Step 2: Enhanced detection for factual questions requiring specific information
+// Step 2: Enhanced detection for factual questions requiring specific information, especially time-related
 function isSpecificFactualQuestion(question: string): boolean {
   const factualIndicators = [
-    // Time-related questions
-    'när', 'vilken tid', 'tidsperiod', 'datum', 'tidpunkt', 'period', 'under',
-    'from', 'to', 'mellan', 'during', 'timeline',
+    // Time-related questions (enhanced Swedish support)
+    'när', 'vilken tid', 'tidsperiod', 'datum', 'tidpunkt', 'period', 'under', 'från', 'till', 'mellan',
+    'genomfördes', 'genomförande', 'startade', 'avslutades', 'pågick', 'varade', 'slutfördes',
+    'utvecklingsfas', 'projektfas', 'fas', 'etapp', 'milstolpe', 'leverans', 'slutleverans',
+    'timeline', 'tidsplan', 'schema', 'kronologi',
+    // English equivalents
+    'when', 'time period', 'from', 'to', 'between', 'during', 'timeline', 'conducted', 'carried out',
+    'started', 'ended', 'completed', 'finished', 'phase', 'milestone', 'delivery',
     // Who/what/where questions
-    'vem', 'vad', 'var', 'hur', 'varför', 'vilken', 'which', 'who', 'what', 'where', 'when', 'how',
+    'vem', 'vad', 'var', 'hur', 'varför', 'vilken', 'which', 'who', 'what', 'where', 'how',
     // Specific detail questions
-    'detaljer', 'specifik', 'exakt', 'details', 'specific', 'exact',
-    // Process/method questions
-    'genomfördes', 'utfördes', 'implemented', 'conducted', 'carried out'
+    'detaljer', 'specifik', 'exakt', 'details', 'specific', 'exact', 'omfattning', 'scope'
   ]
   
   const questionLower = question.toLowerCase()
@@ -140,6 +142,25 @@ function enhancedTitleSearch(question: string, availableDocuments: DocumentInfo[
   return matchingDocs
 }
 
+/**
+ * Helper function to select distributed chunks from an array for better document coverage
+ */
+function selectDistributedChunksFromArray(chunks: any[], count: number): any[] {
+  if (chunks.length <= count) {
+    return chunks
+  }
+  
+  const selected = []
+  const step = Math.max(1, Math.floor(chunks.length / count))
+  
+  // Take chunks from beginning, middle, and end
+  for (let i = 0; i < count && i * step < chunks.length; i++) {
+    selected.push(chunks[i * step])
+  }
+  
+  return selected
+}
+
 export async function performVectorSearch(
   supabase: any,
   question: string,
@@ -181,25 +202,43 @@ export async function performVectorSearch(
     if (titleBasedResults.length > 0) {
       console.log('Found documents by enhanced title search:', titleBasedResults.map(r => r.title))
       
-      // Enhanced chunk retrieval for factual questions
-      const chunkLimit = isFactualQuestion ? 8 : (isSummary ? (isExtensive ? 8 : 5) : 3)
+      // Enhanced chunk retrieval for factual questions with better document coverage
+      const chunkLimit = isFactualQuestion ? 15 : (isSummary ? (isExtensive ? 8 : 5) : 3) // Increased for factual questions
       console.log(`Using chunk limit of ${chunkLimit} for ${isFactualQuestion ? 'factual' : (isSummary ? (isExtensive ? 'extensive summary' : 'summary') : 'regular')} request`)
       
       const results: ContextSource[] = []
       
       for (const doc of titleBasedResults) {
-        // Get more chunks for factual questions to ensure we capture specific details
-        const { data: chunks, error } = await supabase
-          .from('document_chunks')
-          .select('content, chunk_index')
-          .eq('document_id', doc.id)
-          .order('chunk_index', { ascending: true })
-          .limit(chunkLimit)
+        // Enhanced chunk selection for factual questions - get distributed chunks
+        let chunks
+        if (isFactualQuestion) {
+          // For factual questions, get chunks from different parts of the document
+          const { data: allChunks, error } = await supabase
+            .from('document_chunks')
+            .select('content, chunk_index')
+            .eq('document_id', doc.id)
+            .order('chunk_index', { ascending: true })
+          
+          if (!error && allChunks && allChunks.length > 0) {
+            // Select distributed chunks for better coverage
+            chunks = selectDistributedChunksFromArray(allChunks, chunkLimit)
+          }
+        } else {
+          // Standard chunk retrieval for non-factual questions
+          const { data: standardChunks, error } = await supabase
+            .from('document_chunks')
+            .select('content, chunk_index')
+            .eq('document_id', doc.id)
+            .order('chunk_index', { ascending: true })
+            .limit(chunkLimit)
+          
+          if (!error) chunks = standardChunks
+        }
         
-        if (!error && chunks && chunks.length > 0) {
-          // For factual questions, get more content to ensure we capture details
+        if (chunks && chunks.length > 0) {
+          // Enhanced content length for factual questions
           const combinedContent = chunks.map(c => c.content).join(' ')
-          const contentLength = isFactualQuestion ? 3000 : (isSummary ? (isExtensive ? 2500 : 1800) : 1500)
+          const contentLength = isFactualQuestion ? 5000 : (isSummary ? (isExtensive ? 2500 : 1800) : 1500) // Increased for factual questions
           
           results.push({
             document_title: doc.title,
@@ -254,7 +293,7 @@ export async function performVectorSearch(
       // Enhanced fallback for factual questions
       console.log('Vector search returned no results, trying enhanced content-based search...')
       
-      // Try enhanced content-based search for factual questions
+      // Try enhanced content-based search for factual questions with time-aware keywords
       const contentBasedResults = await enhancedContentSearch(supabase, question, availableDocuments, isFactualQuestion)
       if (contentBasedResults.length > 0) {
         console.log('Found enhanced content-based matches:', contentBasedResults.map(r => r.document_title))
@@ -288,25 +327,36 @@ export async function performVectorSearch(
   }
 }
 
-// Enhanced content search for factual questions
+// Enhanced content search for factual questions with better time-related keyword detection
 async function enhancedContentSearch(
   supabase: any,
   question: string,
   availableDocuments: DocumentInfo[],
   isFactualQuestion: boolean
 ): Promise<ContextSource[]> {
-  console.log('=== Enhanced content search for factual questions ===')
+  console.log('=== Enhanced content search for factual questions with time-awareness ===')
   
-  // Extract keywords with enhanced Swedish support
+  // Enhanced keyword extraction with better Swedish support and time-related terms
   const keywords = question
     .toLowerCase()
     .replace(/[^\wÅÄÖåäö\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 2 && !['när', 'vad', 'var', 'vem', 'hur', 'varför', 'vilken', 'under', 'what', 'where', 'when', 'how', 'why', 'which', 'the', 'is', 'are', 'was', 'were', 'about', 'document', 'report', 'och', 'eller', 'som', 'det', 'den', 'denna', 'detta', 'för', 'från', 'till', 'med', 'på', 'av'].includes(word))
   
-  // Add time-related keywords for factual questions
+  // Enhanced time-related keywords for factual questions
   if (isFactualQuestion) {
-    const timeKeywords = ['datum', 'tid', 'period', 'år', 'månad', 'vecka', 'dag', 'genomförande', 'start', 'slut', 'mellan', 'från', 'till']
+    const timeKeywords = [
+      // Swedish time-related terms
+      'datum', 'tid', 'period', 'tidsperiod', 'år', 'månad', 'vecka', 'dag', 'genomförande', 'genomfördes',
+      'start', 'startade', 'slut', 'slutade', 'avslutades', 'mellan', 'från', 'till', 'under', 'pågick',
+      'utvecklingsfas', 'projektfas', 'fas', 'etapp', 'milstolpe', 'leverans', 'slutleverans',
+      // Year and month patterns
+      '2023', '2024', 'januari', 'februari', 'mars', 'april', 'maj', 'juni',
+      'juli', 'augusti', 'september', 'oktober', 'november', 'december',
+      // English equivalents
+      'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+      'september', 'october', 'november', 'december', 'phase', 'milestone', 'delivery'
+    ]
     keywords.push(...timeKeywords.filter(kw => !keywords.includes(kw)))
   }
   
@@ -315,28 +365,28 @@ async function enhancedContentSearch(
     return []
   }
   
-  console.log('Enhanced keywords for search:', keywords)
+  console.log('Enhanced keywords for time-aware search:', keywords)
   
   const results: ContextSource[] = []
   
   for (const doc of availableDocuments) {
-    // Enhanced search for chunks containing the keywords
+    // Enhanced search for chunks containing the keywords with better text search
     let query = supabase
       .from('document_chunks')
       .select('content, chunk_index')
       .eq('document_id', doc.id)
     
-    // For factual questions, search for any of the keywords (OR logic)
+    // For factual questions, search for any of the keywords (OR logic) with enhanced search
     const searchTerms = keywords.join(' | ')
     query = query.textSearch('content', searchTerms, { type: 'websearch', config: 'swedish' })
     
-    const chunkLimit = isFactualQuestion ? 5 : 2
+    const chunkLimit = isFactualQuestion ? 8 : 3 // Increased for factual questions
     const { data: chunks, error } = await query
       .order('chunk_index', { ascending: true })
       .limit(chunkLimit)
     
     if (!error && chunks && chunks.length > 0) {
-      const contentLength = isFactualQuestion ? 2000 : 1200
+      const contentLength = isFactualQuestion ? 4000 : 1200 // Increased for factual questions
       const combinedContent = chunks.map(c => c.content).join(' ').substring(0, contentLength)
       results.push({
         document_title: doc.title,
@@ -344,7 +394,7 @@ async function enhancedContentSearch(
         document_id: doc.id,
         document_url: doc.url
       })
-      console.log(`Found enhanced content match in document: ${doc.title} (${chunks.length} chunks)`)
+      console.log(`Found enhanced time-aware content match in document: ${doc.title} (${chunks.length} chunks)`)
     }
   }
   

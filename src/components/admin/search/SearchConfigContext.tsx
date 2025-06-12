@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from "react";
 
 // Search configuration interface
@@ -46,41 +45,41 @@ interface SearchConfigContextType {
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-// Default search configuration values (optimized based on testing)
+// Enhanced default search configuration values for better factual question coverage
 export const DEFAULT_SEARCH_CONFIG: SearchConfigSettings = {
-  // Similarity Thresholds - Lower values for better recall
-  factualQuestionThresholds: [0.1, 0.2, 0.3, 0.4, 0.5],
+  // Similarity Thresholds - Lower values for better recall, especially for factual questions
+  factualQuestionThresholds: [0.05, 0.15, 0.25, 0.35, 0.45], // Lower thresholds for better coverage
   summaryRequestThresholds: [0.1, 0.2, 0.3, 0.4, 0.5],
   standardThresholds: [0.15, 0.25, 0.35, 0.45],
   
-  // Match Count - More chunks for comprehensive answers
-  factualQuestionMatchCount: 25,
+  // Match Count - Significantly increased for factual questions to capture complete information
+  factualQuestionMatchCount: 40, // Increased from 25 to 40 for better coverage
   summaryMatchCount: 25,
   extensiveSummaryMatchCount: 30,
   standardMatchCount: 15,
   
-  // Content Length - Longer content for detailed responses
-  factualQuestionContentLength: 3000,
+  // Content Length - Increased for factual questions to capture more context
+  factualQuestionContentLength: 5000, // Increased from 3000 to 5000
   summaryContentLength: 1800,
   extensiveSummaryContentLength: 2500,
   standardContentLength: 1500,
   
-  // Processing Limits - Chunks per document
-  factualQuestionChunksPerDocument: 8,
+  // Processing Limits - Enhanced for factual questions to ensure document coverage
+  factualQuestionChunksPerDocument: 15, // Increased from 8 to 15 for better document coverage
   summaryChunksPerDocument: 5,
   extensiveSummaryChunksPerDocument: 8,
   standardChunksPerDocument: 4,
   
-  // Total chunks limit
-  factualQuestionTotalChunksLimit: 20,
+  // Total chunks limit - Increased for factual questions
+  factualQuestionTotalChunksLimit: 35, // Increased from 20 to 35
   summaryTotalChunksLimit: 15,
   extensiveSummaryTotalChunksLimit: 20,
   standardTotalChunksLimit: 12,
   
   // Additional parameters
-  enhancedContentSearchLimit: 5,
+  enhancedContentSearchLimit: 8, // Increased from 5
   titleSearchMinWordLength: 2,
-  contentSearchBatchSize: 2
+  contentSearchBatchSize: 3 // Increased from 2
 };
 
 const SearchConfigContext = createContext<SearchConfigContextType | undefined>(undefined);
