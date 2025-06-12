@@ -125,6 +125,8 @@ const loadChatConfig = async (supabaseClient: any) => {
 
 const storeMessages = async (supabaseClient: any, sessionId: string, messages: { role: string; content: string }[], relevantDocs: any[]) => {
   try {
+    console.log('Storing messages to database for session:', sessionId)
+    
     // Store chat messages
     const messagesToStore = messages.map(msg => ({
       session_id: sessionId,
@@ -132,31 +134,44 @@ const storeMessages = async (supabaseClient: any, sessionId: string, messages: {
       content: msg.content
     }))
 
-    const { error: messagesError } = await supabaseClient
+    const { data: messagesData, error: messagesError } = await supabaseClient
       .from('chat_messages')
       .insert(messagesToStore)
+      .select('id, role')
 
     if (messagesError) {
       console.error('Error saving chat messages:', messagesError)
       throw messagesError
     }
 
-    // Store document context references
-    const contextToStore = relevantDocs.map(doc => ({
-      session_id: sessionId,
-      document_id: doc.document_id,
-      document_title: doc.document_title,
-      chunk_content: doc.chunk_content,
-      similarity: doc.similarity,
-      document_url: doc.document_url
-    }))
+    console.log('Messages stored successfully:', messagesData?.length || 0, 'messages')
 
-    const { error: contextError } = await supabaseClient
-      .from('chat_context')
-      .insert(contextToStore)
+    // Store document context references if we have relevant docs and a message ID
+    if (relevantDocs.length > 0 && messagesData && messagesData.length > 0) {
+      // Find the assistant message (last one)
+      const assistantMessage = messagesData.find(msg => msg.role === 'assistant')
+      
+      if (assistantMessage) {
+        const contextToStore = relevantDocs.map(doc => ({
+          message_id: assistantMessage.id,
+          document_id: doc.document_id,
+          chunk_id: doc.chunk_id,
+          similarity_score: doc.similarity
+        }))
 
-    if (contextError) {
-      console.warn('Error saving chat context:', contextError)
+        console.log('Storing context for', contextToStore.length, 'documents')
+        
+        const { error: contextError } = await supabaseClient
+          .from('chat_contexts')
+          .insert(contextToStore)
+
+        if (contextError) {
+          console.warn('Error saving chat context:', contextError)
+          // Don't throw here - context storage is not critical
+        } else {
+          console.log('Context stored successfully')
+        }
+      }
     }
 
   } catch (error) {
