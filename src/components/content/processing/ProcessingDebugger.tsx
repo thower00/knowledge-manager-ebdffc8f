@@ -36,12 +36,17 @@ export function ProcessingDebugger() {
   const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
 
-  const checkDocumentStatus = async () => {
+  const checkDocumentStatus = async (forceFresh = false) => {
     setIsLoading(true);
     try {
       console.log('Checking document processing status...');
       
-      // Get all processed documents
+      // Add a small delay and force fresh query if requested
+      if (forceFresh) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Get all processed documents with explicit fresh query
       const { data: docs, error: docsError } = await supabase
         .from('processed_documents')
         .select('id, title, status')
@@ -128,11 +133,9 @@ export function ProcessingDebugger() {
       
       console.log(`Sync completed: ${result.updated} documents updated`);
       
-      // Add a small delay to ensure database updates are committed
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Refresh the status display after sync
-      await checkDocumentStatus();
+      // Force a fresh query after sync to ensure we get updated data
+      console.log('Refreshing document status display with fresh data...');
+      await checkDocumentStatus(true);
       
     } catch (error) {
       console.error('Error syncing document statuses:', error);
@@ -281,7 +284,7 @@ export function ProcessingDebugger() {
       <CardContent className="space-y-4">
         <div className="flex gap-2 flex-wrap">
           <Button 
-            onClick={checkDocumentStatus} 
+            onClick={() => checkDocumentStatus()} 
             disabled={isLoading || isClearing || isSyncing}
             variant="outline"
           >
