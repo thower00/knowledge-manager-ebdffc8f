@@ -24,15 +24,15 @@ export async function performVectorSearch(
     console.log('=== Starting vector search ===')
     console.log('Generating embedding for question...')
     
-    // Preprocess query to detect document-specific requests
-    const isDocumentSpecific = /\b(the document|this document|document|summarize|summary|list.*documents|what.*documents|documents.*access)\b/i.test(question)
+    // Enhanced query preprocessing to detect document-specific requests
+    const isDocumentSpecific = /\b(the document|this document|document|summarize|summary|list.*documents|what.*documents|documents.*access|specific.*document|particular.*document)\b/i.test(question)
     console.log('Query is document-specific:', isDocumentSpecific)
     
     // Discover available documents
     const availableDocuments = await discoverAvailableDocuments(supabase)
 
     // For document listing queries, return specific count and clear capabilities
-    if (isDocumentSpecific && /\b(list.*documents|what.*documents|documents.*access)\b/i.test(question)) {
+    if (/\b(list.*documents|what.*documents|documents.*access|how many.*documents)\b/i.test(question)) {
       console.log('Processing document listing query...')
       contextText = generateDocumentListingContext(availableDocuments)
       console.log('Using detailed document access info with document list as context')
@@ -42,7 +42,7 @@ export async function performVectorSearch(
     // Generate embedding for the user's question
     const queryEmbedding = await generateQueryEmbedding(question, config)
 
-    // Perform similarity search
+    // Perform similarity search with improved filtering
     const searchResults = await performSimilaritySearch(supabase, queryEmbedding, config, isDocumentSpecific)
     
     if (searchResults.length > 0) {
@@ -58,10 +58,16 @@ export async function performVectorSearch(
       console.log(`Vector search retrieved content from ${uniqueDocs.length} unique documents:`, uniqueDocs)
       
     } else {
-      // Enhanced fallback: Get content from ALL available documents
+      // More selective fallback
+      console.log('Vector search returned no results, using selective fallback...')
       const fallbackResult = await handleFallbackDocumentRetrieval(supabase, availableDocuments, isDocumentSpecific)
       contextText = fallbackResult.contextText
       relevantDocs = fallbackResult.relevantDocs
+      
+      if (relevantDocs.length > 0) {
+        const uniqueDocs = [...new Set(relevantDocs.map(r => r.document_title))]
+        console.log(`Fallback retrieved content from ${uniqueDocs.length} documents:`, uniqueDocs)
+      }
     }
     
     // Final fallback - provide information about document availability

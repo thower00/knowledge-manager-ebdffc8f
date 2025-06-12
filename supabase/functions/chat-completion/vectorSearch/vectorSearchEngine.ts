@@ -7,8 +7,8 @@ export async function performSimilaritySearch(
   config: any,
   isDocumentSpecific: boolean
 ): Promise<ContextSource[]> {
-  // Multi-threshold vector search strategy with improved thresholds
-  const thresholds = isDocumentSpecific ? [0.3, 0.4, 0.5, 0.6] : [parseFloat(config.similarityThreshold), 0.4, 0.5, 0.6]
+  // Improved threshold strategy - more restrictive to get better matches
+  const thresholds = isDocumentSpecific ? [0.2, 0.3, 0.4, 0.5] : [parseFloat(config.similarityThreshold), 0.35, 0.45, 0.55]
   let searchResults = null
   
   for (const threshold of thresholds) {
@@ -17,7 +17,7 @@ export async function performSimilaritySearch(
       .rpc('search_similar_embeddings', {
         query_embedding: queryEmbedding,
         similarity_threshold: threshold,
-        match_count: 20 // Increase match count for better diversity
+        match_count: isDocumentSpecific ? 15 : 10 // Slightly more results for document-specific queries
       })
     
     if (searchError) {
@@ -38,15 +38,20 @@ export async function performSimilaritySearch(
         console.log(`Results found across ${resultsByDocument.size} different documents:`, 
           Array.from(resultsByDocument.keys()))
         
-        // Take results from multiple documents to ensure diversity
+        // Take results from multiple documents to ensure diversity but limit total
         const diverseResults = []
-        const maxPerDocument = Math.ceil(10 / Math.max(resultsByDocument.size, 1))
+        const maxPerDocument = Math.min(3, Math.ceil(8 / Math.max(resultsByDocument.size, 1)))
         
         for (const [docTitle, docResults] of resultsByDocument) {
-          diverseResults.push(...docResults.slice(0, maxPerDocument))
+          // Sort by similarity and take the best chunks from each document
+          const sortedResults = docResults.sort((a, b) => b.similarity - a.similarity)
+          diverseResults.push(...sortedResults.slice(0, maxPerDocument))
         }
         
-        searchResults = diverseResults.slice(0, 20)
+        searchResults = diverseResults
+          .sort((a, b) => b.similarity - a.similarity) // Sort all results by similarity
+          .slice(0, 12) // Limit total results
+        
         console.log('Search results details:', searchResults.map(r => ({
           similarity: r.similarity,
           doc_title: r.document_title,

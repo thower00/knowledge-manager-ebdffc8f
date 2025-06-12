@@ -1,4 +1,3 @@
-
 import { ContextSource } from '../types.ts'
 import { DocumentInfo } from './types.ts'
 
@@ -7,21 +6,26 @@ export async function handleFallbackDocumentRetrieval(
   availableDocuments: DocumentInfo[],
   isDocumentSpecific: boolean
 ): Promise<{ contextText: string; relevantDocs: ContextSource[] }> {
-  console.log('Vector search unsuccessful, using enhanced fallback for all documents...')
+  console.log('Vector search unsuccessful, using enhanced fallback...')
   
   if (availableDocuments && availableDocuments.length > 0) {
-    console.log('Getting document content directly from chunks for all available documents...')
+    console.log('Getting document content directly from chunks...')
     
-    // Get chunks from ALL documents - process each document individually
+    // Limit the number of documents we process in fallback to avoid returning everything
+    const maxDocumentsInFallback = isDocumentSpecific ? 2 : 1
+    const documentsToProcess = availableDocuments.slice(0, maxDocumentsInFallback)
+    
+    console.log(`Processing ${documentsToProcess.length} documents in fallback (max: ${maxDocumentsInFallback})`)
+    
     const documentContentMap = new Map()
     
-    for (const doc of availableDocuments) {
+    for (const doc of documentsToProcess) {
       const { data: documentChunks, error: chunksError } = await supabase
         .from('document_chunks')
         .select('id, content, chunk_index')
         .eq('document_id', doc.id)
         .order('chunk_index', { ascending: true })
-        .limit(5) // Get more chunks per document for better coverage
+        .limit(3) // Reduce chunks per document to get more focused results
       
       if (!chunksError && documentChunks && documentChunks.length > 0) {
         documentContentMap.set(doc.title, {
@@ -31,11 +35,6 @@ export async function handleFallbackDocumentRetrieval(
         console.log(`Fallback found ${documentChunks.length} chunks for document: ${doc.title}`)
       } else {
         console.log(`No chunks found for document: ${doc.title}`)
-        // Still include the document in the map even if no chunks
-        documentContentMap.set(doc.title, {
-          chunks: [],
-          doc_info: doc
-        })
       }
     }
     
@@ -43,31 +42,19 @@ export async function handleFallbackDocumentRetrieval(
       Array.from(documentContentMap.keys()))
     
     if (documentContentMap.size > 0) {
-      // Create context from document chunks - ensure all documents are represented
       const contextParts = []
       const relevantDocs: ContextSource[] = []
       
       for (const [title, docData] of documentContentMap.entries()) {
         if (docData.chunks.length > 0) {
-          // Sort chunks by index and combine content
           docData.chunks.sort((a, b) => a.chunk_index - b.chunk_index)
-          const maxLength = isDocumentSpecific ? 2000 : 1000
+          const maxLength = isDocumentSpecific ? 1500 : 800
           const combinedContent = docData.chunks.map(c => c.content).join(' ').substring(0, maxLength)
           contextParts.push(`Document: ${title}\nContent: ${combinedContent}`)
           
           relevantDocs.push({
             document_title: title,
             chunk_content: combinedContent,
-            document_id: docData.doc_info.id,
-            document_url: docData.doc_info.url
-          })
-        } else {
-          // Include document even without chunks
-          contextParts.push(`Document: ${title}\nContent: Document processed but content not accessible.`)
-          
-          relevantDocs.push({
-            document_title: title,
-            chunk_content: 'Document processed but content not accessible.',
             document_id: docData.doc_info.id,
             document_url: docData.doc_info.url
           })
