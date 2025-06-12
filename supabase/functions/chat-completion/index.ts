@@ -136,16 +136,18 @@ serve(async (req) => {
     // 9. PREPARE ENHANCED RESPONSE WITH DOCUMENT SOURCES
     // =========================
     
-    // Process document sources for frontend display
-    const enhancedSources = vectorSearchResult.relevantDocs.map(doc => ({
-      title: doc.document_title,
-      content: doc.chunk_content.substring(0, 300) + (doc.chunk_content.length > 300 ? '...' : ''),
-      viewUrl: doc.document_url,
-      downloadUrl: doc.document_url && doc.document_url.includes('drive.google.com') 
-        ? `https://drive.google.com/uc?export=download&id=${extractGoogleDriveFileId(doc.document_url)}`
-        : doc.document_url,
-      isGoogleDrive: doc.document_url?.includes('drive.google.com') || false
-    })).filter((source, index, self) => 
+    // Process document sources for frontend display with enhanced URL processing
+    const enhancedSources = vectorSearchResult.relevantDocs.map(doc => {
+      const processedUrls = processDocumentUrls(doc.document_url || '')
+      
+      return {
+        title: doc.document_title,
+        content: doc.chunk_content.substring(0, 300) + (doc.chunk_content.length > 300 ? '...' : ''),
+        viewUrl: processedUrls.viewUrl,
+        downloadUrl: processedUrls.downloadUrl,
+        isGoogleDrive: processedUrls.isGoogleDrive
+      }
+    }).filter((source, index, self) => 
       // Deduplicate by title
       index === self.findIndex(s => s.title === source.title)
     )
@@ -178,18 +180,108 @@ serve(async (req) => {
   }
 })
 
-// Helper function to extract Google Drive file ID
-function extractGoogleDriveFileId(url: string): string | null {
-  if (!url || !url.includes('drive.google.com')) {
-    return null;
+// Enhanced URL processing function with better Google Drive support
+function processDocumentUrls(url: string): {
+  viewUrl: string;
+  downloadUrl: string;
+  isGoogleDrive: boolean;
+} {
+  if (!url) {
+    return {
+      viewUrl: '',
+      downloadUrl: '',
+      isGoogleDrive: false
+    };
+  }
+
+  const isGoogleDrive = url.includes('drive.google.com') || url.includes('docs.google.com');
+  
+  if (isGoogleDrive) {
+    const fileId = extractGoogleDriveFileId(url);
+    
+    if (fileId) {
+      console.log('Processed Google Drive URL:', { originalUrl: url, fileId });
+      return {
+        viewUrl: `https://drive.google.com/file/d/${fileId}/view`,
+        downloadUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
+        isGoogleDrive: true
+      };
+    } else {
+      console.warn('Could not extract Google Drive file ID from:', url);
+      // Fallback to original URL for both view and download
+      return {
+        viewUrl: url,
+        downloadUrl: url,
+        isGoogleDrive: true
+      };
+    }
   }
   
-  const filePattern = /\/file\/d\/([^/]+)/;
-  const fileMatch = url.match(filePattern);
+  // For non-Google Drive URLs, use the URL as both view and download
+  return {
+    viewUrl: url,
+    downloadUrl: url,
+    isGoogleDrive: false
+  };
+}
+
+// Enhanced Google Drive file ID extraction with better pattern matching
+function extractGoogleDriveFileId(url: string): string | null {
+  if (!url) return null;
   
+  console.log('Extracting file ID from URL:', url);
+  
+  // Remove any trailing parameters that might interfere
+  const cleanUrl = url.split('?')[0].split('#')[0];
+  
+  // Pattern 1: drive.google.com/file/d/FILE_ID/view or /edit
+  const filePattern = /\/file\/d\/([a-zA-Z0-9_-]{25,})/;
+  const fileMatch = cleanUrl.match(filePattern);
   if (fileMatch && fileMatch[1]) {
+    console.log('Extracted file ID using file pattern:', fileMatch[1]);
     return fileMatch[1];
   }
   
+  // Pattern 2: drive.google.com/open?id=FILE_ID
+  const openPattern = /[?&]id=([a-zA-Z0-9_-]{25,})/;
+  const openMatch = url.match(openPattern);
+  if (openMatch && openMatch[1]) {
+    console.log('Extracted file ID using open pattern:', openMatch[1]);
+    return openMatch[1];
+  }
+  
+  // Pattern 3: docs.google.com/document/d/FILE_ID/edit
+  const docsPattern = /\/document\/d\/([a-zA-Z0-9_-]{25,})/;
+  const docsMatch = cleanUrl.match(docsPattern);
+  if (docsMatch && docsMatch[1]) {
+    console.log('Extracted file ID using docs pattern:', docsMatch[1]);
+    return docsMatch[1];
+  }
+  
+  // Pattern 4: docs.google.com/spreadsheets/d/FILE_ID
+  const sheetsPattern = /\/spreadsheets\/d\/([a-zA-Z0-9_-]{25,})/;
+  const sheetsMatch = cleanUrl.match(sheetsPattern);
+  if (sheetsMatch && sheetsMatch[1]) {
+    console.log('Extracted file ID using sheets pattern:', sheetsMatch[1]);
+    return sheetsMatch[1];
+  }
+  
+  // Pattern 5: docs.google.com/presentation/d/FILE_ID
+  const slidesPattern = /\/presentation\/d\/([a-zA-Z0-9_-]{25,})/;
+  const slidesMatch = cleanUrl.match(slidesPattern);
+  if (slidesMatch && slidesMatch[1]) {
+    console.log('Extracted file ID using slides pattern:', slidesMatch[1]);
+    return slidesMatch[1];
+  }
+  
+  // Fallback: Look for any ID-like string in the URL (be more restrictive)
+  const anyIdPattern = /([a-zA-Z0-9_-]{28,})/;
+  const anyMatch = cleanUrl.match(anyIdPattern);
+  if (anyMatch && anyMatch[1]) {
+    console.log('Extracted file ID using fallback pattern:', anyMatch[1]);
+    return anyMatch[1];
+  }
+  
+  console.warn('No file ID pattern matched for URL:', url);
   return null;
 }
