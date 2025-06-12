@@ -130,24 +130,14 @@ export const useChat = (initialSessionId?: string) => {
         fetchSessions(); // Refresh sessions list
       }
 
-      // Process context sources - only include the ones that were actually used
-      if (data.context && Array.isArray(data.context)) {
-        console.log('Processing context sources from backend:', data.context);
-        
-        // Map the backend context to frontend sources format
-        const contextSources: ContextSource[] = data.context.map((contextItem: any) => ({
-          title: contextItem.document_title || contextItem.title,
-          content: contextItem.chunk_content || contextItem.content,
-          viewUrl: contextItem.document_url || contextItem.viewUrl,
-          downloadUrl: contextItem.downloadUrl,
-          isGoogleDrive: contextItem.isGoogleDrive || false
-        }));
-        
-        console.log('Mapped context sources:', contextSources);
-        setSources(contextSources);
+      // Clear existing sources first, then set new ones from the backend response
+      setSources([]);
+      
+      if (data.context && Array.isArray(data.context) && data.context.length > 0) {
+        console.log('Setting sources from backend response:', data.context);
+        setSources(data.context);
       } else {
-        console.log('No context sources in response or invalid format');
-        setSources([]);
+        console.log('No context sources in backend response or empty array');
       }
 
       // Instead of adding to local state, reload messages from DB
@@ -233,6 +223,7 @@ export const useChat = (initialSessionId?: string) => {
       fetchMessages(sessionId);
     } else {
       setMessages([]);
+      setSources([]);
     }
   }, [sessionId, fetchMessages]);
 
