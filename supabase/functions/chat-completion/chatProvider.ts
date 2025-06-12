@@ -1,11 +1,12 @@
 
-import { ChatMessage, ChatConfig } from './types.ts'
+import { ChatMessage, ChatConfig, ContextSource } from './types.ts'
 
 export async function generateChatResponse(
   messages: ChatMessage[],
   question: string,
   contextText: string,
-  config: ChatConfig
+  config: ChatConfig,
+  relevantDocs?: ContextSource[]
 ): Promise<string> {
   // Extract document context from previous messages to maintain context memory
   const previousContext = messages
@@ -31,6 +32,16 @@ export async function generateChatResponse(
     return contextText
   }
   
+  // Create document references section if we have relevant documents with URLs
+  let documentReferences = ''
+  if (relevantDocs && relevantDocs.length > 0) {
+    const docsWithUrls = relevantDocs.filter(doc => doc.document_url)
+    if (docsWithUrls.length > 0) {
+      documentReferences = '\n\n**Sources:**\n' + 
+        docsWithUrls.map(doc => `- [${doc.document_title}](${doc.document_url})`).join('\n')
+    }
+  }
+  
   // Enhanced system message with better context handling
   const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
     `Document Context:\n${contextText}\n\n` +
@@ -41,7 +52,8 @@ export async function generateChatResponse(
     `4. When summarizing, provide comprehensive summaries that cover the main topics, key points, and important details from the document content.\n` +
     `5. Always be helpful and focus on answering the user's specific questions about the document content.\n` +
     `6. If the user asks specific questions about documents, use the provided content to give detailed and accurate answers.\n` +
-    `7. When listing documents, include the specific document names and details provided in the context.`
+    `7. When listing documents, include the specific document names and details provided in the context.\n` +
+    `8. If you reference specific documents in your response, you can mention that sources are available but do not include URLs in your main response - they will be added automatically.`
   
   // Prepare messages array
   const promptMessages: ChatMessage[] = [
@@ -75,7 +87,9 @@ export async function generateChatResponse(
     const openaiData = await openaiResponse.json()
     const assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
     console.log('OpenAI response received with enhanced context')
-    return assistantResponse
+    
+    // Append document references to the response if available
+    return assistantResponse + documentReferences
   } else {
     console.error('Unsupported chat provider:', config.chatProvider)
     throw new Error(`Unsupported chat provider: ${config.chatProvider}. Please configure OpenAI in the admin settings.`)
