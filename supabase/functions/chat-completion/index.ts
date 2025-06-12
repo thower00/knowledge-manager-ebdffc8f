@@ -233,19 +233,46 @@ serve(async (req) => {
       console.log('=== Starting document search ===');
       const searchStartTime = Date.now();
       
-      const { contextText, relevantDocs } = await performVectorSearch(
-        supabase,
-        question,
-        config
-      );
+      let contextText = '';
+      let relevantDocs = [];
       
-      const searchDuration = Date.now() - searchStartTime;
-      console.log('Document search completed:', {
-        searchDuration: `${searchDuration}ms`,
-        contextLength: contextText.length,
-        documentsFound: relevantDocs.length,
-        documentTitles: relevantDocs.map(doc => doc.document_title)
-      });
+      try {
+        console.log('Calling performVectorSearch with config:', {
+          embeddingProvider: config.provider,
+          embeddingModel: config.embeddingModel,
+          similarityThreshold: config.similarityThreshold
+        });
+        
+        const searchResult = await performVectorSearch(
+          supabase,
+          question,
+          config
+        );
+        
+        contextText = searchResult.contextText;
+        relevantDocs = searchResult.relevantDocs;
+        
+        const searchDuration = Date.now() - searchStartTime;
+        console.log('Document search completed successfully:', {
+          searchDuration: `${searchDuration}ms`,
+          contextLength: contextText.length,
+          documentsFound: relevantDocs.length,
+          documentTitles: relevantDocs.map(doc => doc.document_title)
+        });
+        
+      } catch (vectorSearchError) {
+        console.error('=== Vector search failed ===');
+        console.error('Vector search error details:', {
+          message: vectorSearchError.message,
+          stack: vectorSearchError.stack,
+          name: vectorSearchError.name
+        });
+        
+        // Continue without vector search - use empty context
+        console.log('Continuing without document context due to vector search failure');
+        contextText = 'No document context available due to search system issues.';
+        relevantDocs = [];
+      }
 
       console.log('=== Generating AI response ===');
       const responseStartTime = Date.now();
