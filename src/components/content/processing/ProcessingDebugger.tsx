@@ -48,37 +48,55 @@ export function ProcessingDebugger() {
 
       if (docsError) throw docsError;
 
+      console.log(`Found ${docs?.length || 0} documents in database`);
       const documentStatuses: DocumentStatus[] = [];
 
       for (const doc of docs || []) {
+        console.log(`Processing status check for document: ${doc.title} (${doc.id})`);
+        
         // Count chunks
-        const { count: chunksCount } = await supabase
+        const { count: chunksCount, error: chunksError } = await supabase
           .from('document_chunks')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
 
+        if (chunksError) {
+          console.error(`Error counting chunks for ${doc.title}:`, chunksError);
+        }
+
         // Count embeddings
-        const { count: embeddingsCount } = await supabase
+        const { count: embeddingsCount, error: embeddingsError } = await supabase
           .from('document_embeddings')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
 
+        if (embeddingsError) {
+          console.error(`Error counting embeddings for ${doc.title}:`, embeddingsError);
+        }
+
         // Check if chunks have content
-        const { data: sampleChunk } = await supabase
+        const { data: sampleChunk, error: contentError } = await supabase
           .from('document_chunks')
           .select('content')
           .eq('document_id', doc.id)
           .limit(1)
           .maybeSingle();
 
-        documentStatuses.push({
+        if (contentError) {
+          console.error(`Error checking content for ${doc.title}:`, contentError);
+        }
+
+        const docStatus = {
           id: doc.id,
           title: doc.title,
           status: doc.status,
           chunksCount: chunksCount || 0,
           embeddingsCount: embeddingsCount || 0,
           hasContent: !!(sampleChunk?.content && sampleChunk.content.trim().length > 0)
-        });
+        };
+
+        console.log(`Document status for "${doc.title}":`, docStatus);
+        documentStatuses.push(docStatus);
       }
 
       setDocuments(documentStatuses);
@@ -99,7 +117,7 @@ export function ProcessingDebugger() {
   const syncStatuses = async () => {
     setIsSyncing(true);
     try {
-      console.log('Syncing document statuses...');
+      console.log('Starting manual status sync...');
       const result = await syncDocumentStatuses();
       
       toast({
@@ -107,7 +125,9 @@ export function ProcessingDebugger() {
         description: `Updated ${result.updated} out of ${result.total} documents`
       });
       
-      // Refresh the status display
+      console.log(`Sync completed: ${result.updated} documents updated`);
+      
+      // Refresh the status display after sync
       await checkDocumentStatus();
       
     } catch (error) {
@@ -320,6 +340,8 @@ export function ProcessingDebugger() {
               <AlertDescription>
                 Documents marked as "completed" but with 0 chunks/embeddings indicate processing failures.
                 Use "Sync Statuses" to automatically fix status mismatches, or use the reset button to clear their data and reprocess them.
+                <br />
+                <strong>Debug tip:</strong> Check the browser console for detailed sync information.
               </AlertDescription>
             </Alert>
 
