@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatConfig, ContextSource } from './types.ts'
 
 // Document reference utilities (moved here to avoid import issues in edge functions)
@@ -178,6 +177,8 @@ export async function generateChatResponse(
     // Use the new utility functions for better document reference handling
     const documentReferences_processed = processDocumentSources(enhancedSources)
     documentReferences = generateDocumentReferencesMarkdown(documentReferences_processed)
+    
+    console.log('Enhanced document references created:', documentReferences_processed.length)
   }
   
   // Enhanced system message with better context handling

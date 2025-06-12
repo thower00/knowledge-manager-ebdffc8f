@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -122,6 +121,8 @@ export const useChat = (initialSessionId?: string) => {
         throw new Error(error.message || 'Error processing chat request');
       }
 
+      console.log('Chat response received:', data);
+
       // Update session ID if new session was created
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId);
@@ -130,6 +131,7 @@ export const useChat = (initialSessionId?: string) => {
 
       // Enhanced context processing to include document URLs
       if (data.context) {
+        console.log('Processing context sources:', data.context);
         const enhancedSources: ContextSource[] = data.context.map((contextItem: any) => ({
           title: contextItem.title,
           content: contextItem.content,
@@ -138,7 +140,11 @@ export const useChat = (initialSessionId?: string) => {
           downloadUrl: contextItem.downloadUrl,
           isGoogleDrive: contextItem.isGoogleDrive || false
         }));
+        console.log('Enhanced sources set:', enhancedSources);
         setSources(enhancedSources);
+      } else {
+        console.log('No context sources in response');
+        setSources([]);
       }
 
       // Instead of adding to local state, reload messages from DB
