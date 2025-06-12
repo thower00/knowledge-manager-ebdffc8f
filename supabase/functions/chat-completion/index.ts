@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -10,7 +11,7 @@ const loadChatConfig = async (supabaseClient: any) => {
     .from('configurations')
     .select('value')
     .eq('key', 'chat_settings')
-    .single()
+    .maybeSingle()
 
   if (error || !data) {
     console.warn('No chat configuration found, using defaults:', error?.message)
