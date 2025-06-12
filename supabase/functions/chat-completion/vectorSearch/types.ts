@@ -1,12 +1,4 @@
 
-export interface ContextSource {
-  document_title: string;
-  chunk_content: string;
-  similarity?: number;
-  document_id?: string;
-  document_url?: string;
-}
-
 export interface VectorSearchResult {
   contextText: string;
   relevantDocs: ContextSource[];
@@ -23,3 +15,6 @@ export interface DocumentInfo {
   chunksCount: number;
   embeddingsCount: number;
 }
+
+// Import ContextSource from the main types file instead of duplicating it
+export type { ContextSource } from '../types.ts';
