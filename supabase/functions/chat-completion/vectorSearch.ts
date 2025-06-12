@@ -1,4 +1,3 @@
-
 import { ChatConfig } from './config.ts'
 import { ContextSource } from './types.ts'
 import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
@@ -35,18 +34,35 @@ function isExtensiveSummary(question: string): boolean {
          extensiveKeywords.some(keyword => questionLower.includes(keyword))
 }
 
-// Step 2: Enhanced title-based search for summary requests
+// Step 2: Enhanced detection for factual questions requiring specific information
+function isSpecificFactualQuestion(question: string): boolean {
+  const factualIndicators = [
+    // Time-related questions
+    'när', 'vilken tid', 'tidsperiod', 'datum', 'tidpunkt', 'period', 'under',
+    'from', 'to', 'mellan', 'during', 'timeline',
+    // Who/what/where questions
+    'vem', 'vad', 'var', 'hur', 'varför', 'which', 'who', 'what', 'where', 'when', 'how',
+    // Specific detail questions
+    'detaljer', 'specifik', 'exakt', 'details', 'specific', 'exact',
+    // Process/method questions
+    'genomfördes', 'utfördes', 'implemented', 'conducted', 'carried out'
+  ]
+  
+  const questionLower = question.toLowerCase()
+  return factualIndicators.some(indicator => questionLower.includes(indicator))
+}
+
+// Step 3: Enhanced title-based search with better Swedish language support
 function enhancedTitleSearch(question: string, availableDocuments: DocumentInfo[], isSummary: boolean): DocumentInfo[] {
-  console.log('=== Enhanced title search for summary request ===')
+  console.log('=== Enhanced title search with improved matching ===')
   
   const questionLower = question.toLowerCase()
   console.log('Processing question for title matching:', questionLower)
   
-  // Extract potential document identifiers from the question
-  // Remove common words and focus on meaningful terms
+  // Extract potential document identifiers with better Swedish handling
   const cleanedQuestion = questionLower
-    .replace(/\b(summary|summarize|summarise|overview|brief|outline|extensive|detailed|comprehensive|complete|full|thorough|in-depth|lengthy|long|elaborate|sammanfattning|översikt|huvudpunkter|utförlig|detaljerad|omfattande|fullständig|of|the|a|an|give|me|can|you|please|i|want|need)\b/g, '')
-    .replace(/[^\w\sÅÄÖåäö]/g, ' ')
+    .replace(/\b(summary|summarize|summarise|overview|brief|outline|extensive|detailed|comprehensive|complete|full|thorough|in-depth|lengthy|long|elaborate|sammanfattning|översikt|huvudpunkter|utförlig|detaljerad|omfattande|fullständig|under|vilken|tidsperiod|genomfördes|när|datum|tidpunkt|period|av|på|i|för|från|till|med|och|eller|som|det|den|denna|detta|är|var|har|hade|kommer|kan|ska|vill|will|skulle)|of|the|a|an|give|me|can|you|please|i|want|need|from|to|in|on|at|by|with|and|or|that|this|is|was|have|had|will|can|should|want|would)\b/g, '')
+    .replace(/[^\wÅÄÖåäö\s]/g, ' ')
     .trim()
   
   console.log('Cleaned question for matching:', cleanedQuestion)
@@ -61,37 +77,48 @@ function enhancedTitleSearch(question: string, availableDocuments: DocumentInfo[
     console.log(`Checking document: "${doc.title}"`)
     console.log(`Title words:`, titleWords)
     
-    // For summary requests, be more flexible with matching
-    if (isSummary) {
-      // Check if ANY significant word from the question appears in the title
-      const hasWordMatch = questionWords.some(qWord => 
-        titleWords.some(tWord => 
-          tWord.includes(qWord) || qWord.includes(tWord) || 
-          // Check for partial matches (minimum 4 characters)
-          (qWord.length >= 4 && tWord.length >= 4 && 
-           (tWord.substring(0, 4) === qWord.substring(0, 4)))
+    // Enhanced matching logic for better Swedish support
+    let hasWordMatch = false
+    let hasExactMatch = false
+    let hasPartialMatch = false
+    
+    // Check for direct word matches
+    hasWordMatch = questionWords.some(qWord => 
+      titleWords.some(tWord => 
+        tWord.includes(qWord) || qWord.includes(tWord)
+      )
+    )
+    
+    // Check for exact phrase matches
+    hasExactMatch = questionWords.some(qWord => titleLower.includes(qWord))
+    
+    // Check for partial matches with minimum length requirement
+    hasPartialMatch = questionWords.some(qWord => 
+      qWord.length >= 4 && titleWords.some(tWord => 
+        tWord.length >= 4 && (
+          tWord.substring(0, Math.min(4, tWord.length)) === qWord.substring(0, Math.min(4, qWord.length)) ||
+          // Check for Swedish word variations (common endings)
+          (qWord.length > 5 && tWord.length > 5 && 
+           qWord.substring(0, 5) === tWord.substring(0, 5))
         )
       )
-      
-      // Also check for exact phrase matches
-      const hasExactMatch = questionWords.some(qWord => titleLower.includes(qWord))
-      
-      // Check for document name patterns (case-insensitive)
-      const hasDocumentPattern = titleLower.includes(cleanedQuestion) || 
-                                cleanedQuestion.split(' ').some(word => 
-                                  word.length > 3 && titleLower.includes(word)
-                                )
-      
-      const isMatch = hasWordMatch || hasExactMatch || hasDocumentPattern
-      console.log(`Match result for "${doc.title}":`, { hasWordMatch, hasExactMatch, hasDocumentPattern, isMatch })
-      
-      return isMatch
-    } else {
-      // For non-summary requests, use the original matching logic
-      return titleWords.some(word => questionLower.includes(word)) ||
-             questionLower.includes(titleLower) ||
-             titleLower.includes(questionLower.replace(/[^\w\s]/g, ''))
-    }
+    )
+    
+    // Special handling for Swedish compound words and specific terms
+    const hasSwedishMatch = questionWords.some(qWord => {
+      // Handle common Swedish words that might be part of compound words
+      if (qWord === 'staden' && titleLower.includes('stad')) return true
+      if (qWord === 'vägledning' && (titleLower.includes('vägled') || titleLower.includes('guidance'))) return true
+      if (qWord === 'medborgar' && titleLower.includes('medborgare')) return true
+      return false
+    })
+    
+    const isMatch = hasWordMatch || hasExactMatch || hasPartialMatch || hasSwedishMatch
+    console.log(`Match result for "${doc.title}":`, { 
+      hasWordMatch, hasExactMatch, hasPartialMatch, hasSwedishMatch, isMatch 
+    })
+    
+    return isMatch
   })
   
   console.log('Enhanced title search results:', matchingDocs.map(d => d.title))
@@ -108,13 +135,14 @@ export async function performVectorSearch(
   let relevantDocs: ContextSource[] = []
   
   try {
-    console.log('=== Starting vector search ===')
+    console.log('=== Starting enhanced vector search ===')
     console.log('Question:', question)
     
-    // Step 1: Detect if this is a summary request
+    // Step 1: Enhanced request type detection
     const isSummary = isSummaryRequest(question)
     const isExtensive = isExtensiveSummary(question)
-    console.log('Summary request detection:', { isSummary, isExtensive })
+    const isFactualQuestion = isSpecificFactualQuestion(question)
+    console.log('Enhanced request detection:', { isSummary, isExtensive, isFactualQuestion })
     
     // Enhanced query preprocessing to detect document-specific requests
     const isDocumentSpecific = /\b(the document|this document|document|summarize|summary|list.*documents|what.*documents|documents.*access|specific.*document|particular.*document)\b/i.test(question)
@@ -132,20 +160,20 @@ export async function performVectorSearch(
       return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
     }
     
-    // Step 2: Enhanced title-based search for summary requests
+    // Step 2: Enhanced title-based search with improved matching
     const titleBasedResults = enhancedTitleSearch(question, availableDocuments, isSummary)
     
     if (titleBasedResults.length > 0) {
       console.log('Found documents by enhanced title search:', titleBasedResults.map(r => r.title))
       
-      // For summary requests, get more comprehensive content
-      const chunkLimit = isSummary ? (isExtensive ? 8 : 5) : 3
-      console.log(`Using chunk limit of ${chunkLimit} for ${isSummary ? (isExtensive ? 'extensive summary' : 'summary') : 'regular'} request`)
+      // Enhanced chunk retrieval for factual questions
+      const chunkLimit = isFactualQuestion ? 8 : (isSummary ? (isExtensive ? 8 : 5) : 3)
+      console.log(`Using chunk limit of ${chunkLimit} for ${isFactualQuestion ? 'factual' : (isSummary ? (isExtensive ? 'extensive summary' : 'summary') : 'regular')} request`)
       
       const results: ContextSource[] = []
       
       for (const doc of titleBasedResults) {
-        // Get chunks from the matching document
+        // Get more chunks for factual questions to ensure we capture specific details
         const { data: chunks, error } = await supabase
           .from('document_chunks')
           .select('content, chunk_index')
@@ -154,8 +182,9 @@ export async function performVectorSearch(
           .limit(chunkLimit)
         
         if (!error && chunks && chunks.length > 0) {
+          // For factual questions, get more content to ensure we capture details
           const combinedContent = chunks.map(c => c.content).join(' ')
-          const contentLength = isSummary ? (isExtensive ? 2500 : 1800) : 1500
+          const contentLength = isFactualQuestion ? 3000 : (isSummary ? (isExtensive ? 2500 : 1800) : 1500)
           
           results.push({
             document_title: doc.title,
@@ -163,7 +192,7 @@ export async function performVectorSearch(
             document_id: doc.id,
             document_url: doc.url
           })
-          console.log(`Added ${chunks.length} chunks from title-matched document: ${doc.title} (${combinedContent.length} chars)`)
+          console.log(`Added ${chunks.length} chunks from title-matched document: ${doc.title} (${combinedContent.length} chars, truncated to ${contentLength})`)
         }
       }
       
@@ -175,22 +204,23 @@ export async function performVectorSearch(
       return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
     }
     
-    console.log('No enhanced title matches found, proceeding with vector search...')
+    console.log('No enhanced title matches found, proceeding with enhanced vector search...')
     
-    // Continue with enhanced vector search logic
+    // Step 3: Enhanced vector search with factual question awareness
     console.log('Generating embedding for question...')
     
     // Generate embedding for the user's question
     const queryEmbedding = await generateQueryEmbedding(question, config)
 
-    // Step 3: Perform similarity search with summary-aware parameters
+    // Perform similarity search with enhanced parameters for factual questions
     const searchResults = await performSimilaritySearch(
       supabase, 
       queryEmbedding, 
       config, 
       isDocumentSpecific,
-      isSummary,  // Pass summary flag
-      isExtensive  // Pass extensive summary flag
+      isSummary,
+      isExtensive,
+      isFactualQuestion  // Pass factual question flag for enhanced search
     )
     
     if (searchResults.length > 0) {
@@ -206,13 +236,13 @@ export async function performVectorSearch(
       console.log(`Enhanced vector search retrieved content from ${uniqueDocs.length} unique documents:`, uniqueDocs)
       
     } else {
-      // More selective fallback - only if no title match was found
-      console.log('Vector search returned no results, checking if any documents contain relevant content...')
+      // Enhanced fallback for factual questions
+      console.log('Vector search returned no results, trying enhanced content-based search...')
       
-      // Try content-based search as last resort
-      const contentBasedResults = await searchByContent(supabase, question, availableDocuments)
+      // Try enhanced content-based search for factual questions
+      const contentBasedResults = await enhancedContentSearch(supabase, question, availableDocuments, isFactualQuestion)
       if (contentBasedResults.length > 0) {
-        console.log('Found content-based matches:', contentBasedResults.map(r => r.document_title))
+        console.log('Found enhanced content-based matches:', contentBasedResults.map(r => r.document_title))
         relevantDocs = contentBasedResults
         contextText = contentBasedResults
           .map(result => `Document: ${result.document_title}\nContent: ${result.chunk_content}`)
@@ -243,6 +273,70 @@ export async function performVectorSearch(
   }
 }
 
+// Enhanced content search for factual questions
+async function enhancedContentSearch(
+  supabase: any,
+  question: string,
+  availableDocuments: DocumentInfo[],
+  isFactualQuestion: boolean
+): Promise<ContextSource[]> {
+  console.log('=== Enhanced content search for factual questions ===')
+  
+  // Extract keywords with enhanced Swedish support
+  const keywords = question
+    .toLowerCase()
+    .replace(/[^\wÅÄÖåäö\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !['när', 'vad', 'var', 'vem', 'hur', 'varför', 'vilken', 'under', 'what', 'where', 'when', 'how', 'why', 'which', 'the', 'is', 'are', 'was', 'were', 'about', 'document', 'report', 'och', 'eller', 'som', 'det', 'den', 'denna', 'detta', 'för', 'från', 'till', 'med', 'på', 'av'].includes(word))
+  
+  // Add time-related keywords for factual questions
+  if (isFactualQuestion) {
+    const timeKeywords = ['datum', 'tid', 'period', 'år', 'månad', 'vecka', 'dag', 'genomförande', 'start', 'slut', 'mellan', 'från', 'till']
+    keywords.push(...timeKeywords.filter(kw => !keywords.includes(kw)))
+  }
+  
+  if (keywords.length === 0) {
+    console.log('No useful keywords extracted from question')
+    return []
+  }
+  
+  console.log('Enhanced keywords for search:', keywords)
+  
+  const results: ContextSource[] = []
+  
+  for (const doc of availableDocuments) {
+    // Enhanced search for chunks containing the keywords
+    let query = supabase
+      .from('document_chunks')
+      .select('content, chunk_index')
+      .eq('document_id', doc.id)
+    
+    // For factual questions, search for any of the keywords (OR logic)
+    const searchTerms = keywords.join(' | ')
+    query = query.textSearch('content', searchTerms, { type: 'websearch', config: 'swedish' })
+    
+    const chunkLimit = isFactualQuestion ? 5 : 2
+    const { data: chunks, error } = await query
+      .order('chunk_index', { ascending: true })
+      .limit(chunkLimit)
+    
+    if (!error && chunks && chunks.length > 0) {
+      const contentLength = isFactualQuestion ? 2000 : 1200
+      const combinedContent = chunks.map(c => c.content).join(' ').substring(0, contentLength)
+      results.push({
+        document_title: doc.title,
+        chunk_content: combinedContent,
+        document_id: doc.id,
+        document_url: doc.url
+      })
+      console.log(`Found enhanced content match in document: ${doc.title} (${chunks.length} chunks)`)
+    }
+  }
+  
+  return results
+}
+
+// Step 4: Enhanced document retrieval for specific information
 async function searchByDocumentTitle(
   supabase: any, 
   question: string, 
