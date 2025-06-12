@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,46 +35,55 @@ export function ProcessingDebugger() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
   const { toast } = useToast();
 
   const checkDocumentStatus = async (forceFresh = false) => {
     setIsLoading(true);
     try {
-      console.log('Checking document processing status...');
+      console.log('Checking document processing status...', { forceFresh, refreshKey });
       
-      // Create a completely fresh client instance to bypass caching
-      let clientToUse = supabase;
-      if (forceFresh) {
-        console.log('Creating fresh Supabase client to bypass caching...');
-        clientToUse = createClient(
-          'https://sxrinuxxlmytddymjbmr.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
-          {
-            db: {
-              schema: 'public'
+      // Always use a completely fresh client with timestamp to bypass all caching
+      const timestamp = Date.now();
+      const freshClient = createClient(
+        'https://sxrinuxxlmytddymjbmr.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
+        {
+          db: {
+            schema: 'public'
+          },
+          global: {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              'X-Timestamp': timestamp.toString()
             }
           }
-        );
-        // Add a delay to ensure database has committed changes
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      );
+      
+      if (forceFresh) {
+        console.log('Force fresh enabled - waiting 3 seconds for database consistency...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
-      // Get all processed documents with cache-busting query
-      const { data: docs, error: docsError } = await clientToUse
+      // Get all processed documents with aggressive cache busting
+      const { data: docs, error: docsError } = await freshClient
         .from('processed_documents')
         .select('id, title, status')
         .order('created_at', { ascending: false });
 
       if (docsError) throw docsError;
 
-      console.log(`Found ${docs?.length || 0} documents in database`);
+      console.log(`Found ${docs?.length || 0} documents in database at timestamp ${timestamp}`);
       const documentStatuses: DocumentStatus[] = [];
 
       for (const doc of docs || []) {
         console.log(`Processing status check for document: ${doc.title} (${doc.id}) - Current status: ${doc.status}`);
         
-        // Count chunks with fresh client
-        const { count: chunksCount, error: chunksError } = await clientToUse
+        // Count chunks
+        const { count: chunksCount, error: chunksError } = await freshClient
           .from('document_chunks')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
@@ -82,8 +92,8 @@ export function ProcessingDebugger() {
           console.error(`Error counting chunks for ${doc.title}:`, chunksError);
         }
 
-        // Count embeddings with fresh client
-        const { count: embeddingsCount, error: embeddingsError } = await clientToUse
+        // Count embeddings
+        const { count: embeddingsCount, error: embeddingsError } = await freshClient
           .from('document_embeddings')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id);
@@ -92,8 +102,8 @@ export function ProcessingDebugger() {
           console.error(`Error counting embeddings for ${doc.title}:`, embeddingsError);
         }
 
-        // Check if chunks have content with fresh client
-        const { data: sampleChunk, error: contentError } = await clientToUse
+        // Check if chunks have content
+        const { data: sampleChunk, error: contentError } = await freshClient
           .from('document_chunks')
           .select('content')
           .eq('document_id', doc.id)
@@ -145,23 +155,30 @@ export function ProcessingDebugger() {
       
       console.log(`Sync completed: ${result.updated} documents updated`);
       
-      // Wait for database to commit and force multiple fresh refreshes
-      console.log('Waiting for database to commit changes...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Force complete UI refresh with new key
+      console.log('Forcing complete UI refresh...');
+      setRefreshKey(prev => prev + 1);
+      setDocuments([]); // Clear current data
       
-      console.log('Refreshing document status display with completely fresh data...');
+      // Wait longer for database changes to propagate
+      console.log('Waiting 5 seconds for database changes to propagate...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Multiple fresh data fetches with delays
+      console.log('First refresh attempt...');
       await checkDocumentStatus(true);
       
-      // Force additional refreshes with delays to ensure UI updates
       setTimeout(async () => {
-        console.log('Second refresh to ensure UI is up to date...');
+        console.log('Second refresh attempt...');
+        setRefreshKey(prev => prev + 1);
         await checkDocumentStatus(true);
-      }, 2000);
+      }, 3000);
       
       setTimeout(async () => {
-        console.log('Final refresh to guarantee UI shows correct status...');
+        console.log('Final refresh attempt...');
+        setRefreshKey(prev => prev + 1);
         await checkDocumentStatus(true);
-      }, 4000);
+      }, 6000);
       
     } catch (error) {
       console.error('Error syncing document statuses:', error);
@@ -213,6 +230,7 @@ export function ProcessingDebugger() {
       });
 
       // Refresh the status to show empty database
+      setRefreshKey(prev => prev + 1);
       await checkDocumentStatus();
       
     } catch (error) {
@@ -265,6 +283,7 @@ export function ProcessingDebugger() {
       });
 
       // Refresh the status
+      setRefreshKey(prev => prev + 1);
       await checkDocumentStatus();
       
     } catch (error) {
@@ -300,22 +319,22 @@ export function ProcessingDebugger() {
   };
 
   return (
-    <Card>
+    <Card key={refreshKey}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5" />
-          Processing Debugger
+          Processing Debugger {refreshKey > 0 && <span className="text-sm text-muted-foreground">(Refresh: {refreshKey})</span>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2 flex-wrap">
           <Button 
-            onClick={() => checkDocumentStatus()} 
+            onClick={() => checkDocumentStatus(true)} 
             disabled={isLoading || isClearing || isSyncing}
             variant="outline"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Check Status
+            Force Fresh Check
           </Button>
           
           <Button
@@ -374,13 +393,13 @@ export function ProcessingDebugger() {
                 Documents marked as "completed" but with 0 chunks/embeddings indicate processing failures.
                 Use "Sync Statuses" to automatically fix status mismatches, or use the reset button to clear their data and reprocess them.
                 <br />
-                <strong>Debug tip:</strong> Check the browser console for detailed sync information.
+                <strong>Debug tip:</strong> Check the browser console for detailed sync information. Refresh key: {refreshKey}
               </AlertDescription>
             </Alert>
 
             <div className="grid gap-3">
               {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={`${doc.id}-${refreshKey}`} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{doc.title}</span>
