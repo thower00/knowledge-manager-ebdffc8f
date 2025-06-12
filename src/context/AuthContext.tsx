@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "You have been signed out of your account.",
       });
       
-      // Force page reload to clear any cached state
-      window.location.href = '/auth';
+      // Force page reload to clear any cached state and redirect to main page
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
