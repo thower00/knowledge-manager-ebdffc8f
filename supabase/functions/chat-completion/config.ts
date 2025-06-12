@@ -1,4 +1,5 @@
 
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 export interface ChatConfig {
@@ -16,15 +17,28 @@ export interface ChatConfig {
 export async function getChatConfig(supabase: any): Promise<ChatConfig> {
   console.log('Loading chat configuration from database...')
   
-  // Load configuration from database
+  // Load configuration from database - using correct table name 'configurations' (plural)
   const { data: configData, error: configError } = await supabase
-    .from('configuration')
+    .from('configurations')
     .select('*')
     .single()
 
   if (configError) {
     console.error('Error loading configuration:', configError)
-    throw new Error('Failed to load configuration from database')
+    console.log('Falling back to default configuration...')
+    
+    // Return default configuration if database config is not available
+    return {
+      chatProvider: 'openai',
+      chatModel: 'gpt-4o-mini',
+      chatTemperature: '0.7',
+      chatMaxTokens: '2000',
+      chatSystemPrompt: 'You are a helpful assistant.',
+      embeddingProvider: 'openai',
+      embeddingModel: 'text-embedding-3-small',
+      similarityThreshold: '0.7',
+      apiKey: Deno.env.get('OPENAI_API_KEY') || ''
+    }
   }
 
   console.log('Configuration loaded successfully:', {
@@ -43,6 +57,7 @@ export async function getChatConfig(supabase: any): Promise<ChatConfig> {
     embeddingProvider: configData.embedding_provider || 'openai',
     embeddingModel: configData.embedding_model || 'text-embedding-3-small',
     similarityThreshold: configData.similarity_threshold?.toString() || '0.7',
-    apiKey: configData.openai_api_key || ''
+    apiKey: configData.openai_api_key || Deno.env.get('OPENAI_API_KEY') || ''
   }
 }
+
