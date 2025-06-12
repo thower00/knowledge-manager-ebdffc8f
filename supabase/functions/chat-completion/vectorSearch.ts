@@ -1,3 +1,4 @@
+
 import { ChatConfig } from './config.ts'
 import { ContextSource } from './types.ts'
 import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
@@ -176,14 +177,21 @@ export async function performVectorSearch(
     
     console.log('No enhanced title matches found, proceeding with vector search...')
     
-    // Continue with existing vector search logic
+    // Continue with enhanced vector search logic
     console.log('Generating embedding for question...')
     
     // Generate embedding for the user's question
     const queryEmbedding = await generateQueryEmbedding(question, config)
 
-    // Perform similarity search with improved filtering
-    const searchResults = await performSimilaritySearch(supabase, queryEmbedding, config, isDocumentSpecific)
+    // Step 3: Perform similarity search with summary-aware parameters
+    const searchResults = await performSimilaritySearch(
+      supabase, 
+      queryEmbedding, 
+      config, 
+      isDocumentSpecific,
+      isSummary,  // Pass summary flag
+      isExtensive  // Pass extensive summary flag
+    )
     
     if (searchResults.length > 0) {
       relevantDocs = searchResults
@@ -191,11 +199,11 @@ export async function performVectorSearch(
         .map(result => `Document: ${result.document_title}\nContent: ${result.chunk_content}`)
         .join('\n\n')
       
-      console.log('Found relevant content via vector search, total context length:', contextText.length)
+      console.log('Found relevant content via enhanced vector search, total context length:', contextText.length)
       
       // Log unique documents found
       const uniqueDocs = [...new Set(searchResults.map(r => r.document_title))]
-      console.log(`Vector search retrieved content from ${uniqueDocs.length} unique documents:`, uniqueDocs)
+      console.log(`Enhanced vector search retrieved content from ${uniqueDocs.length} unique documents:`, uniqueDocs)
       
     } else {
       // More selective fallback - only if no title match was found
