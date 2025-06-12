@@ -69,7 +69,7 @@ export function ProcessingDebugger() {
           .select('content')
           .eq('document_id', doc.id)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         documentStatuses.push({
           id: doc.id,
@@ -131,7 +131,7 @@ export function ProcessingDebugger() {
       const { error: embeddingsError } = await supabase
         .from('document_embeddings')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .gte('id', '00000000-0000-0000-0000-000000000000');
       
       if (embeddingsError) throw embeddingsError;
       console.log('All embeddings deleted');
@@ -140,7 +140,7 @@ export function ProcessingDebugger() {
       const { error: chunksError } = await supabase
         .from('document_chunks')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .gte('id', '00000000-0000-0000-0000-000000000000');
       
       if (chunksError) throw chunksError;
       console.log('All chunks deleted');
@@ -149,7 +149,7 @@ export function ProcessingDebugger() {
       const { error: docsError } = await supabase
         .from('processed_documents')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .gte('id', '00000000-0000-0000-0000-000000000000');
       
       if (docsError) throw docsError;
       console.log('All processed documents deleted');
@@ -199,7 +199,8 @@ export function ProcessingDebugger() {
         .from('processed_documents')
         .update({ 
           status: 'pending',
-          processed_at: null
+          processed_at: null,
+          error: null
         })
         .eq('id', documentId);
       
@@ -277,7 +278,7 @@ export function ProcessingDebugger() {
             <AlertDialogTrigger asChild>
               <Button 
                 variant="destructive" 
-                disabled={isLoading || isClearing || isSyncing || documents.length === 0}
+                disabled={isLoading || isClearing || isSyncing}
               >
                 <Database className="h-4 w-4 mr-2" />
                 Clear Complete Database

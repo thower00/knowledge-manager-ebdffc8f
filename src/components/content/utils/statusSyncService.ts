@@ -53,13 +53,21 @@ export async function syncDocumentStatuses(): Promise<{ updated: number; total: 
       if (correctStatus !== doc.status) {
         console.log(`Updating document "${doc.title}" status from "${doc.status}" to "${correctStatus}"`);
         
+        const updateData: any = {
+          status: correctStatus,
+        };
+        
+        if (correctStatus === "completed") {
+          updateData.processed_at = new Date().toISOString();
+          updateData.error = null;
+        } else if (correctStatus === "pending") {
+          updateData.processed_at = null;
+          updateData.error = null;
+        }
+        
         const { error: updateError } = await supabase
           .from("processed_documents")
-          .update({
-            status: correctStatus,
-            processed_at: correctStatus === "completed" ? new Date().toISOString() : null,
-            error: null
-          })
+          .update(updateData)
           .eq("id", doc.id);
         
         if (updateError) {
