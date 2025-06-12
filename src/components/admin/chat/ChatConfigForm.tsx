@@ -1,6 +1,6 @@
 
 import React, { useEffect } from "react";
-import { useConfig } from "../document-processing/ConfigContext";
+import { useChatConfig } from "./ChatConfigContext";
 import { ChatModelSelector } from "./ChatModelSelector";
 import { ChatParameters } from "./ChatParameters";
 import { ChatAPIKeyField } from "./ChatAPIKeyField";
@@ -12,7 +12,7 @@ interface ChatConfigFormProps {
 }
 
 export function ChatConfigForm({ isLoading }: ChatConfigFormProps) {
-  const { config, setConfig } = useConfig();
+  const { config, setConfig } = useChatConfig();
   
   // Handle provider and model changes
   const handleProviderChange = (provider: string) => {

@@ -27,10 +27,27 @@ export function useConfigLoader(configKey: string = "document_processing") {
       
       if (data?.value && typeof data.value === 'object' && data.value !== null) {
         console.log(`${configKey} configuration loaded:`, data.value);
-        setConfig(prevConfig => ({
-          ...prevConfig,
-          ...(data.value as Record<string, any>)
-        }));
+        
+        // Only extract document processing specific fields
+        const dbConfig = data.value as any;
+        const docConfig = {
+          apiKey: dbConfig.apiKey || "",
+          provider: dbConfig.provider || DEFAULT_CONFIG.provider,
+          embeddingModel: dbConfig.embeddingModel || DEFAULT_CONFIG.embeddingModel,
+          specificModelId: dbConfig.specificModelId || DEFAULT_CONFIG.specificModelId,
+          chunkSize: dbConfig.chunkSize || DEFAULT_CONFIG.chunkSize,
+          chunkOverlap: dbConfig.chunkOverlap || DEFAULT_CONFIG.chunkOverlap,
+          chunkStrategy: dbConfig.chunkStrategy || DEFAULT_CONFIG.chunkStrategy,
+          storagePath: dbConfig.storagePath || DEFAULT_CONFIG.storagePath,
+          customConfiguration: dbConfig.customConfiguration || DEFAULT_CONFIG.customConfiguration,
+          providerApiKeys: dbConfig.providerApiKeys || {},
+          embeddingBatchSize: dbConfig.embeddingBatchSize || DEFAULT_CONFIG.embeddingBatchSize,
+          similarityThreshold: dbConfig.similarityThreshold || DEFAULT_CONFIG.similarityThreshold,
+          vectorStorage: dbConfig.vectorStorage || DEFAULT_CONFIG.vectorStorage,
+          embeddingMetadata: dbConfig.embeddingMetadata || DEFAULT_CONFIG.embeddingMetadata
+        };
+        
+        setConfig(docConfig);
       } else {
         console.log(`No ${configKey} configuration found in database, using defaults`);
       }
@@ -52,8 +69,26 @@ export function useConfigLoader(configKey: string = "document_processing") {
     try {
       console.log(`Saving ${configKey} configuration to database:`, config);
       
-      // Convert ConfigSettings to Json-compatible format
-      const configAsJson: Json = JSON.parse(JSON.stringify(config));
+      // Only save document processing specific fields
+      const docConfigToSave = {
+        apiKey: config.apiKey,
+        provider: config.provider,
+        embeddingModel: config.embeddingModel,
+        specificModelId: config.specificModelId,
+        chunkSize: config.chunkSize,
+        chunkOverlap: config.chunkOverlap,
+        chunkStrategy: config.chunkStrategy,
+        storagePath: config.storagePath,
+        customConfiguration: config.customConfiguration,
+        providerApiKeys: config.providerApiKeys,
+        embeddingBatchSize: config.embeddingBatchSize,
+        similarityThreshold: config.similarityThreshold,
+        vectorStorage: config.vectorStorage,
+        embeddingMetadata: config.embeddingMetadata
+      };
+      
+      // Convert to Json-compatible format
+      const configAsJson: Json = JSON.parse(JSON.stringify(docConfigToSave));
       
       // First check if the configuration already exists
       const { data: existingConfig } = await supabase

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CHAT_PROVIDERS } from "../document-processing/utils/chatProviders";
-import { useConfig } from "../document-processing/ConfigContext";
+import { useChatConfig } from "./ChatConfigContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ interface ChatAPIKeyFieldProps {
 }
 
 export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
-  const { config, setConfig } = useConfig();
+  const { config, setConfig } = useChatConfig();
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);

@@ -2,8 +2,8 @@
 import React, { createContext, useContext, useState } from "react";
 import { Json } from "@/integrations/supabase/types";
 
-// Define the ConfigSettings interface with an index signature to make it compatible with Json type
-export interface ConfigSettings {
+// Document processing specific configuration interface
+export interface DocumentProcessingConfigSettings {
   apiKey: string;
   provider: string;
   embeddingModel: string;
@@ -16,7 +16,7 @@ export interface ConfigSettings {
   providerApiKeys: {
     [provider: string]: string;
   };
-  // New embedding-specific configurations
+  // Embedding-specific configurations
   embeddingBatchSize: string;
   similarityThreshold: string;
   vectorStorage: "supabase" | "pinecone" | "weaviate" | "local";
@@ -26,29 +26,20 @@ export interface ConfigSettings {
     includeModelInfo: boolean;
     includeChunkIndex: boolean;
   };
-  // New chat-specific configurations
-  chatProvider: string;
-  chatModel: string;
-  chatTemperature: string;
-  chatMaxTokens: string;
-  chatSystemPrompt: string;
-  chatProviderApiKeys: {
-    [provider: string]: string;
-  };
   [key: string]: string | object; // Add index signature to make it compatible with { [key: string]: Json }
 }
 
 interface ConfigContextType {
-  config: ConfigSettings;
-  setConfig: React.Dispatch<React.SetStateAction<ConfigSettings>>;
+  config: DocumentProcessingConfigSettings;
+  setConfig: React.Dispatch<React.SetStateAction<DocumentProcessingConfigSettings>>;
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   isSaving: boolean;
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-// Default configuration settings with improved defaults
-export const DEFAULT_CONFIG: ConfigSettings = {
+// Default configuration settings for document processing only
+export const DEFAULT_CONFIG: DocumentProcessingConfigSettings = {
   apiKey: "",
   provider: "openai",
   embeddingModel: "openai",
@@ -68,14 +59,7 @@ export const DEFAULT_CONFIG: ConfigSettings = {
     includeTimestamp: true,
     includeModelInfo: true,
     includeChunkIndex: true
-  },
-  // Chat defaults
-  chatProvider: "openai",
-  chatModel: "gpt-4o-mini",
-  chatTemperature: "0.7",
-  chatMaxTokens: "2000",
-  chatSystemPrompt: "You are a helpful assistant answering questions based on the provided context. Always use the document content when available and provide comprehensive, detailed responses.",
-  chatProviderApiKeys: {}
+  }
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
@@ -83,7 +67,7 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 export const ConfigProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const [config, setConfig] = useState<ConfigSettings>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<DocumentProcessingConfigSettings>(DEFAULT_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 

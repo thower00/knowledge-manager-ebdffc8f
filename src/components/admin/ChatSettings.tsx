@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { ConfigProvider } from "./document-processing/ConfigContext";
+import { ChatConfigProvider } from "./chat/ChatConfigContext";
 import { ChatConfigForm } from "./chat/ChatConfigForm";
-import { useConfigLoader } from "@/components/admin/document-processing/useConfigLoader";
+import { useChatConfigLoader } from "./chat/useChatConfigLoader";
 import { ConfigActions } from "./document-processing/ConfigActions";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle } from "lucide-react";
@@ -11,15 +11,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function ChatSettings({ activeTab }: { activeTab: string }) {
   return (
-    <ConfigProvider>
+    <ChatConfigProvider>
       <ChatSettingsContent activeTab={activeTab} />
-    </ConfigProvider>
+    </ChatConfigProvider>
   );
 }
 
 function ChatSettingsContent({ activeTab }: { activeTab: string }) {
   const [isError, setIsError] = useState(false);
-  const { loadConfig, saveConfig, isLoading, isSaving, error } = useConfigLoader("chat_settings");
+  const { loadConfig, saveConfig, isLoading, isSaving, error } = useChatConfigLoader();
 
   // Load the configuration when the tab is active
   useEffect(() => {
