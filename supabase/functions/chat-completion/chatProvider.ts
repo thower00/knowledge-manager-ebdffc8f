@@ -1,5 +1,6 @@
 
 import { ChatMessage, ChatConfig, ContextSource } from './types.ts'
+import { processDocumentSources, generateDocumentReferencesMarkdown, type EnhancedContextSource } from '../../../src/utils/documentReferenceUtils.ts'
 
 export async function generateChatResponse(
   messages: ChatMessage[],
@@ -32,23 +33,21 @@ export async function generateChatResponse(
     return contextText
   }
   
-  // Create document references section if we have relevant documents with URLs
+  // Create enhanced document references using the new utilities
   let documentReferences = ''
   if (relevantDocs && relevantDocs.length > 0) {
-    // Deduplicate documents by title and URL
-    const uniqueDocs = relevantDocs.reduce((acc, doc) => {
-      const key = `${doc.document_title}|${doc.document_url || 'no-url'}`
-      if (!acc.has(key)) {
-        acc.set(key, doc)
-      }
-      return acc
-    }, new Map())
+    // Convert ContextSource to EnhancedContextSource format
+    const enhancedSources: EnhancedContextSource[] = relevantDocs.map(doc => ({
+      document_title: doc.document_title,
+      chunk_content: doc.chunk_content,
+      similarity: doc.similarity,
+      document_url: doc.document_url,
+      document_id: doc.document_id
+    }))
     
-    const docsWithUrls = Array.from(uniqueDocs.values()).filter(doc => doc.document_url)
-    if (docsWithUrls.length > 0) {
-      documentReferences = '\n\n**Sources:**\n' + 
-        docsWithUrls.map(doc => `- [${doc.document_title}](${doc.document_url})`).join('\n')
-    }
+    // Use the new utility functions for better document reference handling
+    const documentReferences_processed = processDocumentSources(enhancedSources)
+    documentReferences = generateDocumentReferencesMarkdown(documentReferences_processed)
   }
   
   // Enhanced system message with better context handling
@@ -97,7 +96,7 @@ export async function generateChatResponse(
     const assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
     console.log('OpenAI response received with enhanced context')
     
-    // Append document references to the response if available
+    // Append enhanced document references to the response if available
     return assistantResponse + documentReferences
   } else {
     console.error('Unsupported chat provider:', config.chatProvider)
