@@ -44,7 +44,7 @@ export async function enhancedSyncDocumentStatuses(): Promise<SyncResult> {
     
     console.log(`Batch sync function returned ${syncResults.length} results`);
     
-    // Process the results
+    // Process the results and identify documents that need status updates
     const details = syncResults.map(result => ({
       documentId: result.document_id,
       title: result.title,
@@ -55,26 +55,64 @@ export async function enhancedSyncDocumentStatuses(): Promise<SyncResult> {
       updated: result.updated
     }));
     
+    // Count how many documents were actually updated by the database function
     const updatedCount = details.filter(d => d.updated).length;
     const errors: string[] = [];
     
     // Log detailed results
     console.log("=== SYNC RESULTS SUMMARY ===");
     console.log(`Total documents processed: ${details.length}`);
-    console.log(`Documents updated: ${updatedCount}`);
+    console.log(`Documents updated by database function: ${updatedCount}`);
+    
+    // Check for documents that should be updated but weren't
+    const shouldBeUpdated = details.filter(d => 
+      d.oldStatus !== d.newStatus && !d.updated
+    );
+    
+    if (shouldBeUpdated.length > 0) {
+      console.warn(`Found ${shouldBeUpdated.length} documents that should be updated but weren't:`);
+      for (const doc of shouldBeUpdated) {
+        console.warn(`- "${doc.title}": ${doc.oldStatus} → ${doc.newStatus} (chunks: ${doc.chunksCount}, embeddings: ${doc.embeddingsCount})`);
+        
+        // Try to force update these documents individually
+        try {
+          console.log(`Attempting individual sync for document: ${doc.title}`);
+          const success = await syncSingleDocumentStatus(doc.documentId, doc.newStatus as any);
+          if (success) {
+            console.log(`✓ Successfully force-updated "${doc.title}" to ${doc.newStatus}`);
+            // Mark as updated in our results
+            const detailIndex = details.findIndex(d => d.documentId === doc.documentId);
+            if (detailIndex >= 0) {
+              details[detailIndex].updated = true;
+            }
+          } else {
+            console.error(`✗ Failed to force-update "${doc.title}"`);
+            errors.push(`Failed to update "${doc.title}" from ${doc.oldStatus} to ${doc.newStatus}`);
+          }
+        } catch (error) {
+          console.error(`Error force-updating "${doc.title}":`, error);
+          errors.push(`Error updating "${doc.title}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+    
+    // Recalculate updated count after force updates
+    const finalUpdatedCount = details.filter(d => d.updated).length;
     
     details.forEach(detail => {
       if (detail.updated) {
         console.log(`✓ Updated "${detail.title}": ${detail.oldStatus} → ${detail.newStatus} (chunks: ${detail.chunksCount}, embeddings: ${detail.embeddingsCount})`);
+      } else if (detail.oldStatus === detail.newStatus) {
+        console.log(`- No change needed for "${detail.title}": ${detail.newStatus} (chunks: ${detail.chunksCount}, embeddings: ${detail.embeddingsCount})`);
       } else {
-        console.log(`- No change for "${detail.title}": ${detail.newStatus} (chunks: ${detail.chunksCount}, embeddings: ${detail.embeddingsCount})`);
+        console.log(`✗ Failed to update "${detail.title}": ${detail.oldStatus} → ${detail.newStatus} (chunks: ${detail.chunksCount}, embeddings: ${detail.embeddingsCount})`);
       }
     });
     
     console.log("=== ENHANCED SYNC COMPLETED ===");
     
     return {
-      updated: updatedCount,
+      updated: finalUpdatedCount,
       total: details.length,
       details,
       errors
