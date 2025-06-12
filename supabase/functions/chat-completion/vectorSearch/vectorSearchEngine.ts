@@ -14,7 +14,8 @@ export async function performSimilaritySearch(
   
   if (isFactualQuestion) {
     // More aggressive thresholds for factual questions to capture more potential matches
-    baseThresholds = isDocumentSpecific ? [0.05, 0.15, 0.25, 0.35, 0.45] : [0.1, 0.2, 0.3, 0.4, 0.5]
+    // Lower thresholds to ensure we don't miss relevant content
+    baseThresholds = isDocumentSpecific ? [0.03, 0.1, 0.2, 0.3, 0.4] : [0.05, 0.15, 0.25, 0.35, 0.45]
   } else if (isSummaryRequest) {
     // Relaxed thresholds for summary requests
     baseThresholds = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -33,7 +34,7 @@ export async function performSimilaritySearch(
     // Enhanced match count for different question types
     let matchCount
     if (isFactualQuestion) {
-      matchCount = 40  // Significantly increased for factual questions to ensure complete coverage
+      matchCount = 50  // Significantly increased for factual questions to ensure complete coverage
     } else if (isSummaryRequest) {
       matchCount = isExtensiveSummary ? 30 : 25
     } else {
@@ -110,10 +111,10 @@ export async function performSimilaritySearch(
 }
 
 /**
- * Enhanced processing for factual questions - prioritizes document coverage and time-related content
+ * Enhanced processing for factual questions - prioritizes document coverage and comprehensive time-related content
  */
 function processFactualQuestionResults(results: any[]): any[] {
-  console.log('Processing results for factual question request with enhanced document coverage...')
+  console.log('Processing results for factual question request with enhanced comprehensive document coverage...')
   
   // Group results by document to ensure comprehensive coverage
   const resultsByDocument = new Map()
@@ -130,8 +131,8 @@ function processFactualQuestionResults(results: any[]): any[] {
   
   // For factual questions, prioritize getting comprehensive coverage from relevant documents
   const diverseResults = []
-  const chunksPerDocument = 15  // Significantly increased for better document coverage
-  const totalChunksLimit = 35   // Increased total limit
+  const chunksPerDocument = 18  // Increased significantly for better document coverage
+  const totalChunksLimit = 45   // Increased total limit for comprehensive coverage
   
   // Sort documents by relevance and ensure we get chunks from different parts of each document
   const documentsByRelevance = Array.from(resultsByDocument.entries())
@@ -143,7 +144,7 @@ function processFactualQuestionResults(results: any[]): any[] {
     }))
     .sort((a, b) => b.maxSimilarity - a.maxSimilarity)
   
-  // Enhanced chunk selection to ensure document coverage
+  // Enhanced chunk selection to ensure comprehensive document coverage
   for (const { docTitle, docResults } of documentsByRelevance) {
     if (diverseResults.length >= totalChunksLimit) break
     
@@ -153,11 +154,11 @@ function processFactualQuestionResults(results: any[]): any[] {
       totalChunksLimit - diverseResults.length
     )
     
-    // For factual questions, try to get chunks from different parts of the document
-    const selectedChunks = selectDistributedChunks(docResults, chunksToTake)
+    // For factual questions, try to get chunks from different parts of the document with time priority
+    const selectedChunks = selectDistributedChunksForFactual(docResults, chunksToTake)
     
     diverseResults.push(...selectedChunks)
-    console.log(`Added ${selectedChunks.length} distributed chunks from document: ${docTitle} (max similarity: ${docResults[0].similarity})`)
+    console.log(`Added ${selectedChunks.length} comprehensively distributed chunks from document: ${docTitle} (max similarity: ${docResults[0].similarity})`)
   }
   
   return diverseResults
@@ -166,9 +167,10 @@ function processFactualQuestionResults(results: any[]): any[] {
 }
 
 /**
- * Helper function to select chunks distributed across a document for better coverage
+ * Helper function to select chunks distributed across a document for comprehensive factual coverage
+ * Prioritizes later chunks where completion information might be found
  */
-function selectDistributedChunks(chunks: any[], count: number): any[] {
+function selectDistributedChunksForFactual(chunks: any[], count: number): any[] {
   if (chunks.length <= count) {
     return chunks
   }
@@ -181,23 +183,32 @@ function selectDistributedChunks(chunks: any[], count: number): any[] {
     return b.similarity - a.similarity // Fallback to similarity
   })
   
-  // Take chunks from beginning, middle, and end for better coverage
+  // For factual questions, prioritize later chunks where completion dates might be
   const selected = []
-  const step = Math.max(1, Math.floor(sortedChunks.length / count))
+  const totalChunks = sortedChunks.length
   
-  for (let i = 0; i < count && i * step < sortedChunks.length; i++) {
-    selected.push(sortedChunks[i * step])
+  // Take more chunks from the end (where project completion info typically resides)
+  const endCount = Math.ceil(count * 0.5) // 50% from end for factual questions
+  const middleCount = Math.ceil(count * 0.3) // 30% from middle
+  const beginCount = count - endCount - middleCount // Rest from beginning
+  
+  // Beginning chunks (project start)
+  for (let i = 0; i < beginCount && i < totalChunks; i++) {
+    selected.push(sortedChunks[i])
   }
   
-  // Fill remaining slots with highest similarity chunks
-  const remaining = count - selected.length
-  if (remaining > 0) {
-    const highestSimilarity = chunks
-      .filter(chunk => !selected.includes(chunk))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, remaining)
-    
-    selected.push(...highestSimilarity)
+  // Middle chunks (project development)
+  const middleStart = Math.floor(totalChunks * 0.3)
+  for (let i = 0; i < middleCount && (middleStart + i) < totalChunks; i++) {
+    selected.push(sortedChunks[middleStart + i])
+  }
+  
+  // End chunks (project completion - prioritized)
+  const endStart = Math.max(0, totalChunks - endCount)
+  for (let i = endStart; i < totalChunks && selected.length < count; i++) {
+    if (!selected.find(chunk => chunk.chunk_index === sortedChunks[i].chunk_index)) {
+      selected.push(sortedChunks[i])
+    }
   }
   
   return selected
