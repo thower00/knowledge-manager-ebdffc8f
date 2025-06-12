@@ -1,4 +1,3 @@
-
 import { ChatConfig } from './config.ts'
 import { ContextSource } from './types.ts'
 import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
@@ -35,6 +34,69 @@ function isExtensiveSummary(question: string): boolean {
          extensiveKeywords.some(keyword => questionLower.includes(keyword))
 }
 
+// Step 2: Enhanced title-based search for summary requests
+function enhancedTitleSearch(question: string, availableDocuments: DocumentInfo[], isSummary: boolean): DocumentInfo[] {
+  console.log('=== Enhanced title search for summary request ===')
+  
+  const questionLower = question.toLowerCase()
+  console.log('Processing question for title matching:', questionLower)
+  
+  // Extract potential document identifiers from the question
+  // Remove common words and focus on meaningful terms
+  const cleanedQuestion = questionLower
+    .replace(/\b(summary|summarize|summarise|overview|brief|outline|extensive|detailed|comprehensive|complete|full|thorough|in-depth|lengthy|long|elaborate|sammanfattning|översikt|huvudpunkter|utförlig|detaljerad|omfattande|fullständig|of|the|a|an|give|me|can|you|please|i|want|need)\b/g, '')
+    .replace(/[^\w\sÅÄÖåäö]/g, ' ')
+    .trim()
+  
+  console.log('Cleaned question for matching:', cleanedQuestion)
+  
+  const questionWords = cleanedQuestion.split(/\s+/).filter(word => word.length > 2)
+  console.log('Question words for matching:', questionWords)
+  
+  const matchingDocs = availableDocuments.filter(doc => {
+    const titleLower = doc.title.toLowerCase()
+    const titleWords = titleLower.split(/[\s\-_\.]+/).filter(word => word.length > 2)
+    
+    console.log(`Checking document: "${doc.title}"`)
+    console.log(`Title words:`, titleWords)
+    
+    // For summary requests, be more flexible with matching
+    if (isSummary) {
+      // Check if ANY significant word from the question appears in the title
+      const hasWordMatch = questionWords.some(qWord => 
+        titleWords.some(tWord => 
+          tWord.includes(qWord) || qWord.includes(tWord) || 
+          // Check for partial matches (minimum 4 characters)
+          (qWord.length >= 4 && tWord.length >= 4 && 
+           (tWord.substring(0, 4) === qWord.substring(0, 4)))
+        )
+      )
+      
+      // Also check for exact phrase matches
+      const hasExactMatch = questionWords.some(qWord => titleLower.includes(qWord))
+      
+      // Check for document name patterns (case-insensitive)
+      const hasDocumentPattern = titleLower.includes(cleanedQuestion) || 
+                                cleanedQuestion.split(' ').some(word => 
+                                  word.length > 3 && titleLower.includes(word)
+                                )
+      
+      const isMatch = hasWordMatch || hasExactMatch || hasDocumentPattern
+      console.log(`Match result for "${doc.title}":`, { hasWordMatch, hasExactMatch, hasDocumentPattern, isMatch })
+      
+      return isMatch
+    } else {
+      // For non-summary requests, use the original matching logic
+      return titleWords.some(word => questionLower.includes(word)) ||
+             questionLower.includes(titleLower) ||
+             titleLower.includes(questionLower.replace(/[^\w\s]/g, ''))
+    }
+  })
+  
+  console.log('Enhanced title search results:', matchingDocs.map(d => d.title))
+  return matchingDocs
+}
+
 export async function performVectorSearch(
   supabase: any,
   question: string,
@@ -69,18 +131,52 @@ export async function performVectorSearch(
       return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
     }
     
-    // Try to find documents by title/filename match first
-    const titleBasedResults = await searchByDocumentTitle(supabase, question, availableDocuments)
+    // Step 2: Enhanced title-based search for summary requests
+    const titleBasedResults = enhancedTitleSearch(question, availableDocuments, isSummary)
+    
     if (titleBasedResults.length > 0) {
-      console.log('Found documents by title match:', titleBasedResults.map(r => r.document_title))
-      relevantDocs = titleBasedResults
-      contextText = titleBasedResults
+      console.log('Found documents by enhanced title search:', titleBasedResults.map(r => r.title))
+      
+      // For summary requests, get more comprehensive content
+      const chunkLimit = isSummary ? (isExtensive ? 8 : 5) : 3
+      console.log(`Using chunk limit of ${chunkLimit} for ${isSummary ? (isExtensive ? 'extensive summary' : 'summary') : 'regular'} request`)
+      
+      const results: ContextSource[] = []
+      
+      for (const doc of titleBasedResults) {
+        // Get chunks from the matching document
+        const { data: chunks, error } = await supabase
+          .from('document_chunks')
+          .select('content, chunk_index')
+          .eq('document_id', doc.id)
+          .order('chunk_index', { ascending: true })
+          .limit(chunkLimit)
+        
+        if (!error && chunks && chunks.length > 0) {
+          const combinedContent = chunks.map(c => c.content).join(' ')
+          const contentLength = isSummary ? (isExtensive ? 2500 : 1800) : 1500
+          
+          results.push({
+            document_title: doc.title,
+            chunk_content: combinedContent.substring(0, contentLength),
+            document_id: doc.id,
+            document_url: doc.url
+          })
+          console.log(`Added ${chunks.length} chunks from title-matched document: ${doc.title} (${combinedContent.length} chars)`)
+        }
+      }
+      
+      relevantDocs = results
+      contextText = results
         .map(result => `Document: ${result.document_title}\nContent: ${result.chunk_content}`)
         .join('\n\n')
       
       return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
     }
     
+    console.log('No enhanced title matches found, proceeding with vector search...')
+    
+    // Continue with existing vector search logic
     console.log('Generating embedding for question...')
     
     // Generate embedding for the user's question
