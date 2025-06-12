@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -129,21 +130,23 @@ export const useChat = (initialSessionId?: string) => {
         fetchSessions(); // Refresh sessions list
       }
 
-      // Enhanced context processing to include document URLs
-      if (data.context) {
-        console.log('Processing context sources:', data.context);
-        const enhancedSources: ContextSource[] = data.context.map((contextItem: any) => ({
-          title: contextItem.title,
-          content: contextItem.content,
-          // These will be populated by the backend when available
-          viewUrl: contextItem.viewUrl,
+      // Process context sources - only include the ones that were actually used
+      if (data.context && Array.isArray(data.context)) {
+        console.log('Processing context sources from backend:', data.context);
+        
+        // Map the backend context to frontend sources format
+        const contextSources: ContextSource[] = data.context.map((contextItem: any) => ({
+          title: contextItem.document_title || contextItem.title,
+          content: contextItem.chunk_content || contextItem.content,
+          viewUrl: contextItem.document_url || contextItem.viewUrl,
           downloadUrl: contextItem.downloadUrl,
           isGoogleDrive: contextItem.isGoogleDrive || false
         }));
-        console.log('Enhanced sources set:', enhancedSources);
-        setSources(enhancedSources);
+        
+        console.log('Mapped context sources:', contextSources);
+        setSources(contextSources);
       } else {
-        console.log('No context sources in response');
+        console.log('No context sources in response or invalid format');
         setSources([]);
       }
 
