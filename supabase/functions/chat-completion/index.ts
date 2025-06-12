@@ -194,11 +194,10 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase environment variables')
-      throw new Error('Missing Supabase URL or keys')
+      throw new Error('Missing Supabase URL or service key')
     }
 
     // Create service role client for reading configurations (system data)
@@ -208,14 +207,7 @@ serve(async (req) => {
       }
     })
 
-    // Create anon client for user operations
-    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false
-      }
-    })
-
-    // Authenticate the user with the anon client
+    // Authenticate the user with the user's JWT token
     console.log('=== Authenticating user ===')
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -227,9 +219,22 @@ serve(async (req) => {
     }
 
     const jwt = authHeader.split(' ')[1]
-    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser(jwt)
+    
+    // Create authenticated client for user operations
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      auth: {
+        persistSession: false
+      },
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    })
 
-    if (userError) {
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(jwt)
+
+    if (userError || !user) {
       console.error('Authentication error:', userError)
       return new Response(JSON.stringify({ error: 'Authentication failed' }), {
         status: 401,
@@ -286,16 +291,16 @@ serve(async (req) => {
 
       console.log('=== Managing chat session ===')
 
-      // Get or create chat session using authenticated user client
+      // Get or create chat session using authenticated client
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         console.log('Creating new chat session for user:', user.id)
         
-        // Use the authenticated anon client with proper user context
-        const { data: newSession, error: sessionError } = await supabaseAnon
+        // Use the authenticated client for creating user sessions
+        const { data: newSession, error: sessionError } = await supabaseAuth
           .from('chat_sessions')
           .insert({
-            user_id: user.id,  // Explicitly set the user_id
+            user_id: user.id,
             title: question.slice(0, 50) + (question.length > 50 ? '...' : '')
           })
           .select()
@@ -320,7 +325,7 @@ serve(async (req) => {
       console.log('=== Loading conversation history ===')
       
       // Load recent conversation context (last 10 messages) using authenticated client
-      const { data: recentMessages, error: messagesError } = await supabaseAnon
+      const { data: recentMessages, error: messagesError } = await supabaseAuth
         .from('chat_messages')
         .select('role, content')
         .eq('session_id', currentSessionId)
@@ -401,7 +406,7 @@ serve(async (req) => {
 
       console.log('=== Storing messages ===');
       // Use authenticated client for storing user messages
-      await storeMessages(supabaseAnon, currentSessionId, [
+      await storeMessages(supabaseAuth, currentSessionId, [
         { role: 'user', content: question },
         { role: 'assistant', content: aiResponse }
       ], relevantDocs);
