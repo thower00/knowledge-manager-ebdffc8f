@@ -237,7 +237,7 @@ serve(async (req) => {
       })
     }
 
-    console.log('User authenticated:', user.id)
+    console.log('User authenticated successfully:', user.id)
 
     // Parse the request body
     console.log('=== Parsing request body ===')
@@ -263,7 +263,8 @@ serve(async (req) => {
     console.log('Request parsed successfully:', {
       questionLength: question.length,
       messageCount: messages.length,
-      sessionId
+      sessionId,
+      userId: user.id
     })
 
     try {
@@ -288,11 +289,13 @@ serve(async (req) => {
       // Get or create chat session using authenticated user client
       let currentSessionId = sessionId;
       if (!currentSessionId) {
-        console.log('Creating new chat session...')
+        console.log('Creating new chat session for user:', user.id)
+        
+        // Use the authenticated anon client with proper user context
         const { data: newSession, error: sessionError } = await supabaseAnon
           .from('chat_sessions')
           .insert({
-            user_id: user.id,
+            user_id: user.id,  // Explicitly set the user_id
             title: question.slice(0, 50) + (question.length > 50 ? '...' : '')
           })
           .select()
@@ -300,10 +303,16 @@ serve(async (req) => {
 
         if (sessionError) {
           console.error('Session creation failed:', sessionError)
+          console.error('Session creation error details:', {
+            code: sessionError.code,
+            message: sessionError.message,
+            details: sessionError.details,
+            userId: user.id
+          })
           throw sessionError;
         }
         currentSessionId = newSession.id;
-        console.log('New session created:', currentSessionId);
+        console.log('New session created successfully:', currentSessionId);
       } else {
         console.log('Using existing session:', currentSessionId);
       }
