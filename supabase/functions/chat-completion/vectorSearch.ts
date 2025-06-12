@@ -1,3 +1,4 @@
+
 import { ChatConfig } from './config.ts'
 import { ContextSource } from './types.ts'
 import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
@@ -41,7 +42,7 @@ function isSpecificFactualQuestion(question: string): boolean {
     'när', 'vilken tid', 'tidsperiod', 'datum', 'tidpunkt', 'period', 'under',
     'from', 'to', 'mellan', 'during', 'timeline',
     // Who/what/where questions
-    'vem', 'vad', 'var', 'hur', 'varför', 'which', 'who', 'what', 'where', 'when', 'how',
+    'vem', 'vad', 'var', 'hur', 'varför', 'vilken', 'which', 'who', 'what', 'where', 'when', 'how',
     // Specific detail questions
     'detaljer', 'specifik', 'exakt', 'details', 'specific', 'exact',
     // Process/method questions
@@ -60,8 +61,22 @@ function enhancedTitleSearch(question: string, availableDocuments: DocumentInfo[
   console.log('Processing question for title matching:', questionLower)
   
   // Extract potential document identifiers with better Swedish handling
+  const stopWords = [
+    'summary', 'summarize', 'summarise', 'overview', 'brief', 'outline', 'extensive', 'detailed', 
+    'comprehensive', 'complete', 'full', 'thorough', 'in-depth', 'lengthy', 'long', 'elaborate',
+    'sammanfattning', 'översikt', 'huvudpunkter', 'utförlig', 'detaljerad', 'omfattande', 
+    'fullständig', 'under', 'vilken', 'tidsperiod', 'genomfördes', 'när', 'datum', 'tidpunkt', 
+    'period', 'av', 'på', 'i', 'för', 'från', 'till', 'med', 'och', 'eller', 'som', 'det', 
+    'den', 'denna', 'detta', 'är', 'var', 'har', 'hade', 'kommer', 'kan', 'ska', 'vill', 
+    'will', 'skulle', 'of', 'the', 'a', 'an', 'give', 'me', 'can', 'you', 'please', 'i', 
+    'want', 'need', 'from', 'to', 'in', 'on', 'at', 'by', 'with', 'and', 'or', 'that', 
+    'this', 'is', 'was', 'have', 'had', 'will', 'can', 'should', 'want', 'would'
+  ]
+  
   const cleanedQuestion = questionLower
-    .replace(/\b(summary|summarize|summarise|overview|brief|outline|extensive|detailed|comprehensive|complete|full|thorough|in-depth|lengthy|long|elaborate|sammanfattning|översikt|huvudpunkter|utförlig|detaljerad|omfattande|fullständig|under|vilken|tidsperiod|genomfördes|när|datum|tidpunkt|period|av|på|i|för|från|till|med|och|eller|som|det|den|denna|detta|är|var|har|hade|kommer|kan|ska|vill|will|skulle)|of|the|a|an|give|me|can|you|please|i|want|need|from|to|in|on|at|by|with|and|or|that|this|is|was|have|had|will|can|should|want|would)\b/g, '')
+    .split(/\s+/)
+    .filter(word => !stopWords.includes(word) && word.length > 2)
+    .join(' ')
     .replace(/[^\wÅÄÖåäö\s]/g, ' ')
     .trim()
   
