@@ -4,14 +4,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { useConfig } from "../document-processing/ConfigContext";
+import { useChatConfig } from "./ChatConfigContext";
 
 interface ChatParametersProps {
   isLoading: boolean;
 }
 
 export function ChatParameters({ isLoading }: ChatParametersProps) {
-  const { config, setConfig } = useConfig();
+  const { config, setConfig } = useChatConfig();
   const { chatTemperature, chatMaxTokens, chatSystemPrompt } = config;
   
   const handleTemperatureChange = (value: number[]) => {

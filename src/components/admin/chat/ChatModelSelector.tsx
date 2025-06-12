@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CHAT_PROVIDERS } from "../document-processing/utils/chatProviders";
-import { useConfig } from "../document-processing/ConfigContext";
+import { useChatConfig } from "./ChatConfigContext";
 import { Badge } from "@/components/ui/badge";
 
 interface ChatModelSelectorProps {
@@ -13,7 +13,7 @@ interface ChatModelSelectorProps {
 }
 
 export function ChatModelSelector({ isLoading, onProviderChange, onModelChange }: ChatModelSelectorProps) {
-  const { config } = useConfig();
+  const { config } = useChatConfig();
   const { chatProvider, chatModel } = config;
   
   // Force re-render on mount to ensure UI shows correct values
