@@ -68,21 +68,12 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
 
       console.log('Final view URL:', viewUrl);
       
-      // Try to open the document
-      const opened = window.open(viewUrl, '_blank', 'noopener,noreferrer');
-      
-      if (!opened) {
-        toast({
-          variant: "destructive",
-          title: "Popup blocked",
-          description: "Please allow popups for this site and try again.",
-        });
-        return;
-      }
+      // Use direct navigation instead of window.open to avoid popup blockers
+      window.location.href = viewUrl;
       
       toast({
         title: "Opening document",
-        description: `Opening "${title}" in a new tab.`,
+        description: `Opening "${title}" in current tab.`,
       });
     } catch (error) {
       console.error('Error opening document:', error);
@@ -127,21 +118,8 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
 
       console.log('Final download URL:', finalDownloadUrl);
 
-      // Try direct navigation first
+      // Use direct navigation for download
       window.location.href = finalDownloadUrl;
-      
-      // Fallback: create temporary link
-      setTimeout(() => {
-        const link = document.createElement('a');
-        link.href = finalDownloadUrl;
-        link.download = title;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, 100);
       
       toast({
         title: "Download started",
