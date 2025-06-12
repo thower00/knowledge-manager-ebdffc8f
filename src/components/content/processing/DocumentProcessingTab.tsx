@@ -8,13 +8,28 @@ import { DocumentSelector } from "./DocumentSelector";
 import { useDocumentSelection } from "./hooks/useDocumentSelection";
 
 export function DocumentProcessingTab() {
-  const { selectedDocuments, documents, isLoading, handleDocumentSelection, handleSelectAll, refreshDocuments } = useDocumentSelection();
+  const { 
+    selectedDocuments, 
+    documents, 
+    isLoading, 
+    handleDocumentSelection, 
+    handleSelectAll, 
+    refreshDocuments,
+    lastRefreshTime 
+  } = useDocumentSelection();
+  
   const processingDebuggerRef = useRef<{ onStatusSyncComplete: () => void }>(null);
 
-  // Function to handle status sync completion from ProcessingDebugger
-  const handleStatusSyncComplete = () => {
-    console.log("Status sync completed - refreshing document selection with fresh data");
+  // Enhanced function to handle status sync completion
+  const handleStatusSyncComplete = async () => {
+    console.log("Status sync completed - triggering coordinated refresh");
+    console.log("Last refresh time before sync completion:", lastRefreshTime);
+    
+    // Add a small delay to ensure database changes have propagated
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Force fresh refresh of documents after status sync
+    console.log("Forcing fresh document refresh after sync completion");
     refreshDocuments(true);
   };
 
@@ -27,7 +42,10 @@ export function DocumentProcessingTab() {
         selectedDocuments={selectedDocuments}
         onSelectDocument={handleDocumentSelection}
         onSelectAll={handleSelectAll}
-        onRefresh={() => refreshDocuments(true)}
+        onRefresh={() => {
+          console.log("DocumentSelector refresh requested");
+          refreshDocuments(true);
+        }}
         isLoading={isLoading}
       />
       

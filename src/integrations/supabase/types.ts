@@ -337,6 +337,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      batch_sync_document_statuses: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          document_id: string
+          title: string
+          old_status: string
+          new_status: string
+          chunks_count: number
+          embeddings_count: number
+          updated: boolean
+        }[]
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -427,6 +439,15 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      sync_document_status: {
+        Args: {
+          doc_id: string
+          new_status: string
+          new_processed_at?: string
+          new_error?: string
+        }
+        Returns: boolean
       }
       vector_avg: {
         Args: { "": number[] }

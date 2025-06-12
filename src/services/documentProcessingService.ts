@@ -1,10 +1,10 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedDocument } from "@/types/document";
 import { ChunkingConfig } from "@/types/chunking";
 import { TextExtractionService } from "./extraction/textExtractionService";
 import { ChunkingService } from "./chunking/chunkingService";
 import { EmbeddingService, EmbeddingConfig } from "./embedding/embeddingService";
+import { syncSingleDocumentStatus } from "@/components/content/utils/enhancedStatusSyncService";
 
 export interface ProcessingConfig {
   chunking: ChunkingConfig;
@@ -53,7 +53,7 @@ export class DocumentProcessingService {
   }
 
   async syncDocumentStatuses(): Promise<void> {
-    console.log('Syncing document statuses...');
+    console.log('Syncing document statuses using enhanced service...');
     
     try {
       // Get all pending documents
@@ -86,24 +86,31 @@ export class DocumentProcessingService {
           .eq('document_id', doc.id);
 
         if (chunksCount && chunksCount > 0 && embeddingsCount && embeddingsCount > 0) {
-          console.log(`Document "${doc.title}" has ${chunksCount} chunks and ${embeddingsCount} embeddings - updating to completed`);
+          console.log(`Document "${doc.title}" has ${chunksCount} chunks and ${embeddingsCount} embeddings - updating to completed using enhanced service`);
           
-          await this.updateDocumentStatus(doc.id, 'completed');
+          // Use the enhanced sync service with database function
+          const updated = await syncSingleDocumentStatus(doc.id, 'completed');
           
-          if (this.onProgress) {
-            this.onProgress({
-              documentId: doc.id,
-              documentTitle: doc.title,
-              stage: 'completed',
-              progress: 100,
-              chunksGenerated: chunksCount,
-              embeddingsGenerated: embeddingsCount,
-            });
+          if (updated) {
+            console.log(`Successfully updated document "${doc.title}" status to completed`);
+            
+            if (this.onProgress) {
+              this.onProgress({
+                documentId: doc.id,
+                documentTitle: doc.title,
+                stage: 'completed',
+                progress: 100,
+                chunksGenerated: chunksCount,
+                embeddingsGenerated: embeddingsCount,
+              });
+            }
+          } else {
+            console.warn(`Failed to update document "${doc.title}" status`);
           }
         }
       }
 
-      console.log('Document status synchronization completed');
+      console.log('Document status synchronization completed using enhanced service');
     } catch (error) {
       console.error('Error during document status sync:', error);
     }
@@ -112,7 +119,7 @@ export class DocumentProcessingService {
   async processDocuments(documentIds: string[]): Promise<ProcessingResult[]> {
     console.log(`Starting batch processing of ${documentIds.length} documents`);
     
-    // First, sync any existing document statuses
+    // First, sync any existing document statuses using enhanced service
     await this.syncDocumentStatuses();
     
     const results: ProcessingResult[] = [];
@@ -121,8 +128,8 @@ export class DocumentProcessingService {
       try {
         console.log(`Processing document ${documentId}`);
         
-        // Set status to processing at the start
-        await this.updateDocumentStatus(documentId, 'processing');
+        // Set status to processing using enhanced sync service
+        await syncSingleDocumentStatus(documentId, 'processing');
         
         const result = await this.processDocument(documentId);
         results.push(result);
@@ -130,8 +137,8 @@ export class DocumentProcessingService {
       } catch (error) {
         console.error(`Error processing document ${documentId}:`, error);
         
-        // Update document status to failed
-        await this.updateDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
+        // Update document status to failed using enhanced sync service
+        await syncSingleDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
         
         results.push({
           documentId,
@@ -178,10 +185,10 @@ export class DocumentProcessingService {
       .eq('document_id', documentId);
 
     if (existingChunks && existingChunks > 0 && existingEmbeddings && existingEmbeddings > 0) {
-      console.log(`Document ${typedDocument.title} already has ${existingChunks} chunks and ${existingEmbeddings} embeddings - updating status to completed`);
+      console.log(`Document ${typedDocument.title} already has ${existingChunks} chunks and ${existingEmbeddings} embeddings - updating status to completed using enhanced service`);
       
-      // Update status to completed since processing is already done
-      await this.updateDocumentStatus(documentId, 'completed');
+      // Update status to completed using enhanced sync service
+      await syncSingleDocumentStatus(documentId, 'completed');
       this.updateProgress(documentId, typedDocument.title, 'completed', 100, existingChunks, existingEmbeddings);
 
       return {
@@ -206,7 +213,7 @@ export class DocumentProcessingService {
       this.updateProgress(documentId, typedDocument.title, 'extraction', 30);
     } catch (error) {
       console.error(`Content extraction failed for ${typedDocument.title}:`, error);
-      await this.updateDocumentStatus(documentId, 'failed', `Content extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      await syncSingleDocumentStatus(documentId, 'failed', `Content extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw new Error(`Failed to extract content: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
@@ -250,9 +257,9 @@ export class DocumentProcessingService {
       console.log(`Generated ${embeddingCount} embeddings`);
       this.updateProgress(documentId, typedDocument.title, 'storage', 90, chunks.length, embeddingCount);
 
-      // Step 5: Update document status to completed
-      console.log(`Updating document ${documentId} status to completed`);
-      await this.updateDocumentStatus(documentId, 'completed');
+      // Step 5: Update document status to completed using enhanced sync service
+      console.log(`Updating document ${documentId} status to completed using enhanced service`);
+      await syncSingleDocumentStatus(documentId, 'completed');
       console.log(`Document ${typedDocument.title} processing completed successfully`);
       this.updateProgress(documentId, typedDocument.title, 'completed', 100, chunks.length, embeddingCount);
 
@@ -264,7 +271,7 @@ export class DocumentProcessingService {
       };
     } catch (error) {
       console.error(`Processing failed after extraction for ${typedDocument.title}:`, error);
-      await this.updateDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
+      await syncSingleDocumentStatus(documentId, 'failed', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
@@ -384,37 +391,5 @@ export class DocumentProcessingService {
 
     console.log(`Successfully stored ${data.length} chunks`);
     return data.map(record => record.id);
-  }
-
-  private async updateDocumentStatus(documentId: string, status: string, error?: string): Promise<void> {
-    console.log(`Updating document ${documentId} status to: ${status}${error ? ` with error: ${error}` : ''}`);
-    
-    const updateData: any = { 
-      status,
-      processed_at: new Date().toISOString(),
-    };
-    
-    if (error) {
-      updateData.error = error;
-    } else if (status === 'pending') {
-      // Clear error when resetting to pending
-      updateData.error = null;
-      updateData.processed_at = null;
-    } else if (status === 'completed') {
-      // Ensure error is cleared when completed
-      updateData.error = null;
-    }
-    
-    const { error: updateError } = await supabase
-      .from('processed_documents')
-      .update(updateData)
-      .eq('id', documentId);
-
-    if (updateError) {
-      console.error(`Failed to update document status:`, updateError);
-      throw new Error(`Failed to update document status: ${updateError.message}`);
-    }
-    
-    console.log(`Document ${documentId} status successfully updated to ${status}`);
   }
 }

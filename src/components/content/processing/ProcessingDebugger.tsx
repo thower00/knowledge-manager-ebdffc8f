@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { syncDocumentStatuses } from "../utils/statusSyncService";
-import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database } from "lucide-react";
+import { useEnhancedDocumentSync } from "./hooks/useEnhancedDocumentSync";
+import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database, Zap } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,9 +38,11 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
     const [documents, setDocuments] = useState<DocumentStatus[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isClearing, setIsClearing] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const { toast } = useToast();
+    
+    // Use the enhanced sync hook
+    const { isSyncing, performSync, getSyncSummary } = useEnhancedDocumentSync();
 
     useImperativeHandle(ref, () => ({
       onStatusSyncComplete: () => {
@@ -61,9 +63,7 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
           'https://sxrinuxxlmytddymjbmr.supabase.co',
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
           {
-            db: {
-              schema: 'public'
-            },
+            db: { schema: 'public' },
             global: {
               headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -155,17 +155,9 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
     };
 
     const syncStatuses = async () => {
-      setIsSyncing(true);
       try {
-        console.log('Starting manual status sync...');
-        const result = await syncDocumentStatuses();
-        
-        toast({
-          title: "Status Sync Complete",
-          description: `Updated ${result.updated} out of ${result.total} documents`
-        });
-        
-        console.log(`Sync completed: ${result.updated} documents updated`);
+        console.log('Starting enhanced status sync...');
+        const result = await performSync();
         
         // Force complete UI refresh with new key
         console.log('Forcing complete UI refresh...');
@@ -185,6 +177,8 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
           onStatusSyncComplete();
         }
         
+        return result;
+        
       } catch (error) {
         console.error('Error syncing document statuses:', error);
         toast({
@@ -192,8 +186,6 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
           title: "Sync failed",
           description: error instanceof Error ? error.message : "Unknown error"
         });
-      } finally {
-        setIsSyncing(false);
       }
     };
 
@@ -323,12 +315,15 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
       }
     };
 
+    const syncSummary = getSyncSummary();
+
     return (
       <Card key={refreshKey}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
-            Processing Debugger {refreshKey > 0 && <span className="text-sm text-muted-foreground">(Refresh: {refreshKey})</span>}
+            Enhanced Processing Debugger 
+            {refreshKey > 0 && <span className="text-sm text-muted-foreground">(Refresh: {refreshKey})</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -347,8 +342,8 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
               disabled={isLoading || isClearing || isSyncing}
               variant="outline"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              Sync Statuses
+              <Zap className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              Enhanced Sync
             </Button>
             
             <AlertDialog>
@@ -388,6 +383,17 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
             </AlertDialog>
           </div>
 
+          {/* Sync Summary */}
+          {syncSummary && (
+            <Alert>
+              <Zap className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Last Sync:</strong> {syncSummary.updated} updated, {syncSummary.unchanged} unchanged, {syncSummary.total} total
+                {syncSummary.errors > 0 && <span className="text-red-600"> • {syncSummary.errors} errors</span>}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {documents.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-medium">Document Processing Status ({documents.length} documents)</h4>
@@ -396,7 +402,7 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
                   Documents marked as "completed" but with 0 chunks/embeddings indicate processing failures.
-                  Use "Sync Statuses" to automatically fix status mismatches, or use the reset button to clear their data and reprocess them.
+                  Use "Enhanced Sync" to automatically fix status mismatches with database functions, or reset individual documents.
                   <br />
                   <strong>Debug tip:</strong> Check the browser console for detailed sync information. Refresh key: {refreshKey}
                 </AlertDescription>
