@@ -1,6 +1,7 @@
+
 import { serve } from 'std/server'
 import { corsHeaders } from '../_shared/cors.ts'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { ChatRequest } from './types.ts'
 import { generateChatResponse } from './chatProvider.ts'
 import { performVectorSearch } from './vectorSearch.ts'
