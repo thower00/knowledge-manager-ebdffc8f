@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -20,12 +21,40 @@ const loadChatConfig = async (supabaseClient: any) => {
   }
 
   if (!data) {
-    console.warn('No chat configuration found in database')
-    // Return default configuration
+    console.warn('No chat configuration found in database, checking for alternative configurations')
+    
+    // Try to load document processing config as fallback
+    const { data: docConfigData, error: docConfigError } = await supabaseClient
+      .from('configurations')
+      .select('value')
+      .eq('key', 'document_processing')
+      .maybeSingle()
+    
+    if (!docConfigError && docConfigData?.value) {
+      console.log('Found document processing config, using as fallback')
+      const docConfig = docConfigData.value
+      
+      // Create a chat config from document processing config
+      return {
+        chatProvider: 'openai',
+        chatModel: 'gpt-4o-mini',
+        apiKey: docConfig.apiKey || docConfig.providerApiKeys?.openai || '',
+        chatTemperature: '0.7',
+        chatMaxTokens: '2000',
+        chatSystemPrompt: 'You are a helpful AI assistant that can answer questions based on document content.',
+        provider: docConfig.provider || 'openai',
+        embeddingModel: docConfig.specificModelId || 'text-embedding-3-small',
+        similarityThreshold: docConfig.similarityThreshold || '0.7',
+        embeddingBatchSize: docConfig.embeddingBatchSize || '10'
+      }
+    }
+    
+    // Return default configuration as last resort
+    console.warn('No configurations found, using defaults')
     return {
       chatProvider: 'openai',
       chatModel: 'gpt-4o-mini',
-      apiKey: '', // Will be handled in the chat provider
+      apiKey: '', // Will be handled later
       chatTemperature: '0.7',
       chatMaxTokens: '2000',
       chatSystemPrompt: 'You are a helpful AI assistant that can answer questions based on document content.',
@@ -196,6 +225,9 @@ serve(async (req) => {
       const apiKey = config.apiKey || config.chatProviderApiKeys?.openai || Deno.env.get('OPENAI_API_KEY')
       if (!apiKey) {
         console.error('No API key found in config or environment')
+        console.log('Config apiKey:', !!config.apiKey)
+        console.log('Config chatProviderApiKeys:', config.chatProviderApiKeys)
+        console.log('Environment OPENAI_API_KEY:', !!Deno.env.get('OPENAI_API_KEY'))
         return new Response(JSON.stringify({ 
           error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
         }), {
