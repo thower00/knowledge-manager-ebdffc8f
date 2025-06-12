@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database } from "lucide-react";
+import { syncDocumentStatuses } from "../utils/statusSyncService";
+import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database, Sync } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +32,7 @@ export function ProcessingDebugger() {
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
 
   const checkDocumentStatus = async () => {
@@ -92,6 +93,32 @@ export function ProcessingDebugger() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const syncStatuses = async () => {
+    setIsSyncing(true);
+    try {
+      console.log('Syncing document statuses...');
+      const result = await syncDocumentStatuses();
+      
+      toast({
+        title: "Status Sync Complete",
+        description: `Updated ${result.updated} out of ${result.total} documents`
+      });
+      
+      // Refresh the status display
+      await checkDocumentStatus();
+      
+    } catch (error) {
+      console.error('Error syncing document statuses:', error);
+      toast({
+        variant: "destructive",
+        title: "Sync failed",
+        description: error instanceof Error ? error.message : "Unknown error"
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -230,18 +257,27 @@ export function ProcessingDebugger() {
         <div className="flex gap-2 flex-wrap">
           <Button 
             onClick={checkDocumentStatus} 
-            disabled={isLoading || isClearing}
+            disabled={isLoading || isClearing || isSyncing}
             variant="outline"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Check Status
           </Button>
           
+          <Button
+            onClick={syncStatuses}
+            disabled={isLoading || isClearing || isSyncing}
+            variant="outline"
+          >
+            <Sync className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            Sync Statuses
+          </Button>
+          
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button 
                 variant="destructive" 
-                disabled={isLoading || isClearing || documents.length === 0}
+                disabled={isLoading || isClearing || isSyncing || documents.length === 0}
               >
                 <Database className="h-4 w-4 mr-2" />
                 Clear Complete Database
@@ -282,7 +318,7 @@ export function ProcessingDebugger() {
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Documents marked as "completed" but with 0 chunks/embeddings indicate processing failures.
-                Use the reset button to clear their data and reprocess them, or use "Clear Complete Database" to start fresh.
+                Use "Sync Statuses" to automatically fix status mismatches, or use the reset button to clear their data and reprocess them.
               </AlertDescription>
             </Alert>
 
