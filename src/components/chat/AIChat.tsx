@@ -30,6 +30,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from 'date-fns';
+import { DocumentSourcePanel } from './DocumentSourcePanel';
 
 // Message component to display chat messages
 const ChatMessage = ({ message }) => {
@@ -57,32 +58,6 @@ const ChatMessage = ({ message }) => {
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-// Sources panel to show document sources used for generating the answer
-const SourcesPanel = ({ sources }) => {
-  if (!sources || sources.length === 0) {
-    return (
-      <div className="text-center p-6 text-muted-foreground">
-        <p>No sources available for this response.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 p-1">
-      {sources.map((source, index) => (
-        <Card key={index} className="overflow-hidden">
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm font-medium">{source.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs py-2 bg-muted/50">
-            <p className="line-clamp-5">{source.content}</p>
-          </CardContent>
-        </Card>
-      ))}
     </div>
   );
 };
@@ -220,12 +195,12 @@ export default function AIChat() {
                   <SheetHeader>
                     <SheetTitle>Document Sources</SheetTitle>
                     <SheetDescription>
-                      The AI used these documents to generate its response.
+                      The AI used these documents to generate its response. You can view or download them below.
                     </SheetDescription>
                   </SheetHeader>
                   <Separator className="my-4" />
                   <ScrollArea className="h-[calc(100vh-180px)]">
-                    <SourcesPanel sources={sources} />
+                    <DocumentSourcePanel sources={sources} />
                   </ScrollArea>
                 </SheetContent>
               </Sheet>
@@ -240,7 +215,7 @@ export default function AIChat() {
               <h2 className="text-2xl font-semibold mb-2">How can I help you?</h2>
               <p className="text-muted-foreground max-w-md">
                 Ask me questions about the documents that have been uploaded and processed.
-                I'll use document embeddings to provide contextually relevant answers.
+                I'll use document embeddings to provide contextually relevant answers with source references.
               </p>
             </div>
           )}

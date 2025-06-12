@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -13,6 +14,9 @@ export interface ChatMessage {
 export interface ContextSource {
   title: string;
   content: string;
+  viewUrl?: string;
+  downloadUrl?: string;
+  isGoogleDrive?: boolean;
 }
 
 export interface ChatSession {
@@ -124,9 +128,17 @@ export const useChat = (initialSessionId?: string) => {
         fetchSessions(); // Refresh sessions list
       }
 
-      // Store sources from context
+      // Enhanced context processing to include document URLs
       if (data.context) {
-        setSources(data.context);
+        const enhancedSources: ContextSource[] = data.context.map((contextItem: any) => ({
+          title: contextItem.title,
+          content: contextItem.content,
+          // These will be populated by the backend when available
+          viewUrl: contextItem.viewUrl,
+          downloadUrl: contextItem.downloadUrl,
+          isGoogleDrive: contextItem.isGoogleDrive || false
+        }));
+        setSources(enhancedSources);
       }
 
       // Instead of adding to local state, reload messages from DB
