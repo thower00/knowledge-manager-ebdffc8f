@@ -94,10 +94,7 @@ serve(async (req) => {
     const vectorSearchResult = await performVectorSearch(
       supabase,
       question,
-      config.embeddingProvider,
-      config.embeddingModel,
-      config.similarityThreshold,
-      config.apiKey
+      config
     )
 
     console.log('Document search completed successfully:', {

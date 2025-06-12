@@ -1,11 +1,20 @@
 
-import { ChatConfig, ContextSource } from './types.ts'
+import { ChatConfig } from './config.ts'
+
+export interface ContextSource {
+  document_title: string;
+  chunk_content: string;
+  similarity?: number;
+  document_id?: string;
+  document_url?: string;
+}
 
 export async function performVectorSearch(
   supabase: any,
   question: string,
   config: ChatConfig
-): Promise<{ contextText: string; relevantDocs: ContextSource[] }> {
+): Promise<{ contextText: string; relevantDocs: ContextSource[]; searchDuration?: number }> {
+  const startTime = Date.now()
   let contextText = ''
   let relevantDocs: ContextSource[] = []
   
@@ -72,11 +81,11 @@ export async function performVectorSearch(
         const docCount = availableDocuments.length
         contextText = `I have access to ${docCount} processed document${docCount > 1 ? 's' : ''} that ${docCount > 1 ? 'have' : 'has'} been successfully uploaded and processed:\n\n${availableDocuments.map((doc, index) => `${index + 1}. ${doc.title} (${doc.chunksCount} chunks)`).join('\n')}\n\nI can help you with:\n• Answering questions about the content in these documents\n• Providing summaries of the documents\n• Finding specific information across all documents\n• Explaining key concepts or topics covered\n\nSimply ask me questions about any topics you're interested in, and I'll search through the document content to provide relevant, detailed answers based on what's available.`
         console.log('Using detailed document access info with document list as context')
-        return { contextText, relevantDocs }
+        return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
       } else {
         contextText = 'I currently do not have access to any processed documents. No documents have been successfully uploaded and processed yet. Please upload and process documents first, then I\'ll be able to help answer questions about their content.'
         console.log('No documents available')
-        return { contextText, relevantDocs }
+        return { contextText, relevantDocs, searchDuration: Date.now() - startTime }
       }
     }
     
@@ -140,13 +149,6 @@ export async function performVectorSearch(
     const queryEmbedding = embeddingData.data[0].embedding
     console.log('Generated embedding with dimensions:', queryEmbedding.length)
 
-    // Check document chunks availability for each document
-    if (availableDocuments && availableDocuments.length > 0) {
-      for (const doc of availableDocuments) {
-        console.log(`Document "${doc.title}" has ${doc.chunksCount} chunks and ${doc.embeddingsCount} embeddings`)
-      }
-    }
-    
     // Multi-threshold vector search strategy with improved thresholds
     const thresholds = isDocumentSpecific ? [0.3, 0.4, 0.5, 0.6] : [parseFloat(config.similarityThreshold), 0.4, 0.5, 0.6]
     let searchResults = null
@@ -157,7 +159,7 @@ export async function performVectorSearch(
         .rpc('search_similar_embeddings', {
           query_embedding: queryEmbedding,
           similarity_threshold: threshold,
-          match_count: parseInt(config.embeddingBatchSize) * 3 // Increase match count for better diversity
+          match_count: 20 // Increase match count for better diversity
         })
       
       if (searchError) {
@@ -178,50 +180,15 @@ export async function performVectorSearch(
           console.log(`Results found across ${resultsByDocument.size} different documents:`, 
             Array.from(resultsByDocument.keys()))
           
-          // For document-specific queries, ensure we get results from ALL available documents
-          if (isDocumentSpecific && availableDocuments) {
-            // Check if we're missing any documents from vector search results
-            const foundDocuments = Array.from(resultsByDocument.keys())
-            const missingDocuments = availableDocuments.filter(doc => 
-              !foundDocuments.some(foundDoc => foundDoc.includes(doc.title))
-            )
-            
-            if (missingDocuments.length > 0) {
-              console.log(`Missing documents from vector search: ${missingDocuments.map(d => d.title)}`)
-              
-              // Add content from missing documents directly
-              for (const doc of missingDocuments) {
-                const { data: docChunks, error: chunkError } = await supabase
-                  .from('document_chunks')
-                  .select('content')
-                  .eq('document_id', doc.id)
-                  .order('chunk_index', { ascending: true })
-                  .limit(2)
-                
-                if (!chunkError && docChunks && docChunks.length > 0) {
-                  const combinedContent = docChunks.map(c => c.content).join(' ').substring(0, 1000)
-                  resultsByDocument.set(doc.title, [{
-                    document_title: doc.title,
-                    chunk_content: combinedContent,
-                    similarity: 0.5, // Default similarity for direct retrieval
-                    document_id: doc.id,
-                    document_url: doc.url
-                  }])
-                  console.log(`Added missing document "${doc.title}" directly`)
-                }
-              }
-            }
-          }
-          
           // Take results from multiple documents to ensure diversity
           const diverseResults = []
-          const maxPerDocument = Math.ceil(parseInt(config.embeddingBatchSize) / Math.max(resultsByDocument.size, 1))
+          const maxPerDocument = Math.ceil(10 / Math.max(resultsByDocument.size, 1))
           
           for (const [docTitle, docResults] of resultsByDocument) {
             diverseResults.push(...docResults.slice(0, maxPerDocument))
           }
           
-          searchResults = diverseResults.slice(0, parseInt(config.embeddingBatchSize) * 2)
+          searchResults = diverseResults.slice(0, 20)
           console.log('Search results details:', searchResults.map(r => ({
             similarity: r.similarity,
             doc_title: r.document_title,
@@ -365,5 +332,9 @@ export async function performVectorSearch(
     throw searchErr
   }
   
-  return { contextText, relevantDocs }
+  return { 
+    contextText, 
+    relevantDocs, 
+    searchDuration: Date.now() - startTime 
+  }
 }
