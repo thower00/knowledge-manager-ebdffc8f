@@ -65,8 +65,7 @@ export function useVectorDatabase() {
       const { data, error } = await supabase
         .from('document_embeddings')
         .select('id, document_id, chunk_id, embedding_model, embedding_provider, similarity_threshold, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       
@@ -82,7 +81,7 @@ export function useVectorDatabase() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load recent embeddings"
+        description: "Failed to load embeddings"
       });
     }
   }, [toast]);
@@ -188,7 +187,7 @@ export function useVectorDatabase() {
     isDeleteAllDialogOpen,
     isDeleteDocumentDialogOpen,
     selectedDocumentId,
-    setSelectedDocumentId, // This was missing!
+    setSelectedDocumentId,
     loadStats,
     loadEmbeddings,
     loadVectorData,
