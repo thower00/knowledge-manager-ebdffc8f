@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export function ProcessingDebugger() {
       const documentStatuses: DocumentStatus[] = [];
 
       for (const doc of docs || []) {
-        console.log(`Processing status check for document: ${doc.title} (${doc.id})`);
+        console.log(`Processing status check for document: ${doc.title} (${doc.id}) - Current status: ${doc.status}`);
         
         // Count chunks
         const { count: chunksCount, error: chunksError } = await supabase
@@ -126,6 +127,9 @@ export function ProcessingDebugger() {
       });
       
       console.log(`Sync completed: ${result.updated} documents updated`);
+      
+      // Add a small delay to ensure database updates are committed
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Refresh the status display after sync
       await checkDocumentStatus();
@@ -232,7 +236,7 @@ export function ProcessingDebugger() {
       });
 
       // Refresh the status
-      checkDocumentStatus();
+      await checkDocumentStatus();
       
     } catch (error) {
       console.error(`Error resetting document ${documentId}:`, error);
