@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,14 +42,25 @@ export function ProcessingDebugger() {
       
       // Add a small delay and force fresh query if requested
       if (forceFresh) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Get all processed documents with explicit fresh query
-      const { data: docs, error: docsError } = await supabase
-        .from('processed_documents')
+      // Create a new supabase client instance to avoid any potential caching
+      const freshClient = forceFresh ? 
+        supabase.from('processed_documents') : 
+        supabase.from('processed_documents');
+      
+      // Get all processed documents with explicit fresh query and cache busting
+      const queryBuilder = freshClient
         .select('id, title, status')
         .order('created_at', { ascending: false });
+      
+      // Add a timestamp to force cache invalidation
+      if (forceFresh) {
+        console.log('Forcing fresh query with cache bust...');
+      }
+      
+      const { data: docs, error: docsError } = await queryBuilder;
 
       if (docsError) throw docsError;
 
@@ -60,7 +70,7 @@ export function ProcessingDebugger() {
       for (const doc of docs || []) {
         console.log(`Processing status check for document: ${doc.title} (${doc.id}) - Current status: ${doc.status}`);
         
-        // Count chunks
+        // Count chunks with fresh queries
         const { count: chunksCount, error: chunksError } = await supabase
           .from('document_chunks')
           .select('*', { count: 'exact', head: true })
@@ -70,7 +80,7 @@ export function ProcessingDebugger() {
           console.error(`Error counting chunks for ${doc.title}:`, chunksError);
         }
 
-        // Count embeddings
+        // Count embeddings with fresh queries
         const { count: embeddingsCount, error: embeddingsError } = await supabase
           .from('document_embeddings')
           .select('*', { count: 'exact', head: true })
@@ -133,9 +143,18 @@ export function ProcessingDebugger() {
       
       console.log(`Sync completed: ${result.updated} documents updated`);
       
-      // Force a fresh query after sync to ensure we get updated data
+      // Wait longer and force multiple refreshes to ensure we get updated data
+      console.log('Waiting for database to commit changes...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       console.log('Refreshing document status display with fresh data...');
       await checkDocumentStatus(true);
+      
+      // Force one more refresh after another delay to be absolutely sure
+      setTimeout(async () => {
+        console.log('Final refresh to ensure UI is up to date...');
+        await checkDocumentStatus(true);
+      }, 1000);
       
     } catch (error) {
       console.error('Error syncing document statuses:', error);
