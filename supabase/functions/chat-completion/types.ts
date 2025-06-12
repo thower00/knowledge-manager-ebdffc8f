@@ -28,4 +28,6 @@ export interface ContextSource {
   document_title: string
   chunk_content: string
   similarity?: number
+  document_url?: string
+  document_id?: string
 }
