@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -7,14 +6,21 @@ import { generateChatResponse } from './chatProvider.ts'
 import { performVectorSearch } from './vectorSearch.ts'
 
 const loadChatConfig = async (supabaseClient: any) => {
+  console.log('=== Loading chat configuration from database ===')
+  
   const { data, error } = await supabaseClient
     .from('configurations')
     .select('value')
     .eq('key', 'chat_settings')
     .maybeSingle()
 
-  if (error || !data) {
-    console.warn('No chat configuration found, using defaults:', error?.message)
+  if (error) {
+    console.error('Database error loading chat config:', error)
+    throw new Error(`Database error loading chat configuration: ${error.message}`)
+  }
+
+  if (!data) {
+    console.warn('No chat configuration found in database')
     // Return default configuration
     return {
       chatProvider: 'openai',
@@ -29,6 +35,13 @@ const loadChatConfig = async (supabaseClient: any) => {
       embeddingBatchSize: '10'
     }
   }
+
+  console.log('Chat configuration loaded from database successfully')
+  console.log('Configuration keys found:', Object.keys(data.value))
+  console.log('Chat provider:', data.value.chatProvider)
+  console.log('Chat model:', data.value.chatModel)
+  console.log('Has API key:', !!data.value.apiKey)
+  console.log('API key length:', data.value.apiKey?.length || 0)
 
   return data.value
 }
@@ -155,24 +168,25 @@ serve(async (req) => {
     try {
       console.log('=== Loading configuration ===')
       
-      // Load configuration with fallback to defaults
+      // Load configuration from database
       const config = await loadChatConfig(supabase);
-      console.log('Config loaded successfully:', {
+      
+      console.log('Configuration loaded successfully:', {
         provider: config.chatProvider,
         model: config.chatModel,
         temperature: config.chatTemperature,
         maxTokens: config.chatMaxTokens,
         embeddingProvider: config.provider,
-        embeddingModel: config.embeddingModel,
+        embeddingModel: config.embeddingModel || config.specificModelId,
         similarityThreshold: config.similarityThreshold
       });
 
       console.log('=== Checking API key ===')
       
-      // Check if we have API key from environment or config
-      const apiKey = Deno.env.get('OPENAI_API_KEY') || config.apiKey
+      // Check if we have API key from config or environment
+      const apiKey = config.apiKey || config.chatProviderApiKeys?.openai || Deno.env.get('OPENAI_API_KEY')
       if (!apiKey) {
-        console.error('No API key found in environment or config')
+        console.error('No API key found in config or environment')
         return new Response(JSON.stringify({ 
           error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
         }), {
@@ -183,7 +197,7 @@ serve(async (req) => {
 
       // Add API key to config
       config.apiKey = apiKey
-      console.log('API key configured successfully')
+      console.log('API key configured successfully, length:', apiKey.length)
 
       console.log('=== Managing chat session ===')
 
