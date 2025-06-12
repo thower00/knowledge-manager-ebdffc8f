@@ -1,3 +1,4 @@
+
 import { ChatConfig, ContextSource } from './types.ts'
 
 export async function performVectorSearch(
@@ -163,7 +164,9 @@ export async function performVectorSearch(
                   resultsByDocument.set(doc.title, [{
                     document_title: doc.title,
                     chunk_content: combinedContent,
-                    similarity: 0.5 // Default similarity for direct retrieval
+                    similarity: 0.5, // Default similarity for direct retrieval
+                    document_id: doc.id,
+                    document_url: doc.url
                   }])
                   console.log(`Added missing document "${doc.title}" directly`)
                 }
@@ -191,10 +194,29 @@ export async function performVectorSearch(
     }
     
     if (searchResults && searchResults.length > 0) {
+      // Get document URLs for search results by fetching from processed_documents
+      const documentIds = [...new Set(searchResults.map(r => r.document_id).filter(Boolean))]
+      let documentUrlMap = new Map()
+      
+      if (documentIds.length > 0) {
+        const { data: documentsWithUrls, error: urlError } = await supabase
+          .from('processed_documents')
+          .select('id, url')
+          .in('id', documentIds)
+        
+        if (!urlError && documentsWithUrls) {
+          documentsWithUrls.forEach(doc => {
+            documentUrlMap.set(doc.id, doc.url)
+          })
+        }
+      }
+      
       relevantDocs = searchResults.map(result => ({
         document_title: result.document_title,
         chunk_content: result.chunk_content,
-        similarity: result.similarity
+        similarity: result.similarity,
+        document_id: result.document_id,
+        document_url: result.document_url || documentUrlMap.get(result.document_id)
       }))
       
       contextText = searchResults
@@ -257,7 +279,9 @@ export async function performVectorSearch(
               
               relevantDocs.push({
                 document_title: title,
-                chunk_content: combinedContent
+                chunk_content: combinedContent,
+                document_id: docData.doc_info.id,
+                document_url: docData.doc_info.url
               })
             } else {
               // Include document even without chunks
@@ -265,7 +289,9 @@ export async function performVectorSearch(
               
               relevantDocs.push({
                 document_title: title,
-                chunk_content: 'Document processed but content not accessible.'
+                chunk_content: 'Document processed but content not accessible.',
+                document_id: docData.doc_info.id,
+                document_url: docData.doc_info.url
               })
             }
           }
