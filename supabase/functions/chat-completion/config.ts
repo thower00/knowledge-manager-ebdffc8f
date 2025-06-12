@@ -17,14 +17,15 @@ export interface ChatConfig {
 export async function getChatConfig(supabase: any): Promise<ChatConfig> {
   console.log('Loading chat configuration from database...')
   
-  // Load configuration from database - using correct table name 'configurations' (plural)
+  // Load chat-specific configuration from database - using key 'chat_settings'
   const { data: configData, error: configError } = await supabase
     .from('configurations')
-    .select('*')
-    .single()
+    .select('value')
+    .eq('key', 'chat_settings')
+    .maybeSingle()
 
   if (configError) {
-    console.error('Error loading configuration:', configError)
+    console.error('Error loading chat configuration:', configError)
     console.log('Falling back to default configuration...')
     
     // Return default configuration if database config is not available
@@ -41,23 +42,40 @@ export async function getChatConfig(supabase: any): Promise<ChatConfig> {
     }
   }
 
-  console.log('Configuration loaded successfully:', {
-    chatProvider: configData.chat_provider,
-    chatModel: configData.chat_model,
-    embeddingProvider: configData.embedding_provider,
-    embeddingModel: configData.embedding_model
+  // If no chat configuration exists yet, return defaults
+  if (!configData?.value) {
+    console.log('No chat configuration found, using defaults...')
+    return {
+      chatProvider: 'openai',
+      chatModel: 'gpt-4o-mini',
+      chatTemperature: '0.7',
+      chatMaxTokens: '2000',
+      chatSystemPrompt: 'You are a helpful assistant.',
+      embeddingProvider: 'openai',
+      embeddingModel: 'text-embedding-3-small',
+      similarityThreshold: '0.7',
+      apiKey: Deno.env.get('OPENAI_API_KEY') || ''
+    }
+  }
+
+  const chatConfig = configData.value as any;
+  
+  console.log('Chat configuration loaded successfully:', {
+    chatProvider: chatConfig.chatProvider,
+    chatModel: chatConfig.chatModel,
+    embeddingProvider: chatConfig.embeddingProvider,
+    embeddingModel: chatConfig.embeddingModel
   })
 
   return {
-    chatProvider: configData.chat_provider || 'openai',
-    chatModel: configData.chat_model || 'gpt-4o-mini',
-    chatTemperature: configData.chat_temperature?.toString() || '0.7',
-    chatMaxTokens: configData.chat_max_tokens?.toString() || '2000',
-    chatSystemPrompt: configData.chat_system_prompt || 'You are a helpful assistant.',
-    embeddingProvider: configData.embedding_provider || 'openai',
-    embeddingModel: configData.embedding_model || 'text-embedding-3-small',
-    similarityThreshold: configData.similarity_threshold?.toString() || '0.7',
-    apiKey: configData.openai_api_key || Deno.env.get('OPENAI_API_KEY') || ''
+    chatProvider: chatConfig.chatProvider || 'openai',
+    chatModel: chatConfig.chatModel || 'gpt-4o-mini',
+    chatTemperature: chatConfig.chatTemperature?.toString() || '0.7',
+    chatMaxTokens: chatConfig.chatMaxTokens?.toString() || '2000',
+    chatSystemPrompt: chatConfig.chatSystemPrompt || 'You are a helpful assistant.',
+    embeddingProvider: chatConfig.embeddingProvider || 'openai',
+    embeddingModel: chatConfig.embeddingModel || 'text-embedding-3-small',
+    similarityThreshold: chatConfig.similarityThreshold?.toString() || '0.7',
+    apiKey: chatConfig.apiKey || Deno.env.get('OPENAI_API_KEY') || ''
   }
 }
-
