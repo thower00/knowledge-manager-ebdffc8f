@@ -16,6 +16,8 @@ const loadChatConfig = async (supabaseClient: any) => {
     .eq('key', 'chat_settings')
     .maybeSingle()
 
+  console.log('Chat config query result:', { data: chatConfigData, error: chatConfigError })
+
   if (chatConfigError) {
     console.error('Database error loading chat config:', chatConfigError)
     throw new Error(`Database error loading chat configuration: ${chatConfigError.message}`)
@@ -28,35 +30,58 @@ const loadChatConfig = async (supabaseClient: any) => {
     .eq('key', 'document_processing')
     .maybeSingle()
 
+  console.log('Document config query result:', { data: docConfigData, error: docConfigError })
+
   if (docConfigError) {
     console.error('Database error loading document processing config:', docConfigError)
     throw new Error(`Database error loading document processing configuration: ${docConfigError.message}`)
   }
 
-  if (!chatConfigData) {
+  // Check if we have any chat configuration at all
+  if (!chatConfigData || !chatConfigData.value) {
     console.error('No chat configuration found in database')
-    throw new Error('Chat configuration not found. Please configure your AI chat settings in the admin panel.')
+    console.log('Available configurations should be checked in admin panel')
+    
+    // Try to provide a more helpful error with fallback suggestions
+    if (docConfigData && docConfigData.value) {
+      console.log('Document processing config exists, but chat config is missing')
+      throw new Error('Chat configuration not found. Please set up your AI chat settings in the Configuration Management -> Chat Settings tab in the admin panel.')
+    } else {
+      throw new Error('No configurations found. Please configure both AI chat settings and document processing in the admin panel.')
+    }
   }
 
   const chatConfig = chatConfigData.value
   console.log('Chat configuration loaded successfully')
   console.log('Chat provider:', chatConfig.chatProvider)
   console.log('Chat model:', chatConfig.chatModel)
-  console.log('Has chat API key:', !!chatConfig.apiKey)
   
-  // Extract API key from chat configuration
+  // Extract API key from chat configuration with better debugging
   let apiKey = chatConfig.apiKey
+  console.log('Direct API key found:', !!apiKey)
   
   // If no direct apiKey, try to get from provider-specific keys
   if (!apiKey && chatConfig.chatProviderApiKeys && chatConfig.chatProvider) {
     apiKey = chatConfig.chatProviderApiKeys[chatConfig.chatProvider]
-    console.log('Using provider-specific API key for:', chatConfig.chatProvider)
+    console.log('Provider-specific API key found for', chatConfig.chatProvider, ':', !!apiKey)
+  }
+
+  // Additional fallback - check if the API key is stored with a different property name
+  if (!apiKey && chatConfig.openaiApiKey) {
+    apiKey = chatConfig.openaiApiKey
+    console.log('OpenAI API key found in openaiApiKey property:', !!apiKey)
   }
 
   if (!apiKey) {
     console.error('No API key found in chat configuration')
+    console.log('Available chat config keys:', Object.keys(chatConfig))
+    if (chatConfig.chatProviderApiKeys) {
+      console.log('Available provider API keys:', Object.keys(chatConfig.chatProviderApiKeys))
+    }
     throw new Error('Chat API key not configured. Please set up your API key in the chat settings.')
   }
+
+  console.log('API key successfully extracted for chat provider:', chatConfig.chatProvider)
 
   // Get embedding configuration for vector search (separate from chat config)
   let embeddingConfig = {
