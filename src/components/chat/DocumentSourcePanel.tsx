@@ -45,18 +45,40 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
     }
 
     try {
-      // For Google Drive documents, ensure we're using the correct view URL format
+      console.log('Original URL for viewing:', url);
+      console.log('Is Google Drive:', isGoogleDrive);
+      
       let viewUrl = url;
-      if (isGoogleDrive && !url.includes('/view')) {
-        // Extract file ID and create proper view URL
-        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      
+      // For Google Drive documents, ensure proper view URL format
+      if (isGoogleDrive) {
+        // Extract file ID from various formats
+        const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                           url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                           url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+        
         if (fileIdMatch) {
-          viewUrl = `https://drive.google.com/file/d/${fileIdMatch[1]}/view`;
+          const fileId = fileIdMatch[1];
+          viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+          console.log('Converted to Google Drive view URL:', viewUrl);
+        } else {
+          console.warn('Could not extract file ID from Google Drive URL:', url);
         }
       }
 
-      console.log('Opening document:', { title, originalUrl: url, viewUrl });
-      window.open(viewUrl, '_blank', 'noopener,noreferrer');
+      console.log('Final view URL:', viewUrl);
+      
+      // Try to open the document
+      const opened = window.open(viewUrl, '_blank', 'noopener,noreferrer');
+      
+      if (!opened) {
+        toast({
+          variant: "destructive",
+          title: "Popup blocked",
+          description: "Please allow popups for this site and try again.",
+        });
+        return;
+      }
       
       toast({
         title: "Opening document",
@@ -83,31 +105,43 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
     }
 
     try {
+      console.log('Original download URL:', downloadUrl);
+      console.log('Is Google Drive:', isGoogleDrive);
+      
       let finalDownloadUrl = downloadUrl;
       
-      // For Google Drive documents, ensure we're using the direct download URL
+      // For Google Drive documents, convert to direct download URL
       if (isGoogleDrive) {
         const fileIdMatch = downloadUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
-                           downloadUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                           downloadUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                           downloadUrl.match(/file\/d\/([a-zA-Z0-9_-]+)/);
         
         if (fileIdMatch) {
-          finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+          const fileId = fileIdMatch[1];
+          finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+          console.log('Converted to Google Drive download URL:', finalDownloadUrl);
+        } else {
+          console.warn('Could not extract file ID from Google Drive URL:', downloadUrl);
         }
       }
 
-      console.log('Downloading document:', { title, originalUrl: downloadUrl, finalUrl: finalDownloadUrl });
+      console.log('Final download URL:', finalDownloadUrl);
 
-      // Create a temporary link element to trigger download
-      const link = document.createElement('a');
-      link.href = finalDownloadUrl;
-      link.download = title;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      // Try direct navigation first
+      window.location.href = finalDownloadUrl;
       
-      // Append to body, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Fallback: create temporary link
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = finalDownloadUrl;
+        link.download = title;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 100);
       
       toast({
         title: "Download started",
@@ -137,6 +171,16 @@ export const DocumentSourcePanel: React.FC<DocumentSourcePanelProps> = ({ source
                 <Badge variant="outline" className="text-xs">
                   Google Drive
                 </Badge>
+              )}
+            </div>
+            
+            {/* Debug info for development */}
+            <div className="text-xs text-muted-foreground space-y-1">
+              {source.viewUrl && (
+                <div>View URL: {source.viewUrl}</div>
+              )}
+              {source.downloadUrl && (
+                <div>Download URL: {source.downloadUrl}</div>
               )}
             </div>
             
