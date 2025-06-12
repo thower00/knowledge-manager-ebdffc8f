@@ -27,7 +27,7 @@ export function useSearchConfigLoader() {
 
       if (data?.value) {
         console.log("Search configuration loaded:", data.value);
-        setConfig(data.value as SearchConfigSettings);
+        setConfig(data.value as unknown as SearchConfigSettings);
       } else {
         console.log("No search configuration found, using defaults");
         setConfig(DEFAULT_SEARCH_CONFIG);
