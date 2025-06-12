@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useSearchConfig, DEFAULT_SEARCH_CONFIG } from "./SearchConfigContext";
+import type { SearchConfigSettings } from "./SearchConfigContext";
 
 export function useSearchConfigLoader() {
   const { config, setConfig, isLoading, setIsLoading, isSaving, setIsSaving } = useSearchConfig();
@@ -26,7 +27,7 @@ export function useSearchConfigLoader() {
 
       if (data?.value) {
         console.log("Search configuration loaded:", data.value);
-        setConfig(data.value as any);
+        setConfig(data.value as SearchConfigSettings);
       } else {
         console.log("No search configuration found, using defaults");
         setConfig(DEFAULT_SEARCH_CONFIG);
@@ -53,7 +54,7 @@ export function useSearchConfigLoader() {
         .from("configurations")
         .upsert({
           key: "search_settings",
-          value: config,
+          value: config as any,
         });
 
       if (error) {
