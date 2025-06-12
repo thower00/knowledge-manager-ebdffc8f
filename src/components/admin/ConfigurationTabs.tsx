@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentProcessingSettings } from "./DocumentProcessingSettings";
 import { GoogleDriveIntegration } from "./GoogleDriveIntegration";
 import { ChatSettings } from "./ChatSettings";
+import { SearchSettings } from "./SearchSettings";
 
 export function ConfigurationTabs() {
   // Use localStorage to persist the active tab between renders
@@ -33,10 +34,11 @@ export function ConfigurationTabs() {
       className="w-full"
       defaultValue="document-processing"
     >
-      <TabsList className="grid w-full grid-cols-3 mb-6">
-        <TabsTrigger value="document-processing">Document Processing Settings</TabsTrigger>
-        <TabsTrigger value="google-drive">Google Drive Integration</TabsTrigger>
-        <TabsTrigger value="chat-settings">AI Chat Settings</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsTrigger value="document-processing">Document Processing</TabsTrigger>
+        <TabsTrigger value="google-drive">Google Drive</TabsTrigger>
+        <TabsTrigger value="chat-settings">AI Chat</TabsTrigger>
+        <TabsTrigger value="search-settings">Search Settings</TabsTrigger>
       </TabsList>
       
       <TabsContent value="document-processing">
@@ -49,6 +51,10 @@ export function ConfigurationTabs() {
       
       <TabsContent value="chat-settings">
         <ChatSettings activeTab={activeTab} />
+      </TabsContent>
+      
+      <TabsContent value="search-settings">
+        <SearchSettings activeTab={activeTab} />
       </TabsContent>
     </Tabs>
   );
