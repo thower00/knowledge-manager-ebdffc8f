@@ -1,5 +1,6 @@
 
-import { ContextSource, DocumentInfo } from './types.ts'
+import { ContextSource } from '../types.ts'
+import { DocumentInfo } from './types.ts'
 
 export async function handleFallbackDocumentRetrieval(
   supabase: any,

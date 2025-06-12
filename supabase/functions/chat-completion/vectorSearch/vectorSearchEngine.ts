@@ -1,5 +1,5 @@
 
-import { ContextSource } from './types.ts'
+import { ContextSource } from '../types.ts'
 
 export async function performSimilaritySearch(
   supabase: any,

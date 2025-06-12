@@ -1,6 +1,7 @@
 
 import { ChatConfig } from './config.ts'
-import { VectorSearchResult, DocumentInfo, ContextSource } from './vectorSearch/types.ts'
+import { ContextSource } from './types.ts'
+import { VectorSearchResult, DocumentInfo } from './vectorSearch/types.ts'
 import { discoverAvailableDocuments } from './vectorSearch/documentDiscovery.ts'
 import { generateQueryEmbedding } from './vectorSearch/embeddingGenerator.ts'
 import { performSimilaritySearch } from './vectorSearch/vectorSearchEngine.ts'
@@ -9,9 +10,6 @@ import {
   generateDocumentListingContext, 
   generateFinalFallbackContext 
 } from './vectorSearch/fallbackHandler.ts'
-
-// Re-export ContextSource for backward compatibility
-export { ContextSource } from './vectorSearch/types.ts'
 
 export async function performVectorSearch(
   supabase: any,

@@ -1,4 +1,6 @@
 
+import { ContextSource } from '../types.ts'
+
 export interface VectorSearchResult {
   contextText: string;
   relevantDocs: ContextSource[];
@@ -16,5 +18,4 @@ export interface DocumentInfo {
   embeddingsCount: number;
 }
 
-// Import ContextSource from the main types file instead of duplicating it
-export type { ContextSource } from '../types.ts';
+export { ContextSource }
