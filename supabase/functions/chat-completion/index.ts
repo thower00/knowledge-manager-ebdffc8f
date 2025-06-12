@@ -9,78 +9,92 @@ import { performVectorSearch } from './vectorSearch.ts'
 const loadChatConfig = async (supabaseClient: any) => {
   console.log('=== Loading chat configuration from database ===')
   
-  const { data, error } = await supabaseClient
+  // Load chat configuration for AI chat functionality
+  const { data: chatConfigData, error: chatConfigError } = await supabaseClient
     .from('configurations')
     .select('value')
     .eq('key', 'chat_settings')
     .maybeSingle()
 
-  if (error) {
-    console.error('Database error loading chat config:', error)
-    throw new Error(`Database error loading chat configuration: ${error.message}`)
+  if (chatConfigError) {
+    console.error('Database error loading chat config:', chatConfigError)
+    throw new Error(`Database error loading chat configuration: ${chatConfigError.message}`)
   }
 
-  if (!data) {
-    console.warn('No chat configuration found in database, checking for alternative configurations')
-    
-    // Try to load document processing config as fallback
-    const { data: docConfigData, error: docConfigError } = await supabaseClient
-      .from('configurations')
-      .select('value')
-      .eq('key', 'document_processing')
-      .maybeSingle()
-    
-    if (!docConfigError && docConfigData?.value) {
-      console.log('Found document processing config, using as fallback')
-      const docConfig = docConfigData.value
-      
-      // Create a chat config from document processing config
-      return {
-        chatProvider: 'openai',
-        chatModel: 'gpt-4o-mini',
-        apiKey: docConfig.apiKey || docConfig.providerApiKeys?.openai || '',
-        chatTemperature: '0.7',
-        chatMaxTokens: '2000',
-        chatSystemPrompt: 'You are a helpful AI assistant that can answer questions based on document content.',
-        provider: docConfig.provider || 'openai',
-        embeddingModel: docConfig.specificModelId || 'text-embedding-3-small',
-        similarityThreshold: docConfig.similarityThreshold || '0.7',
-        embeddingBatchSize: docConfig.embeddingBatchSize || '10'
-      }
-    }
-    
-    // Return default configuration as last resort
-    console.warn('No configurations found, using defaults')
-    return {
-      chatProvider: 'openai',
-      chatModel: 'gpt-4o-mini',
-      apiKey: '', // Will be handled later
-      chatTemperature: '0.7',
-      chatMaxTokens: '2000',
-      chatSystemPrompt: 'You are a helpful AI assistant that can answer questions based on document content.',
-      provider: 'openai',
-      embeddingModel: 'text-embedding-3-small',
-      similarityThreshold: '0.7',
-      embeddingBatchSize: '10'
-    }
+  // Load document processing configuration for embedding/vector search
+  const { data: docConfigData, error: docConfigError } = await supabaseClient
+    .from('configurations')
+    .select('value')
+    .eq('key', 'document_processing')
+    .maybeSingle()
+
+  if (docConfigError) {
+    console.error('Database error loading document processing config:', docConfigError)
+    throw new Error(`Database error loading document processing configuration: ${docConfigError.message}`)
   }
 
-  console.log('Chat configuration loaded from database successfully')
-  console.log('Configuration keys found:', Object.keys(data.value))
-  console.log('Chat provider:', data.value.chatProvider)
-  console.log('Chat model:', data.value.chatModel)
-  console.log('Has API key:', !!data.value.apiKey)
-  console.log('API key length:', data.value.apiKey?.length || 0)
+  if (!chatConfigData) {
+    console.error('No chat configuration found in database')
+    throw new Error('Chat configuration not found. Please configure your AI chat settings in the admin panel.')
+  }
 
-  // Fix embedding model configuration - use specificModelId if embeddingModel is just the provider
-  const embeddingModel = data.value.specificModelId || data.value.embeddingModel || 'text-embedding-3-small'
-  console.log('Original embeddingModel:', data.value.embeddingModel)
-  console.log('Specific model ID:', data.value.specificModelId)
-  console.log('Final embedding model to use:', embeddingModel)
+  const chatConfig = chatConfigData.value
+  console.log('Chat configuration loaded successfully')
+  console.log('Chat provider:', chatConfig.chatProvider)
+  console.log('Chat model:', chatConfig.chatModel)
+  console.log('Has chat API key:', !!chatConfig.apiKey)
+  
+  // Extract API key from chat configuration
+  let apiKey = chatConfig.apiKey
+  
+  // If no direct apiKey, try to get from provider-specific keys
+  if (!apiKey && chatConfig.chatProviderApiKeys && chatConfig.chatProvider) {
+    apiKey = chatConfig.chatProviderApiKeys[chatConfig.chatProvider]
+    console.log('Using provider-specific API key for:', chatConfig.chatProvider)
+  }
 
+  if (!apiKey) {
+    console.error('No API key found in chat configuration')
+    throw new Error('Chat API key not configured. Please set up your API key in the chat settings.')
+  }
+
+  // Get embedding configuration for vector search (separate from chat config)
+  let embeddingConfig = {
+    provider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    similarityThreshold: '0.7',
+    embeddingBatchSize: '10'
+  }
+
+  if (docConfigData?.value) {
+    const docConfig = docConfigData.value
+    console.log('Document processing configuration found')
+    
+    embeddingConfig = {
+      provider: docConfig.provider || 'openai',
+      embeddingModel: docConfig.specificModelId || docConfig.embeddingModel || 'text-embedding-3-small',
+      similarityThreshold: docConfig.similarityThreshold || '0.7',
+      embeddingBatchSize: docConfig.embeddingBatchSize || '10'
+    }
+    
+    console.log('Embedding provider:', embeddingConfig.provider)
+    console.log('Embedding model:', embeddingConfig.embeddingModel)
+  } else {
+    console.warn('No document processing configuration found, using defaults for embedding')
+  }
+
+  // Return combined configuration with clear separation
   return {
-    ...data.value,
-    embeddingModel: embeddingModel
+    // Chat configuration
+    chatProvider: chatConfig.chatProvider,
+    chatModel: chatConfig.chatModel,
+    chatTemperature: chatConfig.chatTemperature || '0.7',
+    chatMaxTokens: chatConfig.chatMaxTokens || '2000',
+    chatSystemPrompt: chatConfig.chatSystemPrompt || 'You are a helpful AI assistant that can answer questions based on document content.',
+    apiKey: apiKey,
+    
+    // Embedding configuration (from document processing)
+    ...embeddingConfig
   }
 }
 
@@ -206,48 +220,19 @@ serve(async (req) => {
     try {
       console.log('=== Loading configuration ===')
       
-      // Load configuration from database
+      // Load configuration from database with proper separation
       const config = await loadChatConfig(supabase);
       
       console.log('Configuration loaded successfully:', {
-        provider: config.chatProvider,
-        model: config.chatModel,
-        temperature: config.chatTemperature,
-        maxTokens: config.chatMaxTokens,
+        chatProvider: config.chatProvider,
+        chatModel: config.chatModel,
+        chatTemperature: config.chatTemperature,
+        chatMaxTokens: config.chatMaxTokens,
         embeddingProvider: config.provider,
         embeddingModel: config.embeddingModel,
-        similarityThreshold: config.similarityThreshold
+        similarityThreshold: config.similarityThreshold,
+        hasApiKey: !!config.apiKey
       });
-
-      console.log('=== Checking API key ===')
-      
-      // Check if we have API key from config or environment
-      const apiKey = config.apiKey || config.chatProviderApiKeys?.openai || Deno.env.get('OPENAI_API_KEY')
-      if (!apiKey) {
-        console.error('No API key found in config or environment')
-        console.log('Config apiKey:', !!config.apiKey)
-        console.log('Config chatProviderApiKeys:', config.chatProviderApiKeys)
-        console.log('Environment OPENAI_API_KEY:', !!Deno.env.get('OPENAI_API_KEY'))
-        return new Response(JSON.stringify({ 
-          error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      // Add API key to config and validate embedding model
-      config.apiKey = apiKey
-      
-      // Validate embedding model name
-      const validEmbeddingModels = ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002']
-      if (!validEmbeddingModels.includes(config.embeddingModel)) {
-        console.warn(`Invalid embedding model "${config.embeddingModel}", using default`)
-        config.embeddingModel = 'text-embedding-3-small'
-      }
-      
-      console.log('API key configured successfully, length:', apiKey.length)
-      console.log('Validated embedding model:', config.embeddingModel)
 
       console.log('=== Managing chat session ===')
 
