@@ -85,10 +85,13 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== Chat completion request started ===')
+    
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables')
       throw new Error('Missing Supabase URL or key')
     }
 
@@ -99,8 +102,10 @@ serve(async (req) => {
     })
 
     // Authenticate the user
+    console.log('=== Authenticating user ===')
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No authorization header provided')
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -118,11 +123,15 @@ serve(async (req) => {
       })
     }
 
+    console.log('User authenticated:', user.id)
+
     // Parse the request body
+    console.log('=== Parsing request body ===')
     const requestBody = await req.json() as ChatRequest
     const { messages, question, sessionId } = requestBody
 
     if (!question) {
+      console.error('No question provided in request')
       return new Response(JSON.stringify({ error: 'Missing question parameter' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -130,166 +139,175 @@ serve(async (req) => {
     }
 
     if (!messages || !Array.isArray(messages)) {
+      console.error('Invalid messages parameter:', messages)
       return new Response(JSON.stringify({ error: 'Invalid messages parameter' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
+    console.log('Request parsed successfully:', {
+      questionLength: question.length,
+      messageCount: messages.length,
+      sessionId
+    })
+
     try {
-    console.log('User authenticated:', user.id);
-    
-    // Load configuration with fallback to defaults
-    const config = await loadChatConfig(supabase);
-    console.log('Config loaded:', {
-      provider: config.chatProvider,
-      model: config.chatModel,
-      temperature: config.chatTemperature,
-      maxTokens: config.chatMaxTokens,
-      embeddingProvider: config.provider,
-      embeddingModel: config.embeddingModel,
-      similarityThreshold: config.similarityThreshold
-    });
+      console.log('=== Loading configuration ===')
+      
+      // Load configuration with fallback to defaults
+      const config = await loadChatConfig(supabase);
+      console.log('Config loaded successfully:', {
+        provider: config.chatProvider,
+        model: config.chatModel,
+        temperature: config.chatTemperature,
+        maxTokens: config.chatMaxTokens,
+        embeddingProvider: config.provider,
+        embeddingModel: config.embeddingModel,
+        similarityThreshold: config.similarityThreshold
+      });
 
-    // Check if we have API key from environment or config
-    const apiKey = Deno.env.get('OPENAI_API_KEY') || config.apiKey
-    if (!apiKey) {
-      return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Add API key to config
-    config.apiKey = apiKey
-
-    console.log('Using configuration:', {
-      chatProvider: config.chatProvider,
-      chatModel: config.chatModel,
-      similarityThreshold: config.similarityThreshold,
-      embeddingBatchSize: config.embeddingBatchSize
-    });
-
-    // Get or create chat session
-    let currentSessionId = sessionId;
-    if (!currentSessionId) {
-      const { data: newSession, error: sessionError } = await supabase
-        .from('chat_sessions')
-        .insert({
-          user_id: user.id,
-          title: question.slice(0, 50) + (question.length > 50 ? '...' : '')
+      console.log('=== Checking API key ===')
+      
+      // Check if we have API key from environment or config
+      const apiKey = Deno.env.get('OPENAI_API_KEY') || config.apiKey
+      if (!apiKey) {
+        console.error('No API key found in environment or config')
+        return new Response(JSON.stringify({ 
+          error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
-        .select()
-        .single();
-
-      if (sessionError) throw sessionError;
-      currentSessionId = newSession.id;
-      console.log('Created new session:', currentSessionId);
-    }
-
-    // Load recent conversation context (last 10 messages)
-    const { data: recentMessages, error: messagesError } = await supabase
-      .from('chat_messages')
-      .select('role, content')
-      .eq('session_id', currentSessionId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (messagesError) {
-      console.error('Error loading recent messages:', messagesError);
-    }
-
-    const conversationHistory = recentMessages ? recentMessages.reverse() : [];
-    console.log('Recent conversation context:', conversationHistory.slice(-2));
-
-    // Combine provided messages with recent conversation
-    const allMessages = [...conversationHistory, ...messages];
-
-    console.log('Chat request received:', {
-      sessionId: currentSessionId,
-      messageCount: allMessages.length,
-      question: question
-    });
-
-    // Perform enhanced document search
-    console.log('Starting enhanced document search...');
-    const searchStartTime = Date.now();
-    
-    const { contextText, relevantDocs } = await performVectorSearch(
-      supabase,
-      question,
-      config
-    );
-    
-    const searchDuration = Date.now() - searchStartTime;
-    console.log('Document search completed:', {
-      searchDuration: `${searchDuration}ms`,
-      contextLength: contextText.length,
-      documentsFound: relevantDocs.length,
-      documentTitles: relevantDocs.map(doc => doc.document_title)
-    });
-
-    // Generate AI response with enhanced context
-    console.log('Generating AI response with enhanced context...');
-    const responseStartTime = Date.now();
-    
-    const aiResponse = await generateChatResponse(
-      allMessages,
-      question,
-      contextText,
-      config,
-      relevantDocs
-    );
-    
-    const responseDuration = Date.now() - responseStartTime;
-    console.log('AI response generated:', {
-      responseDuration: `${responseDuration}ms`,
-      responseLength: aiResponse.length
-    });
-
-    // Store messages to database
-    console.log('Storing messages to database...');
-    await storeMessages(supabase, currentSessionId, [
-      { role: 'user', content: question },
-      { role: 'assistant', content: aiResponse }
-    ], relevantDocs);
-
-    console.log('Messages saved successfully');
-    console.log('Chat completion successful with enhanced processing');
-
-    return new Response(
-      JSON.stringify({
-        response: aiResponse,
-        sessionId: currentSessionId,
-        context: relevantDocs.map(doc => ({
-          title: doc.document_title,
-          content: doc.chunk_content.substring(0, 500) + '...'
-        }))
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
       }
-    );
 
-  } catch (error) {
-    console.error('Chat completion error:', error);
-    return new Response(
-      JSON.stringify({
-        error: error.message || 'Internal server error',
-        details: error.stack
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+      // Add API key to config
+      config.apiKey = apiKey
+      console.log('API key configured successfully')
+
+      console.log('=== Managing chat session ===')
+
+      // Get or create chat session
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        console.log('Creating new chat session...')
+        const { data: newSession, error: sessionError } = await supabase
+          .from('chat_sessions')
+          .insert({
+            user_id: user.id,
+            title: question.slice(0, 50) + (question.length > 50 ? '...' : '')
+          })
+          .select()
+          .single();
+
+        if (sessionError) {
+          console.error('Session creation failed:', sessionError)
+          throw sessionError;
+        }
+        currentSessionId = newSession.id;
+        console.log('New session created:', currentSessionId);
+      } else {
+        console.log('Using existing session:', currentSessionId);
       }
-    );
-  }
+
+      console.log('=== Loading conversation history ===')
+      
+      // Load recent conversation context (last 10 messages)
+      const { data: recentMessages, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('role, content')
+        .eq('session_id', currentSessionId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (messagesError) {
+        console.error('Error loading recent messages:', messagesError);
+      }
+
+      const conversationHistory = recentMessages ? recentMessages.reverse() : [];
+      console.log('Conversation history loaded:', conversationHistory.length, 'messages');
+
+      // Combine provided messages with recent conversation
+      const allMessages = [...conversationHistory, ...messages];
+
+      console.log('=== Starting document search ===');
+      const searchStartTime = Date.now();
+      
+      const { contextText, relevantDocs } = await performVectorSearch(
+        supabase,
+        question,
+        config
+      );
+      
+      const searchDuration = Date.now() - searchStartTime;
+      console.log('Document search completed:', {
+        searchDuration: `${searchDuration}ms`,
+        contextLength: contextText.length,
+        documentsFound: relevantDocs.length,
+        documentTitles: relevantDocs.map(doc => doc.document_title)
+      });
+
+      console.log('=== Generating AI response ===');
+      const responseStartTime = Date.now();
+      
+      const aiResponse = await generateChatResponse(
+        allMessages,
+        question,
+        contextText,
+        config,
+        relevantDocs
+      );
+      
+      const responseDuration = Date.now() - responseStartTime;
+      console.log('AI response generated:', {
+        responseDuration: `${responseDuration}ms`,
+        responseLength: aiResponse.length
+      });
+
+      console.log('=== Storing messages ===');
+      await storeMessages(supabase, currentSessionId, [
+        { role: 'user', content: question },
+        { role: 'assistant', content: aiResponse }
+      ], relevantDocs);
+
+      console.log('=== Chat completion successful ===');
+
+      return new Response(
+        JSON.stringify({
+          response: aiResponse,
+          sessionId: currentSessionId,
+          context: relevantDocs.map(doc => ({
+            title: doc.document_title,
+            content: doc.chunk_content.substring(0, 500) + '...'
+          }))
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+
+    } catch (error) {
+      console.error('=== Chat completion error ===:', error);
+      console.error('Error stack:', error.stack);
+      return new Response(
+        JSON.stringify({
+          error: error.message || 'Internal server error',
+          details: error.stack
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
   } catch (error) {
-    console.error('Function error:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('=== Function error ===:', error)
+    console.error('Error stack:', error.stack);
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      details: error.stack 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
