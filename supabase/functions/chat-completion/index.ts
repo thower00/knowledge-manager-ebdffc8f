@@ -12,9 +12,21 @@ const loadChatConfig = async (supabaseClient: any) => {
     .eq('key', 'chat_settings')
     .single()
 
-  if (error) {
-    console.error('Error fetching chat config:', error)
-    throw new Error('Failed to load chat configuration')
+  if (error || !data) {
+    console.warn('No chat configuration found, using defaults:', error?.message)
+    // Return default configuration
+    return {
+      chatProvider: 'openai',
+      chatModel: 'gpt-4o-mini',
+      apiKey: '', // Will be handled in the chat provider
+      chatTemperature: '0.7',
+      chatMaxTokens: '2000',
+      chatSystemPrompt: 'You are a helpful AI assistant that can answer questions based on document content.',
+      provider: 'openai',
+      embeddingModel: 'text-embedding-3-small',
+      similarityThreshold: '0.7',
+      embeddingBatchSize: '10'
+    }
   }
 
   return data.value
@@ -126,7 +138,7 @@ serve(async (req) => {
     try {
     console.log('User authenticated:', user.id);
     
-    // Load configuration
+    // Load configuration with fallback to defaults
     const config = await loadChatConfig(supabase);
     console.log('Config loaded:', {
       provider: config.chatProvider,
@@ -137,6 +149,20 @@ serve(async (req) => {
       embeddingModel: config.embeddingModel,
       similarityThreshold: config.similarityThreshold
     });
+
+    // Check if we have API key from environment or config
+    const apiKey = Deno.env.get('OPENAI_API_KEY') || config.apiKey
+    if (!apiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key not configured. Please set up your API key in the admin settings.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Add API key to config
+    config.apiKey = apiKey
 
     console.log('Using configuration:', {
       chatProvider: config.chatProvider,
