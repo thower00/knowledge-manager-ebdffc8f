@@ -11,6 +11,30 @@ import {
   generateFinalFallbackContext 
 } from './vectorSearch/fallbackHandler.ts'
 
+// Step 1: Summary request detection functions
+function isSummaryRequest(question: string): boolean {
+  const summaryKeywords = [
+    'summary', 'summarize', 'summarise', 'overview', 'brief', 'outline',
+    'key points', 'main points', 'highlights', 'recap', 'digest',
+    'sammanfattning', 'översikt', 'huvudpunkter' // Swedish equivalents
+  ]
+  
+  const questionLower = question.toLowerCase()
+  return summaryKeywords.some(keyword => questionLower.includes(keyword))
+}
+
+function isExtensiveSummary(question: string): boolean {
+  const extensiveKeywords = [
+    'extensive', 'detailed', 'comprehensive', 'complete', 'full', 'thorough',
+    'in-depth', 'lengthy', 'long', 'elaborate',
+    'utförlig', 'detaljerad', 'omfattande', 'fullständig' // Swedish equivalents
+  ]
+  
+  const questionLower = question.toLowerCase()
+  return isSummaryRequest(question) && 
+         extensiveKeywords.some(keyword => questionLower.includes(keyword))
+}
+
 export async function performVectorSearch(
   supabase: any,
   question: string,
@@ -23,6 +47,11 @@ export async function performVectorSearch(
   try {
     console.log('=== Starting vector search ===')
     console.log('Question:', question)
+    
+    // Step 1: Detect if this is a summary request
+    const isSummary = isSummaryRequest(question)
+    const isExtensive = isExtensiveSummary(question)
+    console.log('Summary request detection:', { isSummary, isExtensive })
     
     // Enhanced query preprocessing to detect document-specific requests
     const isDocumentSpecific = /\b(the document|this document|document|summarize|summary|list.*documents|what.*documents|documents.*access|specific.*document|particular.*document)\b/i.test(question)
