@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { syncDocumentStatuses } from "../utils/statusSyncService";
-import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database, Sync } from "lucide-react";
+import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,7 +269,7 @@ export function ProcessingDebugger() {
             disabled={isLoading || isClearing || isSyncing}
             variant="outline"
           >
-            <Sync className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
             Sync Statuses
           </Button>
           
