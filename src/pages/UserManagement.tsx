@@ -13,6 +13,7 @@ import { fetchAllUsers, promoteUserToAdmin, removeUserAdmin } from "@/services/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserRoleManagement } from "@/components/admin/UserRoleManagement";
+import { ManualUserCreation } from "@/components/admin/ManualUserCreation";
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -104,6 +105,13 @@ export default function UserManagement() {
     }
   };
 
+  const handleUserCreated = () => {
+    // Refresh the user list when a new user is created
+    if (activeTab === "users") {
+      fetchUsers();
+    }
+  };
+
   // Show loading state while checking authorization
   if (isLoading) {
     return (
@@ -133,9 +141,10 @@ export default function UserManagement() {
         <h1 className="text-3xl font-bold">User Management</h1>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="roles">Role Management</TabsTrigger>
+            <TabsTrigger value="create">Create User</TabsTrigger>
           </TabsList>
           
           <TabsContent value="users" className="mt-6">
@@ -168,6 +177,10 @@ export default function UserManagement() {
                 <UserRoleManagement />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="create" className="mt-6">
+            <ManualUserCreation onUserCreated={handleUserCreated} />
           </TabsContent>
         </Tabs>
       </div>
