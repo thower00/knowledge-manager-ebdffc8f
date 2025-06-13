@@ -35,42 +35,47 @@ serve(async (req) => {
       }
     )
 
-    // Verify the requesting user is an admin
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
+    // Verify the requesting user is an admin using service role key
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
     
     if (userError || !user) {
+      console.error('User verification error:', userError)
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Check if user is admin
-    const { data: userRole, error: roleError } = await supabaseClient
+    console.log('User authenticated:', user.id)
+
+    // Check if user is admin using service role key
+    const { data: userRole, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
       .maybeSingle()
 
-    if (roleError || !userRole) {
+    console.log('Role check result:', { userRole, roleError })
+
+    if (roleError) {
+      console.error('Role verification error:', roleError)
+      return new Response(
+        JSON.stringify({ error: 'Error checking admin privileges' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!userRole) {
+      console.log('User is not admin:', user.id)
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('Admin verification successful for user:', user.id)
 
     const { email, password, firstName, lastName } = await req.json()
 
@@ -80,6 +85,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('Creating user with email:', email)
 
     // Create user with admin privileges
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
