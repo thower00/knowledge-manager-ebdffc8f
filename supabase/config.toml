@@ -58,3 +58,7 @@ name = "verify-anthropic-key"
 [[functions]]
 verify_jwt = true
 name = "chat-completion"
+
+[[functions]]
+verify_jwt = true
+name = "create-user"

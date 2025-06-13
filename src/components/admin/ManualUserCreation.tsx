@@ -35,18 +35,21 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
     setIsCreating(true);
 
     try {
-      // Create user with admin privileges using the service role
-      const { data, error } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        user_metadata: {
-          first_name: firstName,
-          last_name: lastName,
+      // Call the edge function to create user
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email,
+          password,
+          firstName,
+          lastName,
         },
-        email_confirm: true, // Skip email confirmation for admin-created users
       });
 
       if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       // Clear form
       setEmail("");
