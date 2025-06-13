@@ -62,12 +62,12 @@ export default function Index() {
           <Card className="w-full max-w-md mx-auto">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold">
-                {isSignUp ? "Create an account" : "Sign in"}
+                {isSignUp ? "Skapa konto" : "Logga in"}
               </CardTitle>
               <CardDescription>
                 {isSignUp 
-                  ? "Enter your details to create a new account" 
-                  : "Enter your credentials to access your account"}
+                  ? "Registrering är för närvarande inaktiverad" 
+                  : "Ange dina uppgifter för att komma åt ditt konto"}
               </CardDescription>
             </CardHeader>
             <CardContent>
