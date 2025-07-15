@@ -84,13 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const type = urlParams.get('type');
+    const token = urlParams.get('token'); // Supabase also uses 'token' parameter
     
-    console.log("AuthContext: Checking URL params - code:", code, "type:", type);
+    console.log("AuthContext: Checking URL params - code:", code, "type:", type, "token:", token);
     
-    // If we have a recovery code, always redirect to reset password page
-    if (code && type === 'recovery') {
-      console.log("AuthContext: Found reset code, redirecting to reset-password page");
-      window.location.href = `/reset-password?code=${code}&type=${type}`;
+    // If we have a recovery type, redirect to reset password page
+    if (type === 'recovery' || (token && type === 'recovery')) {
+      console.log("AuthContext: Found recovery type, redirecting to reset-password page");
+      const resetUrl = `/reset-password?${window.location.search}`;
+      window.location.href = resetUrl;
       return;
     }
     
