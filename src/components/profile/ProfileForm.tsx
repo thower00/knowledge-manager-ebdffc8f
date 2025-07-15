@@ -1,13 +1,20 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { Loader2, Save, Key } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PasswordChangeSettings } from "@/components/admin/PasswordChangeSettings";
+import { Separator } from "@/components/ui/separator";
 
 interface ProfileData {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ProfileFormProps {
@@ -17,13 +24,19 @@ interface ProfileFormProps {
 }
 
 export default function ProfileForm({ profileData, userId, onProfileUpdate }: ProfileFormProps) {
-  const [editMode, setEditMode] = useState(false);
   const [firstName, setFirstName] = useState(profileData?.first_name || "");
   const [lastName, setLastName] = useState(profileData?.last_name || "");
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleUpdateProfile = async () => {
+  const hasChanges = firstName !== (profileData?.first_name || "") || 
+                    lastName !== (profileData?.last_name || "");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!userId) return;
+
+    setIsLoading(true);
 
     try {
       const { error } = await supabase
@@ -44,7 +57,6 @@ export default function ProfileForm({ profileData, userId, onProfileUpdate }: Pr
         last_name: lastName,
       });
 
-      setEditMode(false);
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully",
@@ -56,56 +68,61 @@ export default function ProfileForm({ profileData, userId, onProfileUpdate }: Pr
         title: "Error",
         description: "Failed to update profile",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (editMode) {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">First Name</label>
-            <input
+            <Label htmlFor="firstName">First Name</Label>
+            <Input
+              id="firstName"
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full p-2 border rounded"
+              placeholder="Enter your first name"
             />
           </div>
+          
           <div className="space-y-2">
-            <label className="text-sm font-medium">Last Name</label>
-            <input
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full p-2 border rounded"
+              placeholder="Enter your last name"
             />
           </div>
         </div>
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={() => setEditMode(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleUpdateProfile}>Save</Button>
-        </div>
-      </div>
-    );
-  }
+        
+        <Button type="submit" disabled={isLoading || !hasChanges} className="w-full">
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Updating...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Update Profile
+            </>
+          )}
+        </Button>
+      </form>
 
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm font-medium text-gray-500">First Name</p>
-          <p>{profileData?.first_name || "Not set"}</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-500">Last Name</p>
-          <p>{profileData?.last_name || "Not set"}</p>
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={() => setEditMode(true)}>Edit Profile</Button>
+      <Separator />
+      
+      <div>
+        <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+          <Key className="h-5 w-5" />
+          Password Settings
+        </h3>
+        <PasswordChangeSettings />
       </div>
     </div>
   );

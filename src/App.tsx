@@ -16,6 +16,8 @@ import ConfigurationManagement from "./pages/ConfigurationManagement";
 import TestManagement from "./pages/TestManagement";
 import ContentManagement from "./pages/ContentManagement";
 import Documents from "./pages/Documents";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import AppSidebar from "./components/layout/Sidebar";
 
@@ -79,6 +81,8 @@ const App = () => (
                     <main className="flex-grow">
                       <Routes>
                         <Route path="/" element={<Index />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="/profile" element={
                           <ProtectedRoute>
                             <Profile />

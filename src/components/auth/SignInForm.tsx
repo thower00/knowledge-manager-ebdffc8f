@@ -91,9 +91,13 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
       <div className="grid gap-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
-          <a href="#" className="text-xs text-brand-600 hover:underline">
+          <button 
+            type="button"
+            onClick={() => window.location.href = '/forgot-password'}
+            className="text-xs text-brand-600 hover:underline"
+          >
             Forgot password?
-          </a>
+          </button>
         </div>
         <Input
           id="password"

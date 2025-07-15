@@ -192,7 +192,9 @@ export default function UserManagement() {
           </TabsContent>
 
           <TabsContent value="password" className="mt-6">
-            <PasswordChangeSettings />
+            <div className="text-center text-muted-foreground">
+              <p>Password change is available in the Profile section for all users.</p>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
