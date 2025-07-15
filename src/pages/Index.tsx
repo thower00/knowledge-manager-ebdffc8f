@@ -19,6 +19,8 @@ export default function Index() {
     const code = searchParams.get('code');
     const type = searchParams.get('type');
     
+    console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
+    
     // If we have a code parameter, this is likely a password reset link
     if (code && !user) {
       console.log("Found reset code, redirecting to reset password page");
