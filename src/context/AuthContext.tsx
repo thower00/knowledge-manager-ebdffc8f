@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("AuthContext: Checking URL params - code:", code, "type:", type);
     
     // If we have a code parameter and we're on the root path, redirect to reset password
-    if (code && window.location.pathname === '/') {
+    if (code && type === 'recovery' && window.location.pathname === '/') {
       console.log("AuthContext: Found reset code, redirecting immediately");
       window.location.href = `/reset-password?code=${code}${type ? `&type=${type}` : ''}`;
       return;
