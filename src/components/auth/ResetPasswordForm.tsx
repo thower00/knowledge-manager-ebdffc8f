@@ -18,26 +18,23 @@ export function ResetPasswordForm() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if we have a valid reset token (can be either 'code' or 'token')
-    const token = searchParams.get('token') || searchParams.get('code');
-    const type = searchParams.get('type') || 'recovery';
+    // Check both URL search params and hash for recovery parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    const token = urlParams.get('token') || urlParams.get('code') || hashParams.get('access_token');
+    const type = urlParams.get('type') || hashParams.get('type') || 'recovery';
     const fullUrl = window.location.href;
     
     console.log("ResetPasswordForm: Full URL:", fullUrl);
-    console.log("ResetPasswordForm: All searchParams:", Object.fromEntries(searchParams.entries()));
-    console.log("ResetPasswordForm: Checking for token/code:", { token, type });
+    console.log("ResetPasswordForm: Checking for token/code:", { token: !!token, type });
+    console.log("ResetPasswordForm: Hash:", window.location.hash);
     
-    if (token) {
+    if (token || type === 'recovery') {
       setIsValidToken(true);
-      console.log("ResetPasswordForm: Valid token found, allowing password reset");
+      console.log("ResetPasswordForm: Valid recovery flow detected");
     } else {
-      console.log("ResetPasswordForm: No valid token found");
-      console.log("ResetPasswordForm: Available params:", {
-        code: searchParams.get('code'),
-        token: searchParams.get('token'),
-        type: searchParams.get('type'),
-        allParams: Array.from(searchParams.entries())
-      });
+      console.log("ResetPasswordForm: No valid recovery token found");
       
       toast({
         variant: "destructive",
@@ -45,12 +42,11 @@ export function ResetPasswordForm() {
         description: "This password reset link is invalid or has expired.",
       });
       
-      // Don't navigate away immediately, let user see the error
       setTimeout(() => {
         window.location.href = '/forgot-password';
       }, 3000);
     }
-  }, [searchParams, toast]);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
