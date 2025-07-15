@@ -4,31 +4,38 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import SignInForm from "@/components/auth/SignInForm";
 import SignUpForm from "@/components/auth/SignUpForm";
 import AIChat from "@/components/chat/AIChat";
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { debugAuthState } from "@/integrations/supabase/client";
+import { useSearchParams } from "react-router-dom";
+import { debugAuthState, supabase } from "@/integrations/supabase/client";
 
 export default function Index() {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const { user, isLoading } = useAuth();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // Check for password reset code and redirect if found
+  // Check for password reset code
   useEffect(() => {
     const code = searchParams.get('code');
     const type = searchParams.get('type');
-    const currentUrl = window.location.href;
     
-    console.log("Index: URL check:", currentUrl);
+    console.log("Index: URL check:", window.location.href);
     console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
     
-    // If we have a code parameter and no user (indicating password reset flow)
-    if (code && !user) {
-      console.log("Found reset code, redirecting to reset password page");
-      // Force immediate redirect
-      window.location.href = `/reset-password?code=${code}${type ? `&type=${type}` : ''}`;
-      return;
+    // If we have a code parameter, this is a password reset flow
+    if (code && (type === 'recovery' || !type)) {
+      console.log("Found reset code, showing password reset form");
+      setShowPasswordReset(true);
+      
+      // Establish session with the code
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (error) {
+          console.error("Error exchanging code for session:", error);
+        } else {
+          console.log("Session established successfully:", data);
+        }
+      });
     }
   }, [searchParams, user]);
   
@@ -48,6 +55,12 @@ export default function Index() {
   if (isLoading) {
     console.log("Index page - Loading state...");
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  // Show password reset form if we have a reset code
+  if (showPasswordReset) {
+    console.log("Index page - Showing password reset form");
+    return <ResetPasswordForm />;
   }
 
   // Show AI Chat for authenticated users

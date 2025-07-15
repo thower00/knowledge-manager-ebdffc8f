@@ -22,17 +22,24 @@ export function ResetPasswordForm() {
     const token = searchParams.get('token') || searchParams.get('code');
     const type = searchParams.get('type') || 'recovery';
     
+    console.log("ResetPasswordForm: Checking for token/code:", { token, type });
+    
     if (token) {
       setIsValidToken(true);
+      console.log("ResetPasswordForm: Valid token found, allowing password reset");
     } else {
+      console.log("ResetPasswordForm: No valid token found");
       toast({
         variant: "destructive",
         title: "Invalid reset link",
         description: "This password reset link is invalid or has expired.",
       });
-      navigate('/forgot-password');
+      // Don't navigate away immediately, let user see the error
+      setTimeout(() => {
+        window.location.href = '/forgot-password';
+      }, 3000);
     }
-  }, [searchParams, navigate, toast]);
+  }, [searchParams, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,8 +97,8 @@ export function ResetPasswordForm() {
         description: "Ditt lösenord har uppdaterats framgångsrikt.",
       });
 
-      // Redirect to login page
-      navigate('/');
+      // Redirect to homepage with a clean URL
+      window.location.href = '/';
 
     } catch (error: any) {
       console.error("Error updating password:", error);

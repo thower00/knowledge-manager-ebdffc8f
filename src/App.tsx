@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { AuthRedirectHandler } from "@/components/auth/AuthRedirectHandler";
+
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import Index from "./pages/Index";
@@ -80,44 +80,42 @@ const App = () => (
                   <AppSidebar />
                   <SidebarInset className="flex-grow">
                     <main className="flex-grow">
-                      <AuthRedirectHandler>
-                        <Routes>
-                          <Route path="/" element={<Index />} />
-                          <Route path="/forgot-password" element={<ForgotPassword />} />
-                          <Route path="/reset-password" element={<ResetPassword />} />
-                          <Route path="/profile" element={
-                            <ProtectedRoute>
-                              <Profile />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/documents" element={
-                            <ProtectedRoute>
-                              <Documents />
-                            </ProtectedRoute>
-                          } />
-                          <Route path="/user-management" element={
-                            <AdminRoute>
-                              <UserManagement />
-                            </AdminRoute>
-                          } />
-                          <Route path="/content-management" element={
-                            <AdminRoute>
-                              <ContentManagement />
-                            </AdminRoute>
-                          } />
-                          <Route path="/configuration-management" element={
-                            <AdminRoute>
-                              <ConfigurationManagement />
-                            </AdminRoute>
-                          } />
-                          <Route path="/test-management" element={
-                            <AdminRoute>
-                              <TestManagement />
-                            </AdminRoute>
-                          } />
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </AuthRedirectHandler>
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
+                        <Route path="/profile" element={
+                          <ProtectedRoute>
+                            <Profile />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/documents" element={
+                          <ProtectedRoute>
+                            <Documents />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/user-management" element={
+                          <AdminRoute>
+                            <UserManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/content-management" element={
+                          <AdminRoute>
+                            <ContentManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/configuration-management" element={
+                          <AdminRoute>
+                            <ConfigurationManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="/test-management" element={
+                          <AdminRoute>
+                            <TestManagement />
+                          </AdminRoute>
+                        } />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
                     </main>
                     <Footer />
                   </SidebarInset>
