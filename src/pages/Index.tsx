@@ -18,16 +18,19 @@ export default function Index() {
   useEffect(() => {
     const code = searchParams.get('code');
     const type = searchParams.get('type');
+    const currentUrl = window.location.href;
     
+    console.log("Index: URL check:", currentUrl);
     console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
     
-    // If we have a code parameter, this is likely a password reset link
+    // If we have a code parameter and no user (indicating password reset flow)
     if (code && !user) {
       console.log("Found reset code, redirecting to reset password page");
-      // Redirect to reset password page with the code
-      navigate(`/reset-password?code=${code}${type ? `&type=${type}` : ''}`);
+      // Force immediate redirect
+      window.location.href = `/reset-password?code=${code}${type ? `&type=${type}` : ''}`;
+      return;
     }
-  }, [searchParams, navigate, user]);
+  }, [searchParams, user]);
   
   // Debug function to help diagnose auth issues
   useEffect(() => {
