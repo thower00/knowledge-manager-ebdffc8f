@@ -24,18 +24,12 @@ export default function Index() {
     console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
     
     // If we have a code parameter, this is a password reset flow
-    if (code && (type === 'recovery' || !type)) {
+    if (code && type === 'recovery') {
       console.log("Found reset code, showing password reset form");
       setShowPasswordReset(true);
       
-      // Establish session with the code
-      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-        if (error) {
-          console.error("Error exchanging code for session:", error);
-        } else {
-          console.log("Session established successfully:", data);
-        }
-      });
+      // For password reset, Supabase handles session establishment automatically
+      // We just need to detect the flow and show the correct form
     }
   }, [searchParams, user]);
   
