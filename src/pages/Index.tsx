@@ -8,16 +8,25 @@ import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { debugAuthState, supabase } from "@/integrations/supabase/client";
+import { usePasswordRecovery } from "@/hooks/usePasswordRecovery";
 
 export default function Index() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
   const [searchParams] = useSearchParams();
+  const { checkForPasswordRecovery } = usePasswordRecovery();
   
   // Debug function to help diagnose auth issues
   
-  // Debug function to help diagnose auth issues
+  // Check for password recovery first, before anything else
   useEffect(() => {
+    // Check for recovery parameters immediately when the page loads
+    const isRecoveryDetected = checkForPasswordRecovery();
+    if (isRecoveryDetected) {
+      console.log("Index page - Recovery flow detected, redirecting...");
+      return; // Early return if recovery is detected
+    }
+    
     const checkAuth = async () => {
       console.log("Index page mounted, checking auth state");
       const session = await debugAuthState();
@@ -26,7 +35,7 @@ export default function Index() {
     };
     
     checkAuth();
-  }, [user]);
+  }, [checkForPasswordRecovery, user]);
   
   // Show loading state while checking authentication
   if (isLoading) {
