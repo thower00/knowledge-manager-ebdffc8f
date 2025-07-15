@@ -95,11 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           console.log("AuthContext: Checking recovery params after login - type:", type, "token:", token, "code:", code);
           
-          // If this was a recovery login, redirect to reset password
+          // If this was a recovery login, redirect to reset password page
           if (type === 'recovery' || token || code) {
             console.log("AuthContext: Recovery login detected, redirecting to reset-password");
-            const resetUrl = `/reset-password?${window.location.search}`;
-            window.location.href = resetUrl;
+            // Preserve all URL parameters when redirecting
+            const resetUrl = `/reset-password${window.location.search}`;
+            window.location.replace(resetUrl);
             return;
           }
         }
