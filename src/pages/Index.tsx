@@ -14,24 +14,7 @@ export default function Index() {
   const { user, isLoading } = useAuth();
   const [searchParams] = useSearchParams();
   
-  // Check for password reset code and handle Supabase redirect
-  useEffect(() => {
-    const code = searchParams.get('code');
-    const type = searchParams.get('type');
-    const currentUrl = window.location.href;
-    
-    console.log("Index: Full URL check:", currentUrl);
-    console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
-    
-    // If we have a code parameter with type=recovery, this means Supabase redirected here
-    // instead of directly to /reset-password. We need to redirect manually.
-    if (code && type === 'recovery') {
-      console.log("Found reset code, redirecting to reset password page");
-      // Supabase redirected us to / instead of /reset-password, so we redirect manually
-      window.location.href = `/reset-password?code=${code}&type=${type}`;
-      return;
-    }
-  }, [searchParams, user]);
+  // Debug function to help diagnose auth issues
   
   // Debug function to help diagnose auth issues
   useEffect(() => {
