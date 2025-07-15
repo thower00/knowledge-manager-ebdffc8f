@@ -4,6 +4,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { usePasswordRecovery } from "@/hooks/usePasswordRecovery";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface AuthContextProps {
   session: Session | null;
@@ -21,26 +22,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { handleSignInWithRecovery } = usePasswordRecovery();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isAdmin, checkUserRole } = useUserRole(user?.id);
   const { toast } = useToast();
 
-  // Check for user role
-  const checkUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (error) throw error;
-      setIsAdmin(!!data);
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
-    }
-  };
 
   // Sign out function
   const signOut = async () => {
@@ -57,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear state
       setUser(null);
       setSession(null);
-      setIsAdmin(false);
+      // isAdmin will be automatically reset by useUserRole hook when user becomes null
       
       toast({
         title: "Signed out successfully",
@@ -99,12 +83,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Check admin status when session changes
         if (currentSession?.user) {
-          // Defer Supabase calls to prevent deadlocks
-          setTimeout(() => {
-            checkUserRole(currentSession.user.id);
-          }, 0);
-        } else {
-          setIsAdmin(false);
+          // The useUserRole hook will automatically handle role checking when user changes
+          // No need to manually call checkUserRole here anymore
         }
 
         // Mark loading as complete after a state change
@@ -118,9 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
-      if (currentSession?.user) {
-        checkUserRole(currentSession.user.id);
-      }
+      // The useUserRole hook will automatically check role when user changes
       setIsLoading(false);
     });
 
