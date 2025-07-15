@@ -90,18 +90,6 @@ export function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
-      // Get the current session first to ensure we have a valid session for password update
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error("Session error:", sessionError);
-        throw new Error("Invalid or expired reset link. Please request a new password reset.");
-      }
-
-      if (!session) {
-        throw new Error("Invalid or expired reset link. Please request a new password reset.");
-      }
-
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
