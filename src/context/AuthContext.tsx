@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { usePasswordRecovery } from "@/hooks/usePasswordRecovery";
 
 interface AuthContextProps {
   session: Session | null;
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { handleSignInWithRecovery } = usePasswordRecovery();
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
@@ -88,21 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Check for password reset after login event
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const type = urlParams.get('type');
-          const token = urlParams.get('token');
-          const code = urlParams.get('code');
-          
-          console.log("AuthContext: Checking recovery params after login - type:", type, "token:", token, "code:", code);
-          console.log("AuthContext: Current path:", window.location.pathname);
-          
-          // If this was a recovery login and we're NOT already on reset-password page
-          if ((type === 'recovery' || token || code) && window.location.pathname !== '/reset-password') {
-            console.log("AuthContext: Recovery login detected, redirecting to reset-password");
-            const resetUrl = `/reset-password${window.location.search}`;
-            window.location.replace(resetUrl);
-            return;
-          }
+          // Use the hook to handle password recovery flow
+          handleSignInWithRecovery(currentSession.user);
         }
         
         setSession(currentSession);
