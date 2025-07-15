@@ -10,18 +10,23 @@ export const useRegistrationSettings = () => {
     setLoading(true);
     setError(null);
     try {
+      console.log("useRegistrationSettings: Fetching registration settings...");
       const { data, error } = await supabase
         .from('configurations')
         .select('value')
         .eq('key', 'allow_public_registration')
         .maybeSingle();
 
+      console.log("useRegistrationSettings: Query result:", { data, error });
+
       if (error) {
         throw error;
       }
 
       // Default to false if no configuration is found
-      setAllowPublicRegistration(data?.value as boolean ?? false);
+      const setting = data?.value as boolean ?? false;
+      console.log("useRegistrationSettings: Setting registration to:", setting);
+      setAllowPublicRegistration(setting);
     } catch (error) {
       console.error("Error fetching registration settings:", error);
       setError("Failed to load registration settings");
