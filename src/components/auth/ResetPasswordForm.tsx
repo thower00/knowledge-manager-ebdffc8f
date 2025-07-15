@@ -67,6 +67,18 @@ export function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
+      // Get the current session first to ensure we have a valid session for password update
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        throw new Error("Invalid or expired reset link. Please request a new password reset.");
+      }
+
+      if (!session) {
+        throw new Error("Invalid or expired reset link. Please request a new password reset.");
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -74,8 +86,8 @@ export function ResetPasswordForm() {
       if (error) throw error;
 
       toast({
-        title: "Password updated",
-        description: "Your password has been successfully updated.",
+        title: "Lösenord uppdaterat",
+        description: "Ditt lösenord har uppdaterats framgångsrikt.",
       });
 
       // Redirect to login page
@@ -85,8 +97,8 @@ export function ResetPasswordForm() {
       console.error("Error updating password:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update password. Please try again.",
+        title: "Fel",
+        description: error.message || "Misslyckades med att uppdatera lösenord. Försök igen.",
       });
     } finally {
       setIsLoading(false);
