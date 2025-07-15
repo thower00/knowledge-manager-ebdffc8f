@@ -5,109 +5,150 @@ import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { usePasswordRecovery } from "@/hooks/usePasswordRecovery";
 import { useUserRole } from "@/hooks/useUserRole";
-
-interface AuthContextProps {
-  session: Session | null;
-  user: User | null;
-  isLoading: boolean;
-  isAdmin: boolean;
-  signOut: () => Promise<void>;
-}
+import { AuthContextProps, AuthProviderProps, AuthError, SignOutOptions } from "@/types/auth";
 
 // Create context with undefined default value
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { handleSignInWithRecovery } = usePasswordRecovery();
-  const { isAdmin, checkUserRole } = useUserRole(user?.id);
+  const { isAdmin } = useUserRole(user?.id);
   const { toast } = useToast();
 
+  // Enhanced error logging
+  const logAuthError = (error: unknown, context: string): AuthError => {
+    const authError: AuthError = {
+      message: error instanceof Error ? error.message : 'Unknown auth error',
+      code: error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined,
+      details: error
+    };
+    
+    console.error(`Auth Error [${context}]:`, authError);
+    return authError;
+  };
 
-  // Sign out function
-  const signOut = async () => {
+
+  // Enhanced sign out function with better error handling
+  const signOut = async (options: SignOutOptions = {}): Promise<void> => {
+    const { showToast = true, redirectTo = '/' } = options;
+    
     try {
-      console.log("Signing out...");
+      console.log("AuthContext: Initiating sign out...");
       setIsLoading(true);
       
-      // Clean up auth state
+      // Clean up auth state first
       cleanupAuthState();
       
-      // Sign out from Supabase
-      await supabase.auth.signOut({ scope: 'global' });
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) {
+        throw error;
+      }
       
-      // Clear state
+      // Clear local state immediately
       setUser(null);
       setSession(null);
-      // isAdmin will be automatically reset by useUserRole hook when user becomes null
       
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account.",
-      });
+      if (showToast) {
+        toast({
+          title: "Signed out successfully",
+          description: "You have been signed out of your account.",
+        });
+      }
       
-      // Force page reload to clear any cached state and redirect to main page
-      window.location.href = '/';
+      console.log("AuthContext: Sign out completed successfully");
+      
+      // Force page reload to ensure clean state
+      window.location.href = redirectTo;
     } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        variant: "destructive",
-        title: "Sign out failed",
-        description: "There was an error signing out. Please try again.",
-      });
+      const authError = logAuthError(error, 'signOut');
+      
+      if (showToast) {
+        toast({
+          variant: "destructive",
+          title: "Sign out failed",
+          description: authError.message || "There was an error signing out. Please try again.",
+        });
+      }
+      
+      // Even if sign out fails, clear local state and redirect
+      // This prevents users from being stuck in a limbo state
+      setUser(null);
+      setSession(null);
+      cleanupAuthState();
+      
+      // Still redirect to ensure clean state
+      setTimeout(() => {
+        window.location.href = redirectTo;
+      }, 1000);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log("AuthProvider mounted");
+    console.log("AuthContext: Provider mounted, setting up auth listeners");
     setIsLoading(true);
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log("Auth state change event:", event);
-        console.log("Auth state change session:", currentSession?.user?.id || 'no user');
+        console.log(`AuthContext: Auth state change event: ${event}`);
+        console.log(`AuthContext: Session user: ${currentSession?.user?.id || 'no user'}`);
         
-        // Check for password reset after login event
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          // Use the hook to handle password recovery flow
-          handleSignInWithRecovery(currentSession.user);
+        try {
+          // Handle password recovery flow
+          if (event === 'SIGNED_IN' && currentSession?.user) {
+            // Defer password recovery handling to prevent deadlocks
+            setTimeout(() => {
+              handleSignInWithRecovery(currentSession.user);
+            }, 0);
+          }
+          
+          // Update session and user state
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          console.log(`AuthContext: State updated for event: ${event}`);
+        } catch (error) {
+          logAuthError(error, `onAuthStateChange:${event}`);
+        } finally {
+          // Mark loading as complete after state change
+          setIsLoading(false);
         }
-        
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        // Check admin status when session changes
-        if (currentSession?.user) {
-          // The useUserRole hook will automatically handle role checking when user changes
-          // No need to manually call checkUserRole here anymore
-        }
-
-        // Mark loading as complete after a state change
-        setIsLoading(false);
       }
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Initial session check:", currentSession ? `exists: ${currentSession.user.id}` : "none");
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      // The useUserRole hook will automatically check role when user changes
-      setIsLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession }, error }) => {
+        if (error) {
+          logAuthError(error, 'getSession');
+          return;
+        }
+        
+        console.log(`AuthContext: Initial session check: ${currentSession ? `exists: ${currentSession.user.id}` : "none"}`);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      })
+      .catch((error) => {
+        logAuthError(error, 'getSession');
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
 
     return () => {
+      console.log("AuthContext: Cleaning up auth subscription");
       subscription.unsubscribe();
     };
-  }, []);
+  }, [handleSignInWithRecovery]);
 
-  const contextValue = {
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue: AuthContextProps = {
     session,
     user,
     isLoading,
@@ -122,10 +163,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+// Custom hook with enhanced error handling
+export function useAuth(): AuthContextProps {
   const context = useContext(AuthContext);
+  
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error(
+      "useAuth must be used within an AuthProvider. " +
+      "Make sure your component is wrapped with <AuthProvider>."
+    );
   }
+  
   return context;
 }
