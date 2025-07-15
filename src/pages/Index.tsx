@@ -5,11 +5,27 @@ import SignInForm from "@/components/auth/SignInForm";
 import SignUpForm from "@/components/auth/SignUpForm";
 import AIChat from "@/components/chat/AIChat";
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { debugAuthState } from "@/integrations/supabase/client";
 
 export default function Index() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Check for password reset code and redirect if found
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const type = searchParams.get('type');
+    
+    // If we have a code parameter, this is likely a password reset link
+    if (code && !user) {
+      console.log("Found reset code, redirecting to reset password page");
+      // Redirect to reset password page with the code
+      navigate(`/reset-password?code=${code}${type ? `&type=${type}` : ''}`);
+    }
+  }, [searchParams, navigate, user]);
   
   // Debug function to help diagnose auth issues
   useEffect(() => {

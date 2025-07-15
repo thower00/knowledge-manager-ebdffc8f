@@ -18,11 +18,11 @@ export function ResetPasswordForm() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if we have a valid reset token
-    const token = searchParams.get('token');
-    const type = searchParams.get('type');
+    // Check if we have a valid reset token (can be either 'code' or 'token')
+    const token = searchParams.get('token') || searchParams.get('code');
+    const type = searchParams.get('type') || 'recovery';
     
-    if (token && type === 'recovery') {
+    if (token) {
       setIsValidToken(true);
     } else {
       toast({
@@ -30,7 +30,7 @@ export function ResetPasswordForm() {
         title: "Invalid reset link",
         description: "This password reset link is invalid or has expired.",
       });
-      navigate('/');
+      navigate('/forgot-password');
     }
   }, [searchParams, navigate, toast]);
 
