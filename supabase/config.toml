@@ -62,3 +62,7 @@ name = "chat-completion"
 [[functions]]
 verify_jwt = true
 name = "create-user"
+
+[[functions]]
+verify_jwt = false
+name = "send-welcome-email"

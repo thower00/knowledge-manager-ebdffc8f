@@ -109,6 +109,30 @@ serve(async (req) => {
 
     console.log('User created successfully:', newUser.user?.id)
 
+    // Send welcome email
+    try {
+      const welcomeEmailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        },
+        body: JSON.stringify({
+          email: email,
+          firstName: firstName || ''
+        })
+      });
+
+      if (!welcomeEmailResponse.ok) {
+        console.error('Failed to send welcome email:', await welcomeEmailResponse.text());
+      } else {
+        console.log('Welcome email sent successfully to:', email);
+      }
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+      // Don't fail user creation if email fails
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
