@@ -80,6 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("AuthProvider mounted");
     setIsLoading(true);
     
+    // Check for password reset code in URL on mount
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const type = urlParams.get('type');
+    
+    console.log("AuthContext: Checking URL params - code:", code, "type:", type);
+    
+    // If we have a code parameter and we're on the root path, redirect to reset password
+    if (code && window.location.pathname === '/') {
+      console.log("AuthContext: Found reset code, redirecting immediately");
+      window.location.href = `/reset-password?code=${code}${type ? `&type=${type}` : ''}`;
+      return;
+    }
+    
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
