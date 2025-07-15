@@ -16,18 +16,17 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [password, setPassword] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!email) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Email and password are required.",
+        description: "Email is required.",
       });
       return;
     }
@@ -39,7 +38,6 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email,
-          password,
           firstName,
           lastName,
         },
@@ -55,11 +53,10 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
       setEmail("");
       setFirstName("");
       setLastName("");
-      setPassword("");
       
       toast({
         title: "User created successfully",
-        description: `User ${email} has been created and can now log in.`,
+        description: `User ${email} has been created and will receive a password reset email to set up their account.`,
       });
 
       // Notify parent component to refresh user list
@@ -87,29 +84,19 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleCreateUser} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              required
+            />
+            <p className="text-sm text-muted-foreground">
+              User will receive a password reset email to set up their account
+            </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -137,7 +124,7 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
 
           <Button 
             type="submit" 
-            disabled={isCreating || !email || !password}
+            disabled={isCreating || !email}
             className="w-full"
           >
             {isCreating ? (

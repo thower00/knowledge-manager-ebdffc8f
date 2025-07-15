@@ -77,21 +77,20 @@ serve(async (req) => {
 
     console.log('Admin verification successful for user:', user.id)
 
-    const { email, password, firstName, lastName } = await req.json()
+    const { email, firstName, lastName } = await req.json()
 
-    if (!email || !password) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ error: 'Email and password are required' }),
+        JSON.stringify({ error: 'Email is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     console.log('Creating user with email:', email)
 
-    // Create user with admin privileges
+    // Create user without password - they will set it via password reset
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password,
       user_metadata: {
         first_name: firstName || '',
         last_name: lastName || '',
@@ -109,27 +108,20 @@ serve(async (req) => {
 
     console.log('User created successfully:', newUser.user?.id)
 
-    // Send welcome email
+    // Send password reset email so user can set their password
     try {
-      const welcomeEmailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-welcome-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-        },
-        body: JSON.stringify({
-          email: email,
-          firstName: firstName || ''
-        })
-      });
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo: `${Deno.env.get('SUPABASE_URL')?.replace('/auth/v1', '')}/reset-password`,
+      })
 
-      if (!welcomeEmailResponse.ok) {
-        console.error('Failed to send welcome email:', await welcomeEmailResponse.text());
+      if (resetError) {
+        console.error('Failed to send password reset email:', resetError)
+        // Don't fail user creation if password reset email fails
       } else {
-        console.log('Welcome email sent successfully to:', email);
+        console.log('Password reset email sent successfully to:', email)
       }
     } catch (emailError) {
-      console.error('Error sending welcome email:', emailError);
+      console.error('Error sending password reset email:', emailError)
       // Don't fail user creation if email fails
     }
 
@@ -139,7 +131,8 @@ serve(async (req) => {
         user: {
           id: newUser.user?.id,
           email: newUser.user?.email
-        }
+        },
+        message: 'User created successfully. Password reset email sent.'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
