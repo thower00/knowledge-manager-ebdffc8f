@@ -20,11 +20,24 @@ export default function Index() {
   
   // Check for password recovery first, before anything else
   useEffect(() => {
-    // Check for recovery parameters immediately when the page loads
-    const isRecoveryDetected = checkForPasswordRecovery();
-    if (isRecoveryDetected) {
-      console.log("Index page - Recovery flow detected, redirecting...");
-      return; // Early return if recovery is detected
+    // Check URL for recovery parameters immediately on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    const type = urlParams.get('type') || hashParams.get('type');
+    const token = urlParams.get('token') || hashParams.get('access_token') || hashParams.get('token');
+    
+    console.log("Index: Checking for recovery params - type:", type, "token:", !!token);
+    console.log("Index: Current URL:", window.location.href);
+    
+    if (type === 'recovery' || (token && window.location.href.includes('recovery'))) {
+      console.log("Index: Recovery flow detected, redirecting to reset-password");
+      // Preserve all parameters
+      const resetUrl = window.location.hash ? 
+        `/reset-password${window.location.hash}` : 
+        `/reset-password${window.location.search}`;
+      window.location.replace(resetUrl);
+      return;
     }
     
     const checkAuth = async () => {
@@ -35,7 +48,7 @@ export default function Index() {
     };
     
     checkAuth();
-  }, [checkForPasswordRecovery, user]);
+  }, [user]);
   
   // Show loading state while checking authentication
   if (isLoading) {
