@@ -28,11 +28,13 @@ interface UserTableProps {
   users: User[];
   loading: boolean;
   currentUserId?: string;
-  onPromoteToAdmin: (userId: string) => Promise<void>;
-  onRemoveAdmin: (userId: string) => Promise<void>;
-  onDeleteUser: (userId: string) => Promise<void>;
+  onPromoteToAdmin?: (userId: string) => Promise<void>;
+  onRemoveAdmin?: (userId: string) => Promise<void>;
+  onDeleteUser?: (userId: string) => Promise<void>;
+  onResetPassword?: (userId: string) => void;
   searchQuery: string;
   deletingUserId?: string;
+  mode: 'users' | 'roles';
 }
 
 export function UserTable({
@@ -42,8 +44,10 @@ export function UserTable({
   onPromoteToAdmin,
   onRemoveAdmin,
   onDeleteUser,
+  onResetPassword,
   searchQuery,
   deletingUserId,
+  mode,
 }: UserTableProps) {
   // Filter users based on search query
   const filteredUsers = users.filter(
@@ -57,14 +61,15 @@ export function UserTable({
           <TableRow>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Actions</TableHead>
-            <TableHead className="w-20"></TableHead>
+            {mode === 'users' && <TableHead>Actions</TableHead>}
+            {mode === 'roles' && <TableHead>Role Actions</TableHead>}
+            {mode === 'users' && <TableHead className="w-20">Delete</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-4">
+              <TableCell colSpan={mode === 'users' ? 4 : 3} className="text-center py-4">
                 <div className="flex items-center justify-center">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Loading users...
@@ -82,65 +87,92 @@ export function UserTable({
                     "User"
                   )}
                 </TableCell>
+                
+                {/* Actions column for both modes */}
                 <TableCell>
-                  {!user.isAdmin ? (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => onPromoteToAdmin(user.id)}
-                      disabled={user.id === currentUserId} // Can't change own role
-                    >
-                      Make Admin
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => onRemoveAdmin(user.id)}
-                      disabled={user.id === currentUserId} // Can't change own role
-                    >
-                      Remove Admin
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        disabled={user.id === currentUserId || deletingUserId === user.id}
-                      >
-                        {deletingUserId === user.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="flex gap-2">
+                    {mode === 'roles' && (
+                      // Role management actions
+                      <>
+                        {!user.isAdmin ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => onPromoteToAdmin?.(user.id)}
+                            disabled={user.id === currentUserId}
+                          >
+                            Make Admin
+                          </Button>
                         ) : (
-                          <Trash2 className="h-4 w-4" />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => onRemoveAdmin?.(user.id)}
+                            disabled={user.id === currentUserId}
+                          >
+                            Remove Admin
+                          </Button>
                         )}
+                      </>
+                    )}
+                    
+                    {mode === 'users' && (
+                      // User management actions
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => onResetPassword?.(user.id)}
+                        disabled={true} // Placeholder for now
+                      >
+                        Reset Password
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Ta bort användare</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Är du säker på att du vill ta bort användaren <strong>{user.email}</strong>? 
-                          Denna åtgärd kan inte ångras och kommer att ta bort all användardata.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={() => onDeleteUser(user.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Ta bort användare
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                    )}
+                  </div>
                 </TableCell>
+                
+                {/* Delete column only for users mode */}
+                {mode === 'users' && (
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          disabled={user.id === currentUserId || deletingUserId === user.id}
+                        >
+                          {deletingUserId === user.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Ta bort användare</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Är du säker på att du vill ta bort användaren <strong>{user.email}</strong>? 
+                            Denna åtgärd kan inte ångras och kommer att ta bort all användardata.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => onDeleteUser?.(user.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Ta bort användare
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                )}
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-4">
+              <TableCell colSpan={mode === 'users' ? 4 : 3} className="text-center py-4">
                 No users found.
               </TableCell>
             </TableRow>

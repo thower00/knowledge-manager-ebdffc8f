@@ -190,11 +190,17 @@ export default function UserManagement() {
                 users={users}
                 loading={loading}
                 currentUserId={currentUser?.id}
-                onPromoteToAdmin={promoteToAdmin}
-                onRemoveAdmin={removeAdmin}
                 onDeleteUser={handleDeleteUser}
+                onResetPassword={(userId) => {
+                  // Placeholder for password reset functionality
+                  toast({
+                    title: "Password reset",
+                    description: "Password reset functionality is not implemented yet",
+                  });
+                }}
                 searchQuery={searchQuery}
                 deletingUserId={deletingUserId}
+                mode="users"
               />
             </div>
           </TabsContent>
