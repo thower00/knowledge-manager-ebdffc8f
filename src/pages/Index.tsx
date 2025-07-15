@@ -11,25 +11,25 @@ import { debugAuthState, supabase } from "@/integrations/supabase/client";
 
 export default function Index() {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const { user, isLoading } = useAuth();
   const [searchParams] = useSearchParams();
   
-  // Check for password reset code
+  // Check for password reset code and handle Supabase redirect
   useEffect(() => {
     const code = searchParams.get('code');
     const type = searchParams.get('type');
+    const currentUrl = window.location.href;
     
-    console.log("Index: URL check:", window.location.href);
+    console.log("Index: Full URL check:", currentUrl);
     console.log("Index: searchParams check - code:", code, "type:", type, "user:", user);
     
-    // If we have a code parameter, this is a password reset flow
+    // If we have a code parameter with type=recovery, this means Supabase redirected here
+    // instead of directly to /reset-password. We need to redirect manually.
     if (code && type === 'recovery') {
-      console.log("Found reset code, showing password reset form");
-      setShowPasswordReset(true);
-      
-      // For password reset, Supabase handles session establishment automatically
-      // We just need to detect the flow and show the correct form
+      console.log("Found reset code, redirecting to reset password page");
+      // Supabase redirected us to / instead of /reset-password, so we redirect manually
+      window.location.href = `/reset-password?code=${code}&type=${type}`;
+      return;
     }
   }, [searchParams, user]);
   
@@ -49,12 +49,6 @@ export default function Index() {
   if (isLoading) {
     console.log("Index page - Loading state...");
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  // Show password reset form if we have a reset code
-  if (showPasswordReset) {
-    console.log("Index page - Showing password reset form");
-    return <ResetPasswordForm />;
   }
 
   // Show AI Chat for authenticated users
