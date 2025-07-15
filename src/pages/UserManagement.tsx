@@ -9,7 +9,7 @@ import { Navigate } from "react-router-dom";
 import { User } from "@/types/user";
 import { UserTable } from "@/components/user/UserTable";
 import { UserSearch } from "@/components/user/UserSearch";
-import { fetchAllUsers, promoteUserToAdmin, removeUserAdmin } from "@/services/userService";
+import { fetchAllUsers, promoteUserToAdmin, removeUserAdmin, deleteUser } from "@/services/userService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserRoleManagement } from "@/components/admin/UserRoleManagement";
@@ -21,6 +21,7 @@ export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingUserId, setDeletingUserId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("users");
   const { toast } = useToast();
   const { user: currentUser, isAdmin, isLoading } = useAuth();
@@ -107,6 +108,30 @@ export default function UserManagement() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    setDeletingUserId(userId);
+    try {
+      await deleteUser(userId);
+      
+      // Remove user from local state
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      
+      toast({
+        title: "Användare borttagen",
+        description: "Användaren har tagits bort permanent.",
+      });
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      toast({
+        variant: "destructive",
+        title: "Fel",
+        description: error.message || "Kunde inte ta bort användaren. Försök igen.",
+      });
+    } finally {
+      setDeletingUserId(undefined);
+    }
+  };
+
   const handleUserCreated = () => {
     // Refresh the user list when a new user is created
     if (activeTab === "users") {
@@ -167,7 +192,9 @@ export default function UserManagement() {
                 currentUserId={currentUser?.id}
                 onPromoteToAdmin={promoteToAdmin}
                 onRemoveAdmin={removeAdmin}
+                onDeleteUser={handleDeleteUser}
                 searchQuery={searchQuery}
+                deletingUserId={deletingUserId}
               />
             </div>
           </TabsContent>

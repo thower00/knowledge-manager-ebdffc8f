@@ -54,3 +54,18 @@ export async function removeUserAdmin(userId: string): Promise<void> {
   
   if (error) throw error;
 }
+
+export async function deleteUser(userId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { userId }
+  });
+
+  if (error) {
+    console.error('Error calling delete-user function:', error);
+    throw new Error(error.message || 'Failed to delete user');
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+}

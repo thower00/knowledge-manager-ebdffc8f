@@ -10,7 +10,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Trash2 } from "lucide-react";
 import { User } from "@/types/user";
 
 interface UserTableProps {
@@ -19,7 +30,9 @@ interface UserTableProps {
   currentUserId?: string;
   onPromoteToAdmin: (userId: string) => Promise<void>;
   onRemoveAdmin: (userId: string) => Promise<void>;
+  onDeleteUser: (userId: string) => Promise<void>;
   searchQuery: string;
+  deletingUserId?: string;
 }
 
 export function UserTable({
@@ -28,7 +41,9 @@ export function UserTable({
   currentUserId,
   onPromoteToAdmin,
   onRemoveAdmin,
+  onDeleteUser,
   searchQuery,
+  deletingUserId,
 }: UserTableProps) {
   // Filter users based on search query
   const filteredUsers = users.filter(
@@ -43,12 +58,13 @@ export function UserTable({
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Actions</TableHead>
+            <TableHead className="w-20"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-center py-4">
+              <TableCell colSpan={4} className="text-center py-4">
                 <div className="flex items-center justify-center">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Loading users...
@@ -85,11 +101,46 @@ export function UserTable({
                     </Button>
                   )}
                 </TableCell>
+                <TableCell>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        disabled={user.id === currentUserId || deletingUserId === user.id}
+                      >
+                        {deletingUserId === user.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Ta bort användare</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Är du säker på att du vill ta bort användaren <strong>{user.email}</strong>? 
+                          Denna åtgärd kan inte ångras och kommer att ta bort all användardata.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => onDeleteUser(user.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Ta bort användare
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={3} className="text-center py-4">
+              <TableCell colSpan={4} className="text-center py-4">
                 No users found.
               </TableCell>
             </TableRow>
