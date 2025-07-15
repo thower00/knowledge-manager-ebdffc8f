@@ -90,6 +90,24 @@ export function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
+      // If we have hash parameters (recovery flow), we need to set the session first
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        console.log("ResetPasswordForm: Setting session from hash parameters");
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        
+        if (sessionError) {
+          console.error("Error setting session:", sessionError);
+          throw new Error("Invalid or expired reset link. Please request a new password reset.");
+        }
+      }
+      
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
