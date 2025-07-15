@@ -21,7 +21,10 @@ export function ResetPasswordForm() {
     // Check if we have a valid reset token (can be either 'code' or 'token')
     const token = searchParams.get('token') || searchParams.get('code');
     const type = searchParams.get('type') || 'recovery';
+    const fullUrl = window.location.href;
     
+    console.log("ResetPasswordForm: Full URL:", fullUrl);
+    console.log("ResetPasswordForm: All searchParams:", Object.fromEntries(searchParams.entries()));
     console.log("ResetPasswordForm: Checking for token/code:", { token, type });
     
     if (token) {
@@ -29,11 +32,19 @@ export function ResetPasswordForm() {
       console.log("ResetPasswordForm: Valid token found, allowing password reset");
     } else {
       console.log("ResetPasswordForm: No valid token found");
+      console.log("ResetPasswordForm: Available params:", {
+        code: searchParams.get('code'),
+        token: searchParams.get('token'),
+        type: searchParams.get('type'),
+        allParams: Array.from(searchParams.entries())
+      });
+      
       toast({
         variant: "destructive",
         title: "Invalid reset link",
         description: "This password reset link is invalid or has expired.",
       });
+      
       // Don't navigate away immediately, let user see the error
       setTimeout(() => {
         window.location.href = '/forgot-password';
