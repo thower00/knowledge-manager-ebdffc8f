@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserRoleManagement } from "@/components/admin/UserRoleManagement";
 import { ManualUserCreation } from "@/components/admin/ManualUserCreation";
+import { RegistrationSettings } from "@/components/admin/RegistrationSettings";
+import { PasswordChangeSettings } from "@/components/admin/PasswordChangeSettings";
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -141,10 +143,12 @@ export default function UserManagement() {
         <h1 className="text-3xl font-bold">User Management</h1>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="roles">Role Management</TabsTrigger>
             <TabsTrigger value="create">Create User</TabsTrigger>
+            <TabsTrigger value="settings">Registration Settings</TabsTrigger>
+            <TabsTrigger value="password">Change Password</TabsTrigger>
           </TabsList>
           
           <TabsContent value="users" className="mt-6">
@@ -181,6 +185,14 @@ export default function UserManagement() {
 
           <TabsContent value="create" className="mt-6">
             <ManualUserCreation onUserCreated={handleUserCreated} />
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-6">
+            <RegistrationSettings />
+          </TabsContent>
+
+          <TabsContent value="password" className="mt-6">
+            <PasswordChangeSettings />
           </TabsContent>
         </Tabs>
       </div>
