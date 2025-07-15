@@ -36,6 +36,14 @@ export function ResetPasswordForm() {
       console.log("ResetPasswordForm: Valid recovery flow detected");
     } else {
       console.log("ResetPasswordForm: No valid recovery token found");
+      console.log("ResetPasswordForm: Available params:", {
+        urlToken: urlParams.get('token'),
+        urlCode: urlParams.get('code'),
+        urlType: urlParams.get('type'),
+        hashAccessToken: hashParams.get('access_token'),
+        hashType: hashParams.get('type'),
+        hashExpiresAt: hashParams.get('expires_at')
+      });
       
       toast({
         variant: "destructive",
