@@ -28,7 +28,8 @@ export function ResetPasswordForm() {
     
     console.log("ResetPasswordForm: Full URL:", fullUrl);
     console.log("ResetPasswordForm: Checking for token/code:", { token: !!token, type });
-    console.log("ResetPasswordForm: Hash:", window.location.hash);
+    console.log("ResetPasswordForm: Hash params:", Object.fromEntries(hashParams.entries()));
+    console.log("ResetPasswordForm: URL params:", Object.fromEntries(urlParams.entries()));
     
     if (token || type === 'recovery') {
       setIsValidToken(true);
