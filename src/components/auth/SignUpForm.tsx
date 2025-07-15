@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { useRegistrationSettings } from "@/hooks/useRegistrationSettings";
 
 interface SignUpFormProps {
   onSignIn: () => void;
@@ -16,17 +19,102 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { allowPublicRegistration, loading: settingsLoading } = useRegistrationSettings();
+  const { toast } = useToast();
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!allowPublicRegistration) {
+      toast({
+        variant: "destructive",
+        title: "Registrering inaktiverad",
+        description: "Självregistrering är för närvarande inaktiverad.",
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Lösenorden matchar inte",
+        description: "Kontrollera att lösenorden är identiska.",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Lösenordet är för kort",
+        description: "Lösenordet måste vara minst 6 tecken långt.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Konto skapat!",
+        description: "Kontrollera din e-post för att verifiera ditt konto.",
+      });
+
+      // Clear form
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      
+    } catch (error: any) {
+      console.error("Sign up error:", error);
+      toast({
+        variant: "destructive",
+        title: "Registrering misslyckades",
+        description: error.message || "Ett oväntat fel inträffade.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        <span>Laddar...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pt-2">
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Självregistrering är för närvarande inaktiverad. Kontakta en administratör för att få ett konto.
-        </AlertDescription>
-      </Alert>
+      {!allowPublicRegistration && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Självregistrering är för närvarande inaktiverad. Kontakta en administratör för att få ett konto.
+          </AlertDescription>
+        </Alert>
+      )}
 
-      <form className="space-y-4 opacity-50 pointer-events-none">
+      <form onSubmit={handleSignUp} className={`space-y-4 ${!allowPublicRegistration ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="firstName">Förnamn</Label>
@@ -35,7 +123,8 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
               placeholder="John"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              disabled={true}
+              disabled={!allowPublicRegistration}
+              required
             />
           </div>
           
@@ -46,7 +135,8 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
               placeholder="Doe"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              disabled={true}
+              disabled={!allowPublicRegistration}
+              required
             />
           </div>
         </div>
@@ -59,7 +149,8 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
             placeholder="din@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={true}
+            disabled={!allowPublicRegistration}
+            required
           />
         </div>
         
@@ -71,7 +162,9 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            disabled={true}
+            disabled={!allowPublicRegistration}
+            required
+            minLength={6}
           />
         </div>
         
@@ -83,16 +176,27 @@ export default function SignUpForm({ onSignIn }: SignUpFormProps) {
             placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={true}
+            disabled={!allowPublicRegistration}
+            required
+            minLength={6}
           />
         </div>
         
         <Button
-          type="button"
+          type="submit"
           className="w-full bg-brand-600 hover:bg-brand-700"
-          disabled={true}
+          disabled={!allowPublicRegistration || isSubmitting}
         >
-          Skapa konto (Inaktiverat)
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Skapar konto...
+            </>
+          ) : allowPublicRegistration ? (
+            "Skapa konto"
+          ) : (
+            "Skapa konto (Inaktiverat)"
+          )}
         </Button>
       </form>
       
