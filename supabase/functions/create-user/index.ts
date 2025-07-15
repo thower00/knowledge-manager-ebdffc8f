@@ -111,7 +111,7 @@ serve(async (req) => {
     // Send password reset email so user can set their password
     try {
       const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: `${Deno.env.get('SUPABASE_URL')?.replace('/auth/v1', '')}/reset-password`,
+        redirectTo: `https://knowledge-manager.lovable.app/`,
       })
 
       if (resetError) {
