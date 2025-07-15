@@ -80,27 +80,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("AuthProvider mounted");
     setIsLoading(true);
     
-    // Check for password reset code in URL on mount
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const type = urlParams.get('type');
-    const token = urlParams.get('token'); // Supabase also uses 'token' parameter
-    
-    console.log("AuthContext: Checking URL params - code:", code, "type:", type, "token:", token);
-    
-    // If we have a recovery type, redirect to reset password page
-    if (type === 'recovery' || (token && type === 'recovery')) {
-      console.log("AuthContext: Found recovery type, redirecting to reset-password page");
-      const resetUrl = `/reset-password?${window.location.search}`;
-      window.location.href = resetUrl;
-      return;
-    }
-    
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log("Auth state change event:", event);
         console.log("Auth state change session:", currentSession?.user?.id || 'no user');
+        
+        // Check for password reset after login event
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const type = urlParams.get('type');
+          const token = urlParams.get('token');
+          const code = urlParams.get('code');
+          
+          console.log("AuthContext: Checking recovery params after login - type:", type, "token:", token, "code:", code);
+          
+          // If this was a recovery login, redirect to reset password
+          if (type === 'recovery' || token || code) {
+            console.log("AuthContext: Recovery login detected, redirecting to reset-password");
+            const resetUrl = `/reset-password?${window.location.search}`;
+            window.location.href = resetUrl;
+            return;
+          }
+        }
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
