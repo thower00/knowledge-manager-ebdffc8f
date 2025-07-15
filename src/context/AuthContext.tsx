@@ -94,11 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const code = urlParams.get('code');
           
           console.log("AuthContext: Checking recovery params after login - type:", type, "token:", token, "code:", code);
+          console.log("AuthContext: Current path:", window.location.pathname);
           
-          // If this was a recovery login, redirect to reset password page
-          if (type === 'recovery' || token || code) {
+          // If this was a recovery login and we're NOT already on reset-password page
+          if ((type === 'recovery' || token || code) && window.location.pathname !== '/reset-password') {
             console.log("AuthContext: Recovery login detected, redirecting to reset-password");
-            // Preserve all URL parameters when redirecting
             const resetUrl = `/reset-password${window.location.search}`;
             window.location.replace(resetUrl);
             return;
