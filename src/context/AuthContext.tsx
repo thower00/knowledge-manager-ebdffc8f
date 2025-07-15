@@ -145,7 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log("AuthContext: Cleaning up auth subscription");
       subscription.unsubscribe();
     };
-  }, [handleSignInWithRecovery]);
+  }, []); // REMOVE handleSignInWithRecovery dependency to prevent infinite loop
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue: AuthContextProps = {
