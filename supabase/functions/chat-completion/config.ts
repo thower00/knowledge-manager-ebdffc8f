@@ -42,14 +42,29 @@ export interface ChatConfig {
   chatTemperature: string
   chatMaxTokens: string
   chatSystemPrompt: string
-  embeddingProvider: string
-  embeddingModel: string
-  similarityThreshold: string
   apiKey: string
+}
+
+export interface DocumentProcessingConfig {
+  provider: string
+  embeddingModel: string
+  specificModelId: string
+  apiKey: string
+  chunkSize: string
+  chunkOverlap: string
+  chunkStrategy: string
+  similarityThreshold: string
+  embeddingBatchSize: string
+  vectorStorage: string
 }
 
 export interface CombinedConfig extends ChatConfig {
   searchConfig: SearchConfig
+  documentProcessingConfig: DocumentProcessingConfig
+  // Derived embedding settings (prioritizing document processing)
+  embeddingProvider: string
+  embeddingModel: string
+  similarityThreshold: string
 }
 
 export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> {
@@ -69,8 +84,18 @@ export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> 
     .eq('key', 'search_settings')
     .maybeSingle()
 
+  // Load document processing configuration from database
+  const { data: docProcessingData, error: docProcessingError } = await supabase
+    .from('configurations')
+    .select('value')
+    .eq('key', 'document_processing')
+    .maybeSingle()
+
   // Create search config with defaults
   const searchConfig = getSearchConfigWithDefaults(searchData, searchError)
+  
+  // Create document processing config with defaults
+  const documentProcessingConfig = getDocumentProcessingConfigWithDefaults(docProcessingData, docProcessingError)
   
   if (configError) {
     console.error('Error loading chat configuration:', configError)
@@ -83,11 +108,13 @@ export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> 
       chatTemperature: '0.7',
       chatMaxTokens: '2000',
       chatSystemPrompt: 'You are a helpful assistant that answers questions based on provided document content. When referencing documents, use the document titles naturally in your response text, but do NOT create a separate "Sources:" section at the end - the system will automatically display document sources separately.',
-      embeddingProvider: 'openai',
-      embeddingModel: 'text-embedding-3-small',
-      similarityThreshold: '0.7',
       apiKey: Deno.env.get('OPENAI_API_KEY') || '',
-      searchConfig
+      searchConfig,
+      documentProcessingConfig,
+      // Use document processing settings for embeddings
+      embeddingProvider: documentProcessingConfig.provider,
+      embeddingModel: documentProcessingConfig.specificModelId,
+      similarityThreshold: documentProcessingConfig.similarityThreshold
     }
   }
 
@@ -100,11 +127,13 @@ export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> 
       chatTemperature: '0.7',
       chatMaxTokens: '2000',
       chatSystemPrompt: 'You are a helpful assistant that answers questions based on provided document content. When referencing documents, use the document titles naturally in your response text, but do NOT create a separate "Sources:" section at the end - the system will automatically display document sources separately.',
-      embeddingProvider: 'openai',
-      embeddingModel: 'text-embedding-3-small',
-      similarityThreshold: '0.7',
       apiKey: Deno.env.get('OPENAI_API_KEY') || '',
-      searchConfig
+      searchConfig,
+      documentProcessingConfig,
+      // Use document processing settings for embeddings
+      embeddingProvider: documentProcessingConfig.provider,
+      embeddingModel: documentProcessingConfig.specificModelId,
+      similarityThreshold: documentProcessingConfig.similarityThreshold
     }
   }
 
@@ -113,9 +142,10 @@ export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> 
   console.log('Combined configuration loaded successfully:', {
     chatProvider: chatConfig.chatProvider,
     chatModel: chatConfig.chatModel,
-    embeddingProvider: chatConfig.embeddingProvider,
-    embeddingModel: chatConfig.embeddingModel,
-    searchConfigLoaded: !!searchConfig
+    documentProcessingProvider: documentProcessingConfig.provider,
+    documentProcessingModel: documentProcessingConfig.specificModelId,
+    searchConfigLoaded: !!searchConfig,
+    documentProcessingConfigLoaded: !!documentProcessingConfig
   })
 
   // Ensure the system prompt prevents duplicate sources
@@ -127,11 +157,13 @@ export async function getCombinedConfig(supabase: any): Promise<CombinedConfig> 
     chatTemperature: chatConfig.chatTemperature?.toString() || '0.7',
     chatMaxTokens: chatConfig.chatMaxTokens?.toString() || '2000',
     chatSystemPrompt: systemPrompt,
-    embeddingProvider: chatConfig.embeddingProvider || 'openai',
-    embeddingModel: chatConfig.embeddingModel || 'text-embedding-3-small',
-    similarityThreshold: chatConfig.similarityThreshold?.toString() || '0.7',
     apiKey: chatConfig.apiKey || Deno.env.get('OPENAI_API_KEY') || '',
-    searchConfig
+    searchConfig,
+    documentProcessingConfig,
+    // Prioritize document processing settings for embeddings
+    embeddingProvider: documentProcessingConfig.provider,
+    embeddingModel: documentProcessingConfig.specificModelId,
+    similarityThreshold: documentProcessingConfig.similarityThreshold
   }
 }
 
@@ -215,5 +247,48 @@ function getSearchConfigWithDefaults(searchData: any, searchError: any): SearchC
     enhancedContentSearchLimit: searchConfig.enhancedContentSearchLimit || defaultSearchConfig.enhancedContentSearchLimit,
     titleSearchMinWordLength: searchConfig.titleSearchMinWordLength || defaultSearchConfig.titleSearchMinWordLength,
     contentSearchBatchSize: searchConfig.contentSearchBatchSize || defaultSearchConfig.contentSearchBatchSize
+  }
+}
+
+function getDocumentProcessingConfigWithDefaults(docProcessingData: any, docProcessingError: any): DocumentProcessingConfig {
+  // Default document processing configuration matching the ConfigContext
+  const defaultDocProcessingConfig: DocumentProcessingConfig = {
+    provider: 'openai',
+    embeddingModel: 'openai',
+    specificModelId: 'text-embedding-3-small',
+    apiKey: '',
+    chunkSize: '1000',
+    chunkOverlap: '200',
+    chunkStrategy: 'fixed_size',
+    similarityThreshold: '0.5',
+    embeddingBatchSize: '10',
+    vectorStorage: 'supabase'
+  }
+
+  if (docProcessingError) {
+    console.error('Error loading document processing configuration:', docProcessingError)
+    console.log('Falling back to default document processing configuration...')
+    return defaultDocProcessingConfig
+  }
+
+  if (!docProcessingData?.value) {
+    console.log('No document processing configuration found, using defaults...')
+    return defaultDocProcessingConfig
+  }
+
+  const docConfig = docProcessingData.value as any
+  console.log('Document processing configuration loaded from database')
+
+  return {
+    provider: docConfig.provider || defaultDocProcessingConfig.provider,
+    embeddingModel: docConfig.embeddingModel || defaultDocProcessingConfig.embeddingModel,
+    specificModelId: docConfig.specificModelId || defaultDocProcessingConfig.specificModelId,
+    apiKey: docConfig.apiKey || docConfig.providerApiKeys?.openai || Deno.env.get('OPENAI_API_KEY') || '',
+    chunkSize: docConfig.chunkSize || defaultDocProcessingConfig.chunkSize,
+    chunkOverlap: docConfig.chunkOverlap || defaultDocProcessingConfig.chunkOverlap,
+    chunkStrategy: docConfig.chunkStrategy || defaultDocProcessingConfig.chunkStrategy,
+    similarityThreshold: docConfig.similarityThreshold || defaultDocProcessingConfig.similarityThreshold,
+    embeddingBatchSize: docConfig.embeddingBatchSize || defaultDocProcessingConfig.embeddingBatchSize,
+    vectorStorage: docConfig.vectorStorage || defaultDocProcessingConfig.vectorStorage
   }
 }
