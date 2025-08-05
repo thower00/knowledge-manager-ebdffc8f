@@ -4,11 +4,11 @@ import { ChunkingConfig } from "@/types/chunking";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useChunkingConfig() {
-  // Default chunking configuration
+  // State will be populated from Configuration Management
   const [chunkingConfig, setChunkingConfig] = useState<ChunkingConfig>({
     chunkSize: 1000,
     chunkOverlap: 200,
-    chunkStrategy: "fixed_size",
+    chunkStrategy: "recursive", // Match Configuration Management default
   });
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function useChunkingConfig() {
           // Ensure we have numbers, not strings for numeric values
           chunkSize: parseInt(configValue.chunkSize) || 1000,
           chunkOverlap: parseInt(configValue.chunkOverlap) || 200,
-          chunkStrategy: configValue.chunkStrategy as ChunkingConfig["chunkStrategy"] || "fixed_size",
+          chunkStrategy: configValue.chunkStrategy as ChunkingConfig["chunkStrategy"] || "recursive",
         });
       } else {
         console.log("useChunkingConfig - No configuration found, using defaults");

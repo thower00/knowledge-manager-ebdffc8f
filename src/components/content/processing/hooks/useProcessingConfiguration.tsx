@@ -9,6 +9,7 @@ interface ProcessingConfig {
   embedding: EmbeddingConfig;
 }
 
+// These values should match Configuration Management defaults
 const DEFAULT_CHUNKING_CONFIG: ChunkingConfig = {
   chunkSize: 1000,
   chunkOverlap: 200,
