@@ -9,19 +9,16 @@ export async function performSimilaritySearch(
   isExtensiveSummary: boolean = false,
   isFactualQuestion: boolean = false
 ): Promise<ContextSource[]> {
-  // Enhanced thresholds for different types of questions
+  // Use search configuration for thresholds
   let baseThresholds
+  const searchConfig = config.searchConfig
   
   if (isFactualQuestion) {
-    // More aggressive thresholds for factual questions to capture more potential matches
-    // Lower thresholds to ensure we don't miss relevant content
-    baseThresholds = isDocumentSpecific ? [0.03, 0.1, 0.2, 0.3, 0.4] : [0.05, 0.15, 0.25, 0.35, 0.45]
+    baseThresholds = searchConfig.factualQuestionThresholds
   } else if (isSummaryRequest) {
-    // Relaxed thresholds for summary requests
-    baseThresholds = [0.1, 0.2, 0.3, 0.4, 0.5]
+    baseThresholds = searchConfig.summaryRequestThresholds
   } else {
-    // Standard thresholds for regular questions
-    baseThresholds = isDocumentSpecific ? [0.15, 0.25, 0.35, 0.45] : [parseFloat(config.similarityThreshold) * 0.8, 0.25, 0.35, 0.45]
+    baseThresholds = searchConfig.standardThresholds
   }
   
   console.log(`Using ${isFactualQuestion ? 'factual-question-optimized' : (isSummaryRequest ? 'summary-optimized' : 'standard')} search thresholds:`, baseThresholds)
@@ -31,14 +28,14 @@ export async function performSimilaritySearch(
   for (const threshold of baseThresholds) {
     console.log(`Attempting enhanced vector search with threshold: ${threshold}`)
     
-    // Enhanced match count for different question types
+    // Use search configuration for match count
     let matchCount
     if (isFactualQuestion) {
-      matchCount = 50  // Significantly increased for factual questions to ensure complete coverage
+      matchCount = searchConfig.factualQuestionMatchCount
     } else if (isSummaryRequest) {
-      matchCount = isExtensiveSummary ? 30 : 25
+      matchCount = isExtensiveSummary ? searchConfig.extensiveSummaryMatchCount : searchConfig.summaryMatchCount
     } else {
-      matchCount = isDocumentSpecific ? 20 : 15
+      matchCount = searchConfig.standardMatchCount
     }
     
     console.log(`Using match count: ${matchCount} for question type`)
@@ -63,11 +60,11 @@ export async function performSimilaritySearch(
         
         // Enhanced result processing based on question type
         if (isFactualQuestion) {
-          searchResults = processFactualQuestionResults(results)
+          searchResults = processFactualQuestionResults(results, searchConfig)
         } else if (isSummaryRequest) {
-          searchResults = processSummaryResults(results, isExtensiveSummary)
+          searchResults = processSummaryResults(results, isExtensiveSummary, searchConfig)
         } else {
-          searchResults = processStandardResults(results, isDocumentSpecific)
+          searchResults = processStandardResults(results, isDocumentSpecific, searchConfig)
         }
         
         console.log('Final enhanced search results details:', searchResults.map(r => ({
@@ -113,7 +110,7 @@ export async function performSimilaritySearch(
 /**
  * Enhanced processing for factual questions - prioritizes document coverage and comprehensive time-related content
  */
-function processFactualQuestionResults(results: any[]): any[] {
+function processFactualQuestionResults(results: any[], searchConfig: any): any[] {
   console.log('Processing results for factual question request with enhanced comprehensive document coverage...')
   
   // Group results by document to ensure comprehensive coverage
@@ -131,8 +128,8 @@ function processFactualQuestionResults(results: any[]): any[] {
   
   // For factual questions, prioritize getting comprehensive coverage from relevant documents
   const diverseResults = []
-  const chunksPerDocument = 18  // Increased significantly for better document coverage
-  const totalChunksLimit = 45   // Increased total limit for comprehensive coverage
+  const chunksPerDocument = searchConfig.factualQuestionChunksPerDocument
+  const totalChunksLimit = searchConfig.factualQuestionTotalChunksLimit
   
   // Sort documents by relevance and ensure we get chunks from different parts of each document
   const documentsByRelevance = Array.from(resultsByDocument.entries())
@@ -218,7 +215,7 @@ function selectDistributedChunksForFactual(chunks: any[], count: number): any[] 
  * Process results specifically for summary requests
  * Ensures better coverage across documents and prioritizes completeness
  */
-function processSummaryResults(results: any[], isExtensiveSummary: boolean): any[] {
+function processSummaryResults(results: any[], isExtensiveSummary: boolean, searchConfig: any): any[] {
   console.log('Processing results for summary request...')
   
   // Group results by document to ensure comprehensive coverage
@@ -236,8 +233,8 @@ function processSummaryResults(results: any[], isExtensiveSummary: boolean): any
   
   // For summary requests, prioritize getting substantial content from each document
   const diverseResults = []
-  const chunksPerDocument = isExtensiveSummary ? 8 : 5 // More chunks for extensive summaries
-  const totalChunksLimit = isExtensiveSummary ? 20 : 15
+  const chunksPerDocument = isExtensiveSummary ? searchConfig.extensiveSummaryChunksPerDocument : searchConfig.summaryChunksPerDocument
+  const totalChunksLimit = isExtensiveSummary ? searchConfig.extensiveSummaryTotalChunksLimit : searchConfig.summaryTotalChunksLimit
   
   // Sort documents by average similarity to prioritize most relevant documents
   const documentsByRelevance = Array.from(resultsByDocument.entries())
@@ -270,7 +267,7 @@ function processSummaryResults(results: any[], isExtensiveSummary: boolean): any
 /**
  * Standard result processing for non-summary requests
  */
-function processStandardResults(results: any[], isDocumentSpecific: boolean): any[] {
+function processStandardResults(results: any[], isDocumentSpecific: boolean, searchConfig: any): any[] {
   // Group results by document to ensure diversity
   const resultsByDocument = new Map()
   results.forEach(result => {
@@ -286,7 +283,7 @@ function processStandardResults(results: any[], isDocumentSpecific: boolean): an
   
   // Take results from multiple documents to ensure diversity but limit total
   const diverseResults = []
-  const maxPerDocument = Math.min(4, Math.ceil(12 / Math.max(resultsByDocument.size, 1)))
+  const maxPerDocument = Math.min(searchConfig.standardChunksPerDocument, Math.ceil(searchConfig.standardTotalChunksLimit / Math.max(resultsByDocument.size, 1)))
   
   for (const [docTitle, docResults] of resultsByDocument) {
     // Sort by similarity and take the best chunks from each document
@@ -296,5 +293,5 @@ function processStandardResults(results: any[], isDocumentSpecific: boolean): an
   
   return diverseResults
     .sort((a, b) => b.similarity - a.similarity) // Sort all results by similarity
-    .slice(0, 15) // Limit total results
+    .slice(0, searchConfig.standardTotalChunksLimit) // Use configured limit
 }

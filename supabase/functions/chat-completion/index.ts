@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { authenticateUser } from './auth.ts'
-import { getChatConfig } from './config.ts'
+import { getCombinedConfig } from './config.ts'
 import { performVectorSearch } from './vectorSearch.ts'
 import { generateChatResponse } from './chatProvider.ts'
 import { manageSession, storeMessagesToDatabase } from './messageStorage.ts'
@@ -49,9 +49,9 @@ serve(async (req) => {
     // =========================
     // 3. LOAD CONFIGURATION
     // =========================
-    console.log('=== Loading configuration ===')
-    const config = await getChatConfig(supabase)
-    console.log('Configuration loaded successfully:', {
+    console.log('=== Loading combined configuration ===')
+    const config = await getCombinedConfig(supabase)
+    console.log('Combined configuration loaded successfully:', {
       chatProvider: config.chatProvider,
       chatModel: config.chatModel,
       chatTemperature: config.chatTemperature,
@@ -59,7 +59,10 @@ serve(async (req) => {
       embeddingProvider: config.embeddingProvider,
       embeddingModel: config.embeddingModel,
       similarityThreshold: config.similarityThreshold,
-      hasApiKey: !!config.apiKey
+      hasApiKey: !!config.apiKey,
+      searchConfigEnabled: !!config.searchConfig,
+      factualQuestionThresholds: config.searchConfig.factualQuestionThresholds,
+      factualQuestionMatchCount: config.searchConfig.factualQuestionMatchCount
     })
 
     // =========================
