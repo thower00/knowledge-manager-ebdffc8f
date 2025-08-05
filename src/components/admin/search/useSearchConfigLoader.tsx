@@ -55,6 +55,9 @@ export function useSearchConfigLoader() {
         .upsert({
           key: "search_settings",
           value: config as any,
+        }, { 
+          onConflict: 'key',
+          ignoreDuplicates: false 
         });
 
       if (error) {
