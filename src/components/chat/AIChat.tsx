@@ -1,5 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
+import { processMessageContent } from '@/utils/markdownParser';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,9 +33,33 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from 'date-fns';
 import { DocumentSourcePanel } from './DocumentSourcePanel';
 
-// Message component to display chat messages
+// Message component to display chat messages with markdown support
 const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user';
+  
+  // Fallback to original rendering if markdown processing fails
+  const renderContent = () => {
+    try {
+      const parsedContent = processMessageContent(message.content);
+      return (
+        <div className="text-sm">
+          {parsedContent}
+        </div>
+      );
+    } catch (error) {
+      console.warn('Failed to parse markdown, falling back to plain text:', error);
+      // Fallback to original rendering
+      return (
+        <div className="text-sm">
+          {message.content.split('\n').map((text, i) => (
+            <p key={i} className={i > 0 ? 'mt-2' : ''}>
+              {text}
+            </p>
+          ))}
+        </div>
+      );
+    }
+  };
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -45,13 +70,7 @@ const ChatMessage = ({ message }) => {
             : 'bg-muted text-foreground'
         } px-4 py-3 rounded-lg max-w-[80%] relative`}
       >
-        <div className="text-sm">
-          {message.content.split('\n').map((text, i) => (
-            <p key={i} className={i > 0 ? 'mt-2' : ''}>
-              {text}
-            </p>
-          ))}
-        </div>
+        {renderContent()}
         {message.created_at && (
           <div className="text-xs opacity-70 mt-2 text-right">
             {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
