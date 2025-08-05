@@ -293,5 +293,5 @@ function processStandardResults(results: any[], isDocumentSpecific: boolean, sea
   
   return diverseResults
     .sort((a, b) => b.similarity - a.similarity) // Sort all results by similarity
-    .slice(0, searchConfig.standardTotalChunksLimit) // Use configured limit
+    .slice(0, searchConfig.standardMatchCount) // Use standardMatchCount for consistency
 }
