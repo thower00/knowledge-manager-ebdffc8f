@@ -153,12 +153,13 @@ export async function generateChatResponse(
   console.log('All relevant documents for this response:', allRelevantDocs)
   
   // Check if this is a document listing query and we have a specific document list response
-  const isDocumentListingQuery = /\b(list.*documents|what.*documents|documents.*access|what documents do you have)\b/i.test(question)
+  const isDocumentListingQuery = /\b(list.*documents|what.*documents|documents.*access|what documents do you have|vilka dokument)\b/i.test(question)
   const hasDocumentListContext = /I have access to \d+ processed document/.test(contextText)
   
   if (isDocumentListingQuery && hasDocumentListContext) {
     // For document listing queries, pass the context directly as the response
-    console.log('Using document listing context directly as response')
+    // Do NOT add additional document references to avoid duplication
+    console.log('Using document listing context directly as response (no additional references)')
     return contextText
   }
   
