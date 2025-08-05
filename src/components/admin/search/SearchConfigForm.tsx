@@ -192,59 +192,99 @@ export function SearchConfigForm({ isLoading }: SearchConfigFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Chunks Per Document</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div>
-                  <Label htmlFor="factualQuestionChunksPerDocument" className="text-xs">Factual</Label>
-                  <Input
-                    id="factualQuestionChunksPerDocument"
-                    type="number"
-                    value={config.factualQuestionChunksPerDocument}
-                    onChange={(e) => handleNumberChange('factualQuestionChunksPerDocument', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="summaryChunksPerDocument" className="text-xs">Summary</Label>
-                  <Input
-                    id="summaryChunksPerDocument"
-                    type="number"
-                    value={config.summaryChunksPerDocument}
-                    onChange={(e) => handleNumberChange('summaryChunksPerDocument', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <Label>Total Chunks Limit</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div>
-                  <Label htmlFor="factualQuestionTotalChunksLimit" className="text-xs">Factual</Label>
-                  <Input
-                    id="factualQuestionTotalChunksLimit"
-                    type="number"
-                    value={config.factualQuestionTotalChunksLimit}
-                    onChange={(e) => handleNumberChange('factualQuestionTotalChunksLimit', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="summaryTotalChunksLimit" className="text-xs">Summary</Label>
-                  <Input
-                    id="summaryTotalChunksLimit"
-                    type="number"
-                    value={config.summaryTotalChunksLimit}
-                    onChange={(e) => handleNumberChange('summaryTotalChunksLimit', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+           <div className="grid grid-cols-2 gap-4">
+             <div>
+               <Label>Chunks Per Document</Label>
+               <div className="grid grid-cols-2 gap-2 mt-1">
+                 <div>
+                   <Label htmlFor="factualQuestionChunksPerDocument" className="text-xs">Factual</Label>
+                   <Input
+                     id="factualQuestionChunksPerDocument"
+                     type="number"
+                     value={config.factualQuestionChunksPerDocument}
+                     onChange={(e) => handleNumberChange('factualQuestionChunksPerDocument', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="summaryChunksPerDocument" className="text-xs">Summary</Label>
+                   <Input
+                     id="summaryChunksPerDocument"
+                     type="number"
+                     value={config.summaryChunksPerDocument}
+                     onChange={(e) => handleNumberChange('summaryChunksPerDocument', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="extensiveSummaryChunksPerDocument" className="text-xs">Extensive</Label>
+                   <Input
+                     id="extensiveSummaryChunksPerDocument"
+                     type="number"
+                     value={config.extensiveSummaryChunksPerDocument}
+                     onChange={(e) => handleNumberChange('extensiveSummaryChunksPerDocument', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="standardChunksPerDocument" className="text-xs">Standard</Label>
+                   <Input
+                     id="standardChunksPerDocument"
+                     type="number"
+                     value={config.standardChunksPerDocument}
+                     onChange={(e) => handleNumberChange('standardChunksPerDocument', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+               </div>
+             </div>
+             
+             <div>
+               <Label>Total Chunks Limit</Label>
+               <div className="grid grid-cols-2 gap-2 mt-1">
+                 <div>
+                   <Label htmlFor="factualQuestionTotalChunksLimit" className="text-xs">Factual</Label>
+                   <Input
+                     id="factualQuestionTotalChunksLimit"
+                     type="number"
+                     value={config.factualQuestionTotalChunksLimit}
+                     onChange={(e) => handleNumberChange('factualQuestionTotalChunksLimit', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="summaryTotalChunksLimit" className="text-xs">Summary</Label>
+                   <Input
+                     id="summaryTotalChunksLimit"
+                     type="number"
+                     value={config.summaryTotalChunksLimit}
+                     onChange={(e) => handleNumberChange('summaryTotalChunksLimit', e.target.value)}
+                     disabled={isLoading}
+                   />
+                 </div>
+                  <div>
+                    <Label htmlFor="extensiveSummaryTotalChunksLimit" className="text-xs">Extensive</Label>
+                    <Input
+                      id="extensiveSummaryTotalChunksLimit"
+                      type="number"
+                      value={config.extensiveSummaryTotalChunksLimit}
+                      onChange={(e) => handleNumberChange('extensiveSummaryTotalChunksLimit', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="standardTotalChunksLimit" className="text-xs">Standard</Label>
+                    <Input
+                      id="standardTotalChunksLimit"
+                      type="number"
+                      value={config.standardTotalChunksLimit}
+                      onChange={(e) => handleNumberChange('standardTotalChunksLimit', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+               </div>
+             </div>
+           </div>
           
           <Separator />
           
