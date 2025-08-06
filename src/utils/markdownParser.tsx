@@ -58,6 +58,9 @@ export function parseMarkdownToJSX(text: string): React.ReactNode[] {
   // Sort matches by index
   allMatches.sort((a, b) => a.index - b.index);
 
+  // Generate unique base ID for this parsing session
+  const uniqueId = Math.random().toString(36).substr(2, 9);
+  
   // Process matches and build JSX elements
   allMatches.forEach((match, matchIndex) => {
     // Add text before this match
@@ -68,11 +71,11 @@ export function parseMarkdownToJSX(text: string): React.ReactNode[] {
       }
     }
 
-    // Add the matched element
+    // Add the matched element with unique keys
     if (match.type === 'link' && match.url) {
       elements.push(
         <a
-          key={`link-${matchIndex}`}
+          key={`link-${uniqueId}-${matchIndex}`}
           href={match.url}
           target="_blank"
           rel="noopener noreferrer"
@@ -83,7 +86,7 @@ export function parseMarkdownToJSX(text: string): React.ReactNode[] {
       );
     } else if (match.type === 'bold') {
       elements.push(
-        <strong key={`bold-${matchIndex}`} className="font-semibold">
+        <strong key={`bold-${uniqueId}-${matchIndex}`} className="font-semibold">
           {match.text}
         </strong>
       );
@@ -118,10 +121,11 @@ export function processMessageContent(content: string): React.ReactNode[] {
 
   const lines = content.split('\n');
   const result: React.ReactNode[] = [];
+  const uniqueContentId = Math.random().toString(36).substr(2, 9);
 
   lines.forEach((line, lineIndex) => {
     if (lineIndex > 0) {
-      result.push(<br key={`br-${lineIndex}`} />);
+      result.push(<br key={`br-${uniqueContentId}-${lineIndex}`} />);
     }
     
     const parsedLine = parseMarkdownToJSX(line);
