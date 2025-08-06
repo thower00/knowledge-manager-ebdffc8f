@@ -228,8 +228,8 @@ export async function generateChatResponse(
     const assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
     console.log('OpenAI response received with enhanced context')
     
-    // Append enhanced document references to the response if available
-    return assistantResponse + documentReferences
+    // Return response without document references - they will be handled by the frontend
+    return assistantResponse
   } else {
     console.error('Unsupported chat provider:', config.chatProvider)
     throw new Error(`Unsupported chat provider: ${config.chatProvider}. Please configure OpenAI in the admin settings.`)
