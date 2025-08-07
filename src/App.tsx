@@ -75,9 +75,10 @@ const App = () => (
             <Toaster />
             <Sonner />
             <SidebarProvider defaultOpen={true}>
-              <div className="flex flex-col min-h-screen w-full">
+              <div className="min-h-screen w-full">
                 <Navbar />
-                <div className="flex flex-1">
+                <div className="flex flex-col min-h-screen w-full pt-16">
+                  <div className="flex flex-1">
                   <AppSidebar />
                   <SidebarInset className="flex-grow">
                     <main className="flex-grow">
@@ -125,6 +126,7 @@ const App = () => (
                     </main>
                     <Footer />
                   </SidebarInset>
+                  </div>
                 </div>
               </div>
             </SidebarProvider>
