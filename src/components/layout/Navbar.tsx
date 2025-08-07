@@ -19,15 +19,15 @@ export default function Navbar() {
   
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background">
-      <div className="flex h-16 items-center justify-between px-4 lg:px-6 ml-60">
-        <div className="flex items-center gap-2">
+      <div className="flex h-16 items-center justify-between">
+        <div className="flex items-center gap-2 pl-4 lg:pl-6">
           <FileText className="h-6 w-6 text-brand-600" />
           <Link to="/" className="logo-text">
             Knowledge Manager
           </Link>
         </div>
         
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-6 pr-4 lg:pr-6">
           {user ? (
             <div className="flex items-center gap-4">
               <div className="hidden md:block">
