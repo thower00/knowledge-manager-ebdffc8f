@@ -16,7 +16,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { VerificationStatusAlert, VerificationButton } from "./VerificationStatus";
-import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface GoogleDriveConfig {
@@ -46,8 +46,14 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
   const [googleDriveVerification, setGoogleDriveVerification] = useState<VerificationStatus>({
     isVerifying: false
   });
-  const [showSensitiveData, setShowSensitiveData] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
+  const [fieldValues, setFieldValues] = useState<GoogleDriveConfig>({
+    client_email: "",
+    private_key: "",
+    project_id: "",
+    private_key_id: "",
+    folder_id: ""
+  });
   const { toast } = useToast();
 
   // Fetch configurations from the database
@@ -123,7 +129,7 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setGoogleDriveConfig({ ...googleDriveConfig, [name]: value });
+    setFieldValues({ ...fieldValues, [name]: value });
   };
 
   const handleSave = async () => {
@@ -132,13 +138,13 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     try {
       console.log("Saving Google Drive configuration");
       
-      // Convert GoogleDriveConfig to Json compatible object
+      // Convert current field values to Json compatible object
       const jsonValue = {
-        client_email: googleDriveConfig.client_email,
-        private_key: googleDriveConfig.private_key,
-        project_id: googleDriveConfig.project_id,
-        private_key_id: googleDriveConfig.private_key_id,
-        folder_id: googleDriveConfig.folder_id
+        client_email: fieldValues.client_email,
+        private_key: fieldValues.private_key,
+        project_id: fieldValues.project_id,
+        private_key_id: fieldValues.private_key_id,
+        folder_id: fieldValues.folder_id
       } as Json;
       
       const { error } = await supabase
@@ -156,8 +162,9 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         return;
       }
       
+      // Update the saved config with new values
+      setGoogleDriveConfig(fieldValues);
       setConfigSaved(true);
-      setShowSensitiveData(false);
       
       toast({
         title: "Google Drive configuration saved",
@@ -184,10 +191,10 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
       // Call Supabase Edge Function to verify Google Drive configuration
       const { data, error } = await supabase.functions.invoke("verify-google-drive", {
         body: { 
-          client_email: googleDriveConfig.client_email,
-          private_key: googleDriveConfig.private_key,
-          project_id: googleDriveConfig.project_id,
-          folder_id: googleDriveConfig.folder_id,
+          client_email: fieldValues.client_email,
+          private_key: fieldValues.private_key,
+          project_id: fieldValues.project_id,
+          folder_id: fieldValues.folder_id,
         },
       });
       
@@ -220,36 +227,39 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     }
   };
 
-  const maskValue = (value: string, isEmail = false) => {
-    if (!value || !configSaved || showSensitiveData) return value;
+  const getFieldDisplayValue = (fieldName: keyof GoogleDriveConfig, savedValue: string) => {
+    const currentFieldValue = fieldValues[fieldName];
     
-    if (isEmail) {
-      const [username, domain] = value.split('@');
-      if (username && domain) {
-        return `${username.slice(0, 2)}***@${domain}`;
+    // If user is actively typing (field has content different from saved), show the typed value
+    if (currentFieldValue && currentFieldValue !== savedValue) {
+      return currentFieldValue;
+    }
+    
+    // If configuration is saved and field is empty or matches saved value, show masked version
+    if (configSaved && savedValue) {
+      if (fieldName === 'private_key') {
+        return "***PRIVATE KEY SET***";
+      } else if (fieldName === 'client_email') {
+        const [username, domain] = savedValue.split('@');
+        if (username && domain) {
+          return `${username.slice(0, 2)}***@${domain}`;
+        }
+        return "***";
+      } else if (fieldName === 'private_key_id' && savedValue) {
+        return savedValue.length <= 8 ? "***" : `${savedValue.slice(0, 3)}***${savedValue.slice(-3)}`;
       }
     }
     
-    if (value.length <= 8) {
-      return "***";
-    }
-    return `${value.slice(0, 3)}***${value.slice(-3)}`;
+    // Otherwise show the current field value (for new inputs or non-sensitive fields)
+    return currentFieldValue;
   };
 
-  const maskPrivateKey = (value: string) => {
-    if (!value || !configSaved || showSensitiveData) return value;
-    return "***PRIVATE KEY SET***";
-  };
-
-  const toggleSensitiveVisibility = () => {
-    if (!showSensitiveData) {
-      // Show confirmation before revealing sensitive data
-      const confirmed = window.confirm(
-        "Are you sure you want to view sensitive configuration data? This should only be done for editing purposes."
-      );
-      if (!confirmed) return;
+  const getFieldPlaceholder = (fieldName: keyof GoogleDriveConfig, defaultPlaceholder: string) => {
+    const savedValue = googleDriveConfig[fieldName];
+    if (configSaved && savedValue) {
+      return "Enter new value to replace existing...";
     }
-    setShowSensitiveData(!showSensitiveData);
+    return defaultPlaceholder;
   };
 
   const clearConfiguration = async () => {
@@ -273,8 +283,14 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         private_key_id: "",
         folder_id: ""
       });
+      setFieldValues({
+        client_email: "",
+        private_key: "",
+        project_id: "",
+        private_key_id: "",
+        folder_id: ""
+      });
       setConfigSaved(false);
-      setShowSensitiveData(false);
       
       toast({
         title: "Configuration cleared",
@@ -300,43 +316,27 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
       <CardContent className="space-y-4">
         {configSaved && (
           <Alert>
-            <AlertTriangle className="h-4 w-4" />
+            <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Sensitive configuration data is masked for security. Use the "Show/Hide" button to view or edit values.
+              Configuration saved securely. Sensitive data is masked for security. You can enter new values to replace existing ones.
             </AlertDescription>
           </Alert>
         )}
-        
-        {configSaved && (
-          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-            <span className="text-sm font-medium">Configuration Status</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {showSensitiveData ? "Showing sensitive data" : "Data masked"}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleSensitiveVisibility}
-                className="flex items-center gap-2"
-              >
-                {showSensitiveData ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {showSensitiveData ? "Hide" : "Show"}
-              </Button>
-            </div>
-          </div>
-        )}
 
         <div className="grid gap-2">
-          <Label htmlFor="client_email">Client Email <span className="text-red-500">*</span></Label>
+          <Label htmlFor="client_email">
+            Client Email <span className="text-red-500">*</span>
+            {configSaved && googleDriveConfig.client_email && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Configured</span>
+            )}
+          </Label>
           <Input
             id="client_email"
             name="client_email"
-            type={configSaved && !showSensitiveData ? "password" : "email"}
-            value={maskValue(googleDriveConfig.client_email, true)}
+            type="email"
+            value={getFieldDisplayValue('client_email', googleDriveConfig.client_email)}
             onChange={handleGoogleDriveConfigChange}
-            placeholder="service-account@project-id.iam.gserviceaccount.com"
-            disabled={configSaved && !showSensitiveData}
+            placeholder={getFieldPlaceholder('client_email', "service-account@project-id.iam.gserviceaccount.com")}
           />
           <p className="text-sm text-muted-foreground">
             Service account email from Google Cloud.
@@ -344,16 +344,20 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="private_key">Private Key <span className="text-red-500">*</span></Label>
+          <Label htmlFor="private_key">
+            Private Key <span className="text-red-500">*</span>
+            {configSaved && googleDriveConfig.private_key && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Configured</span>
+            )}
+          </Label>
           <Textarea
             id="private_key"
             name="private_key"
-            value={maskPrivateKey(googleDriveConfig.private_key)}
+            value={getFieldDisplayValue('private_key', googleDriveConfig.private_key)}
             onChange={handleGoogleDriveConfigChange}
-            placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-            rows={configSaved && !showSensitiveData ? 1 : 5}
+            placeholder={getFieldPlaceholder('private_key', "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n")}
+            rows={configSaved && googleDriveConfig.private_key && !fieldValues.private_key ? 1 : 5}
             className="font-mono"
-            disabled={configSaved && !showSensitiveData}
           />
           <p className="text-sm text-muted-foreground">
             Private key for the service account (includes BEGIN/END markers).
@@ -361,14 +365,19 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="project_id">Project ID <span className="text-sm text-muted-foreground">(Optional)</span></Label>
+          <Label htmlFor="project_id">
+            Project ID <span className="text-sm text-muted-foreground">(Optional)</span>
+            {configSaved && googleDriveConfig.project_id && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Configured</span>
+            )}
+          </Label>
           <Input
             id="project_id"
             name="project_id"
             type="text"
-            value={googleDriveConfig.project_id}
+            value={getFieldDisplayValue('project_id', googleDriveConfig.project_id)}
             onChange={handleGoogleDriveConfigChange}
-            placeholder="your-project-id"
+            placeholder={getFieldPlaceholder('project_id', "your-project-id")}
           />
           <p className="text-sm text-muted-foreground">
             Google Cloud project ID associated with the service account.
@@ -376,15 +385,19 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="private_key_id">Private Key ID <span className="text-sm text-muted-foreground">(Optional)</span></Label>
+          <Label htmlFor="private_key_id">
+            Private Key ID <span className="text-sm text-muted-foreground">(Optional)</span>
+            {configSaved && googleDriveConfig.private_key_id && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Configured</span>
+            )}
+          </Label>
           <Input
             id="private_key_id"
             name="private_key_id"
-            type={configSaved && !showSensitiveData ? "password" : "text"}
-            value={maskValue(googleDriveConfig.private_key_id)}
+            type="text"
+            value={getFieldDisplayValue('private_key_id', googleDriveConfig.private_key_id)}
             onChange={handleGoogleDriveConfigChange}
-            placeholder="a1b2c3d4e5f6g7h8i9j0"
-            disabled={configSaved && !showSensitiveData}
+            placeholder={getFieldPlaceholder('private_key_id', "a1b2c3d4e5f6g7h8i9j0")}
           />
           <p className="text-sm text-muted-foreground">
             ID of the private key for the service account.
@@ -392,14 +405,19 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="folder_id">Google Drive Folder ID <span className="text-sm text-muted-foreground">(Optional)</span></Label>
+          <Label htmlFor="folder_id">
+            Google Drive Folder ID <span className="text-sm text-muted-foreground">(Optional)</span>
+            {configSaved && googleDriveConfig.folder_id && (
+              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Configured</span>
+            )}
+          </Label>
           <Input
             id="folder_id"
             name="folder_id"
             type="text"
-            value={googleDriveConfig.folder_id}
+            value={getFieldDisplayValue('folder_id', googleDriveConfig.folder_id)}
             onChange={handleGoogleDriveConfigChange}
-            placeholder="1abCdEfGhIjKlMnOpQrStUvWxYz"
+            placeholder={getFieldPlaceholder('folder_id', "1abCdEfGhIjKlMnOpQrStUvWxYz")}
           />
           <p className="text-sm text-muted-foreground">
             ID of the Google Drive folder to use for document storage.
@@ -410,7 +428,7 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
           <VerificationButton 
             onClick={verifyGoogleDriveConfig}
             isVerifying={googleDriveVerification.isVerifying}
-            disabled={!googleDriveConfig.client_email || !googleDriveConfig.private_key}
+            disabled={!fieldValues.client_email || !fieldValues.private_key}
           />
           
           <VerificationStatusAlert {...googleDriveVerification} />
@@ -426,9 +444,9 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </Button>
         <Button 
           onClick={handleSave}
-          disabled={isSaving || (configSaved && !showSensitiveData)}
+          disabled={isSaving || (!fieldValues.client_email && !fieldValues.private_key && !fieldValues.project_id && !fieldValues.private_key_id && !fieldValues.folder_id)}
         >
-          {isSaving ? "Saving..." : "Save Configuration"}
+          {isSaving ? "Saving..." : (configSaved ? "Update Configuration" : "Save Configuration")}
         </Button>
       </CardFooter>
     </Card>
