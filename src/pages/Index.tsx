@@ -56,10 +56,14 @@ export default function Index() {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  // Show AI Chat for authenticated users (without fullscreen layout to keep navbar visible)
+  // Show AI Chat for authenticated users (respecting layout structure)
   if (user) {
     console.log("Index page - User authenticated, showing AI chat", user);
-    return <AIChat />;
+    return (
+      <div className="flex flex-col h-full">
+        <AIChat />
+      </div>
+    );
   }
 
   // Show login/signup for non-authenticated users with hero layout
