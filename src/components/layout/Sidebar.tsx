@@ -31,11 +31,7 @@ export default function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex items-center justify-between">
-        <div className="flex items-center gap-2 px-4">
-          <FileText className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold">Knowledge Manager</span>
-        </div>
+      <SidebarHeader className="flex items-center justify-end">
         <SidebarTrigger />
       </SidebarHeader>
       

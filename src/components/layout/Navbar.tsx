@@ -20,7 +20,7 @@ export default function Navbar() {
   return (
     <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-16">
           <FileText className="h-6 w-6 text-brand-600" />
           <Link to="/" className="logo-text">
             Knowledge Manager
@@ -28,28 +28,6 @@ export default function Navbar() {
         </div>
         
         <nav className="flex items-center gap-6">
-          <Link to="/" className="text-sm font-medium transition-colors hover:text-brand-700">
-            Home
-          </Link>
-          <Link to="/features" className="text-sm font-medium transition-colors hover:text-brand-700">
-            Features
-          </Link>
-          <Link to="/docs" className="text-sm font-medium transition-colors hover:text-brand-700">
-            Documentation
-          </Link>
-          
-          {user && (
-            <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-brand-700">
-              Dashboard
-            </Link>
-          )}
-          
-          {isAdmin && (
-            <Link to="/admin" className="text-sm font-medium transition-colors hover:text-brand-700">
-              Admin
-            </Link>
-          )}
-          
           {user ? (
             <div className="flex items-center gap-4">
               <div className="hidden md:block">
