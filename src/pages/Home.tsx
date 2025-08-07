@@ -8,7 +8,6 @@ export default function Home() {
         <title>AI Chat | Knowledge Manager</title>
       </Helmet>
       
-      <h1 className="text-3xl font-bold mb-6">AI Chat</h1>
       <AIChat />
     </div>
   );
