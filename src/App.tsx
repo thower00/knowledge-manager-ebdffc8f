@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import Index from "./pages/Index";
+import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
@@ -82,6 +83,11 @@ const App = () => (
                     <main className="flex-grow">
                       <Routes>
                         <Route path="/" element={<Index />} />
+                        <Route path="/home" element={
+                          <ProtectedRoute>
+                            <Home />
+                          </ProtectedRoute>
+                        } />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="/profile" element={

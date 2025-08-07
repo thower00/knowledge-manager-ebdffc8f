@@ -38,8 +38,8 @@ export default function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/")} tooltip="Home">
-              <Link to="/">
+            <SidebarMenuButton asChild isActive={isActive("/home")} tooltip="Home">
+              <Link to="/home">
                 <LayoutDashboard />
                 <span>Home</span>
               </Link>

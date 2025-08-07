@@ -18,8 +18,16 @@ export default function Index() {
   
   // Debug function to help diagnose auth issues
   
-  // Check for password recovery first, before anything else
+  // Check for password recovery and redirect authenticated users
   useEffect(() => {
+    if (isLoading) return;
+    
+    // Redirect authenticated users to home
+    if (user) {
+      window.location.replace('/home');
+      return;
+    }
+    
     // Check URL for recovery parameters immediately on page load
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -48,7 +56,7 @@ export default function Index() {
     };
     
     checkAuth();
-  }, [user]);
+  }, [isLoading, user]);
   
   // Show loading state while checking authentication
   if (isLoading) {
@@ -56,11 +64,6 @@ export default function Index() {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  // Show AI Chat for authenticated users (respecting layout structure)
-  if (user) {
-    console.log("Index page - User authenticated, showing AI chat", user);
-    return <AIChat />;
-  }
 
   // Show login/signup for non-authenticated users with hero layout
   console.log("Index page - No user, showing auth forms");
