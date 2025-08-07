@@ -19,7 +19,7 @@ export default function Navbar() {
   
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background">
-      <div className="container flex h-16 items-center justify-between">
+      <div className="flex h-16 items-center justify-between px-4 lg:px-6 ml-60">
         <div className="flex items-center gap-2">
           <FileText className="h-6 w-6 text-brand-600" />
           <Link to="/" className="logo-text">
