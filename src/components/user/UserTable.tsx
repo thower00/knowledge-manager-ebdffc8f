@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 import { User } from "@/types/user";
+import { format } from "date-fns";
 
 interface UserTableProps {
   users: User[];
@@ -54,6 +55,15 @@ export function UserTable({
     (user) => user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const formatLastSignIn = (lastSignInAt: string | null | undefined) => {
+    if (!lastSignInAt) return "Never";
+    try {
+      return format(new Date(lastSignInAt), "yyyy-MM-dd HH:mm");
+    } catch {
+      return "Invalid date";
+    }
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -61,6 +71,7 @@ export function UserTable({
           <TableRow>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Last Login</TableHead>
             {mode === 'users' && <TableHead>Actions</TableHead>}
             {mode === 'roles' && <TableHead>Role Actions</TableHead>}
             {mode === 'users' && <TableHead className="w-20">Delete</TableHead>}
@@ -69,7 +80,7 @@ export function UserTable({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={mode === 'users' ? 4 : 3} className="text-center py-4">
+              <TableCell colSpan={mode === 'users' ? 5 : 4} className="text-center py-4">
                 <div className="flex items-center justify-center">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Loading users...
@@ -86,6 +97,9 @@ export function UserTable({
                   ) : (
                     "User"
                   )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {formatLastSignIn(user.lastSignInAt)}
                 </TableCell>
                 
                 {/* Actions column for both modes */}
@@ -172,7 +186,7 @@ export function UserTable({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={mode === 'users' ? 4 : 3} className="text-center py-4">
+              <TableCell colSpan={mode === 'users' ? 5 : 4} className="text-center py-4">
                 No users found.
               </TableCell>
             </TableRow>
