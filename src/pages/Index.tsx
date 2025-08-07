@@ -59,11 +59,7 @@ export default function Index() {
   // Show AI Chat for authenticated users (respecting layout structure)
   if (user) {
     console.log("Index page - User authenticated, showing AI chat", user);
-    return (
-      <div className="flex flex-col h-full">
-        <AIChat />
-      </div>
-    );
+    return <AIChat />;
   }
 
   // Show login/signup for non-authenticated users with hero layout
