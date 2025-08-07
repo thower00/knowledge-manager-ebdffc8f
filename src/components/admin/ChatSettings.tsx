@@ -38,6 +38,10 @@ function ChatSettingsContent({ activeTab }: { activeTab: string }) {
     <Card>
       <CardHeader>
         <CardTitle>AI Chat Configuration</CardTitle>
+        <div className="text-sm text-muted-foreground mt-2">
+          Konfigurerar vilken AI-modell och parametrar som används för att generera svar på användarfrågor. 
+          Dessa inställningar styr AI:ns beteende, kreativitet och svarsstil.
+        </div>
       </CardHeader>
       <CardContent>
         {isError && (

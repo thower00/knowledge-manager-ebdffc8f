@@ -34,7 +34,8 @@ export function SearchConfigForm({ isLoading }: SearchConfigFormProps) {
         <CardHeader>
           <CardTitle>Similarity Thresholds</CardTitle>
           <CardDescription>
-            Lower values increase recall but may reduce precision. Values should be between 0.0 and 1.0.
+            Styr hur lika dokumentdelar måste vara för att betraktas som relevanta. Lägre värden ger fler sökresultat 
+            men kan minska precision. Värden mellan 0.0 och 1.0.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -78,7 +79,8 @@ export function SearchConfigForm({ isLoading }: SearchConfigFormProps) {
         <CardHeader>
           <CardTitle>Match Count (Chunks Retrieved)</CardTitle>
           <CardDescription>
-            Higher values provide more context but may introduce noise. Adjust based on document size and complexity.
+            Antal dokumentdelar som hämtas för varje frågetyp. Högre värden ger mer kontext men kan introducera 
+            irrelevant information. Anpassa baserat på dokumentstorlek och komplexitet.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
@@ -133,7 +135,8 @@ export function SearchConfigForm({ isLoading }: SearchConfigFormProps) {
         <CardHeader>
           <CardTitle>Content Length Limits (Characters)</CardTitle>
           <CardDescription>
-            Maximum character count per chunk. Longer content provides more context but increases processing time.
+            Maximalt antal tecken per dokumentdel som skickas till AI:n. Längre innehåll ger mer kontext men 
+            ökar bearbetningstiden och kostnaden.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
@@ -188,7 +191,8 @@ export function SearchConfigForm({ isLoading }: SearchConfigFormProps) {
         <CardHeader>
           <CardTitle>Processing Limits</CardTitle>
           <CardDescription>
-            Fine-tune chunk processing and total limits for optimal performance and response quality.
+            Finjustera bearbetningsgränser för optimal prestanda och svarskvalitet. Balansera mellan 
+            informationsmängd och systembelastning.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

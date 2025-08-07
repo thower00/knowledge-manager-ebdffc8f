@@ -41,14 +41,18 @@ function SearchSettingsContent({ activeTab }: { activeTab: string }) {
           <Search className="h-5 w-5" />
           Search Configuration
         </CardTitle>
+        <div className="text-sm text-muted-foreground mt-2">
+          Konfigurerar hur systemet söker och filtrerar relevanta dokument innan de skickas till AI:n för att generera svar. 
+          Dessa inställningar påverkar vilka dokumentdelar som hittas och hur de prioriteras vid sökning.
+        </div>
       </CardHeader>
       <CardContent>
         <Alert className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Note:</strong> These search configuration values are currently not being used by the system. 
-            They are available for future implementation and testing purposes. The search system currently uses 
-            hard-coded default values for optimal performance.
+            <strong>Aktiva inställningar:</strong> Dessa sökkonfigurationsvärden används aktivt av systemet för att 
+            styra dokumentsökning och filtrering. Ändringar påverkar hur relevanta dokumentdelar hittas och prioriteras 
+            vid användarfrågor.
           </AlertDescription>
         </Alert>
 
