@@ -226,7 +226,7 @@ export default function AIChat() {
           </div>
         </CardHeader>
         
-        <CardContent className="p-4 h-96 overflow-y-auto">
+        <CardContent className="p-4 h-[60vh] overflow-y-auto">
           {messages.length === 0 && !isLoading && (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <div className="text-5xl mb-4">🤖</div>

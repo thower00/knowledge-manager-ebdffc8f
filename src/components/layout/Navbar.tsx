@@ -20,7 +20,7 @@ export default function Navbar() {
   return (
     <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2 ml-64">
+        <div className="flex items-center gap-2">
           <FileText className="h-6 w-6 text-brand-600" />
           <Link to="/" className="logo-text">
             Knowledge Manager
