@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
+import ScrollToTop from "./components/layout/ScrollToTop";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
@@ -69,6 +70,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
+      <ScrollToTop />
       <HelmetProvider>
         <AuthProvider>
           <TooltipProvider>
