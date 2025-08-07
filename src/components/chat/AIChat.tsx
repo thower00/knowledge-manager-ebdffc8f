@@ -148,7 +148,7 @@ export default function AIChat() {
 
   return (
     <div className="container py-6">
-      <Card className="overflow-hidden flex flex-col min-h-[calc(100vh-12rem)] max-w-4xl mx-auto">
+      <Card className="overflow-hidden flex flex-col max-w-4xl mx-auto">
         <CardHeader className="py-3 px-4 border-b bg-card flex-shrink-0 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-primary" />
@@ -227,7 +227,7 @@ export default function AIChat() {
           </div>
         </CardHeader>
         
-        <CardContent className="flex-grow overflow-y-auto p-4">
+        <CardContent className="p-4 h-96 overflow-y-auto">
           {messages.length === 0 && !isLoading && (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <div className="text-5xl mb-4">🤖</div>
