@@ -131,6 +131,36 @@ function generateDocumentReferencesMarkdown(references: DocumentReference[]): st
   return '\n\n**Sources:**\n' + referenceLinks.join('\n');
 }
 
+/**
+ * Detects and removes existing Sources sections from OpenAI response
+ * and ensures only one properly formatted Sources section exists
+ */
+function cleanAndMergeDocumentReferences(assistantResponse: string, documentReferences: string): string {
+  if (!documentReferences.trim()) {
+    return assistantResponse;
+  }
+  
+  // Regex patterns to detect various Sources section formats (Swedish and English)
+  const sourcesPatterns = [
+    /\n\n\*\*Sources?:\*\*[\s\S]*$/i,     // **Sources:** or **Source:**
+    /\n\n\*\*Källor:\*\*[\s\S]*$/i,       // **Källor:**
+    /\n\n\*\*Referenser:\*\*[\s\S]*$/i,  // **Referenser:**
+    /\n\n\*\*Källa:\*\*[\s\S]*$/i,       // **Källa:**
+    /\n\nSources?:[\s\S]*$/i,            // Sources: or Source:
+    /\n\nKällor?:[\s\S]*$/i,             // Källor: or Källa:
+    /\n\nReferenser?:[\s\S]*$/i,         // Referenser: or Referens:
+  ];
+  
+  // Remove any existing Sources sections from OpenAI's response
+  let cleanedResponse = assistantResponse;
+  for (const pattern of sourcesPatterns) {
+    cleanedResponse = cleanedResponse.replace(pattern, '');
+  }
+  
+  // Add our properly formatted document references
+  return cleanedResponse + documentReferences;
+}
+
 export async function generateChatResponse(
   messages: ChatMessage[],
   question: string,
@@ -185,6 +215,11 @@ export async function generateChatResponse(
   // Enhanced system message with better context handling
   const systemMessage = `${config.chatSystemPrompt || 'You are a helpful assistant.'}\n\n` +
     `Document Context:\n${contextText}\n\n` +
+    `CRITICAL RESPONSE FORMATTING RULES:\n` +
+    `- NEVER include "Sources:", "Källor:", "Referenser:", "Källa:" or any sources section in your response\n` +
+    `- Do NOT add document references, citations, or source listings\n` +
+    `- Document sources will be automatically added by the system\n` +
+    `- Focus only on answering the question based on the provided content\n\n` +
     `IMPORTANT INSTRUCTIONS:\n` +
     `1. You have access to specific document content provided above. Use this content to answer questions directly and comprehensively.\n` +
     `2. When users ask about "the documents", "what documents", or request to "list documents", use the exact information provided in the Document Context above.\n` +
@@ -193,7 +228,7 @@ export async function generateChatResponse(
     `5. Always be helpful and focus on answering the user's specific questions about the document content.\n` +
     `6. If the user asks specific questions about documents, use the provided content to give detailed and accurate answers.\n` +
     `7. When listing documents, include the specific document names and details provided in the context.\n` +
-    `8. If you reference specific documents in your response, you can mention that sources are available but do not include URLs in your main response - they will be added automatically.`
+    `8. You can mention that information comes from specific documents, but do not create any sources section - this is handled automatically.`
   
   // Prepare messages array
   const promptMessages: ChatMessage[] = [
@@ -228,8 +263,8 @@ export async function generateChatResponse(
     const assistantResponse = openaiData.choices[0]?.message?.content || 'No response generated.'
     console.log('OpenAI response received with enhanced context')
     
-    // Include document references in the response for clickable links
-    return assistantResponse + documentReferences
+    // Use cleanAndMergeDocumentReferences to prevent duplicate Sources sections
+    return cleanAndMergeDocumentReferences(assistantResponse, documentReferences)
   } else {
     console.error('Unsupported chat provider:', config.chatProvider)
     throw new Error(`Unsupported chat provider: ${config.chatProvider}. Please configure OpenAI in the admin settings.`)
