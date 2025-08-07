@@ -30,7 +30,7 @@ export default function AppSidebar() {
   if (!user) return null;
 
   return (
-    <Sidebar>
+    <Sidebar className="fixed top-16 h-[calc(100vh-4rem)]">
       <SidebarHeader className="flex items-center justify-end">
         <SidebarTrigger />
       </SidebarHeader>
