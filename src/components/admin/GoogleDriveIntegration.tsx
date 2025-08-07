@@ -188,14 +188,17 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     try {
       console.log("Verifying Google Drive configuration");
       
+      // Use field values if provided, otherwise fallback to saved config
+      const configToVerify = {
+        client_email: fieldValues.client_email || googleDriveConfig.client_email,
+        private_key: fieldValues.private_key || googleDriveConfig.private_key,
+        project_id: fieldValues.project_id || googleDriveConfig.project_id,
+        folder_id: fieldValues.folder_id || googleDriveConfig.folder_id,
+      };
+      
       // Call Supabase Edge Function to verify Google Drive configuration
       const { data, error } = await supabase.functions.invoke("verify-google-drive", {
-        body: { 
-          client_email: fieldValues.client_email,
-          private_key: fieldValues.private_key,
-          project_id: fieldValues.project_id,
-          folder_id: fieldValues.folder_id,
-        },
+        body: configToVerify,
       });
       
       console.log("Google Drive verification response:", data, error);
@@ -428,7 +431,7 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
           <VerificationButton 
             onClick={verifyGoogleDriveConfig}
             isVerifying={googleDriveVerification.isVerifying}
-            disabled={!fieldValues.client_email || !fieldValues.private_key}
+            disabled={(!fieldValues.client_email && !googleDriveConfig.client_email) || (!fieldValues.private_key && !googleDriveConfig.private_key)}
           />
           
           <VerificationStatusAlert {...googleDriveVerification} />
