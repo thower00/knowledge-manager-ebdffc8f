@@ -16,6 +16,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { VerificationStatusAlert, VerificationButton } from "./VerificationStatus";
+import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface GoogleDriveConfig {
   client_email: string;
@@ -44,6 +46,8 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
   const [googleDriveVerification, setGoogleDriveVerification] = useState<VerificationStatus>({
     isVerifying: false
   });
+  const [showSensitiveData, setShowSensitiveData] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
   const { toast } = useToast();
 
   // Fetch configurations from the database
@@ -94,6 +98,9 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         if (data && data.value) {
           // Type assertion to safely convert from Json to GoogleDriveConfig
           const configData = data.value as Record<string, string>;
+          const hasConfig = Object.values(configData).some(value => value && value.trim() !== "");
+          setConfigSaved(hasConfig);
+          
           setGoogleDriveConfig({
             client_email: configData.client_email || "",
             private_key: configData.private_key || "",
@@ -148,6 +155,9 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         });
         return;
       }
+      
+      setConfigSaved(true);
+      setShowSensitiveData(false);
       
       toast({
         title: "Google Drive configuration saved",
@@ -210,6 +220,75 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
     }
   };
 
+  const maskValue = (value: string, isEmail = false) => {
+    if (!value || !configSaved || showSensitiveData) return value;
+    
+    if (isEmail) {
+      const [username, domain] = value.split('@');
+      if (username && domain) {
+        return `${username.slice(0, 2)}***@${domain}`;
+      }
+    }
+    
+    if (value.length <= 8) {
+      return "***";
+    }
+    return `${value.slice(0, 3)}***${value.slice(-3)}`;
+  };
+
+  const maskPrivateKey = (value: string) => {
+    if (!value || !configSaved || showSensitiveData) return value;
+    return "***PRIVATE KEY SET***";
+  };
+
+  const toggleSensitiveVisibility = () => {
+    if (!showSensitiveData) {
+      // Show confirmation before revealing sensitive data
+      const confirmed = window.confirm(
+        "Are you sure you want to view sensitive configuration data? This should only be done for editing purposes."
+      );
+      if (!confirmed) return;
+    }
+    setShowSensitiveData(!showSensitiveData);
+  };
+
+  const clearConfiguration = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to clear all Google Drive configuration? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("configurations")
+        .update({ value: {} })
+        .eq("key", "google_drive_integration");
+        
+      if (error) throw error;
+      
+      setGoogleDriveConfig({
+        client_email: "",
+        private_key: "",
+        project_id: "",
+        private_key_id: "",
+        folder_id: ""
+      });
+      setConfigSaved(false);
+      setShowSensitiveData(false);
+      
+      toast({
+        title: "Configuration cleared",
+        description: "Google Drive configuration has been cleared successfully",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error clearing configuration",
+        description: error.message,
+      });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -219,15 +298,45 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {configSaved && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Sensitive configuration data is masked for security. Use the "Show/Hide" button to view or edit values.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {configSaved && (
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <span className="text-sm font-medium">Configuration Status</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {showSensitiveData ? "Showing sensitive data" : "Data masked"}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleSensitiveVisibility}
+                className="flex items-center gap-2"
+              >
+                {showSensitiveData ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showSensitiveData ? "Hide" : "Show"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-2">
-          <Label htmlFor="client_email">Client Email</Label>
+          <Label htmlFor="client_email">Client Email <span className="text-red-500">*</span></Label>
           <Input
             id="client_email"
             name="client_email"
-            type="text"
-            value={googleDriveConfig.client_email}
+            type={configSaved && !showSensitiveData ? "password" : "email"}
+            value={maskValue(googleDriveConfig.client_email, true)}
             onChange={handleGoogleDriveConfigChange}
             placeholder="service-account@project-id.iam.gserviceaccount.com"
+            disabled={configSaved && !showSensitiveData}
           />
           <p className="text-sm text-muted-foreground">
             Service account email from Google Cloud.
@@ -235,15 +344,16 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="private_key">Private Key</Label>
+          <Label htmlFor="private_key">Private Key <span className="text-red-500">*</span></Label>
           <Textarea
             id="private_key"
             name="private_key"
-            value={googleDriveConfig.private_key}
+            value={maskPrivateKey(googleDriveConfig.private_key)}
             onChange={handleGoogleDriveConfigChange}
             placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-            rows={5}
+            rows={configSaved && !showSensitiveData ? 1 : 5}
             className="font-mono"
+            disabled={configSaved && !showSensitiveData}
           />
           <p className="text-sm text-muted-foreground">
             Private key for the service account (includes BEGIN/END markers).
@@ -270,10 +380,11 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
           <Input
             id="private_key_id"
             name="private_key_id"
-            type="text"
-            value={googleDriveConfig.private_key_id}
+            type={configSaved && !showSensitiveData ? "password" : "text"}
+            value={maskValue(googleDriveConfig.private_key_id)}
             onChange={handleGoogleDriveConfigChange}
             placeholder="a1b2c3d4e5f6g7h8i9j0"
+            disabled={configSaved && !showSensitiveData}
           />
           <p className="text-sm text-muted-foreground">
             ID of the private key for the service account.
@@ -306,10 +417,16 @@ export function GoogleDriveIntegration({ activeTab }: { activeTab: string }) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button variant="outline">Reset</Button>
+        <Button 
+          variant="outline" 
+          onClick={clearConfiguration}
+          disabled={isSaving || !configSaved}
+        >
+          Clear Configuration
+        </Button>
         <Button 
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || (configSaved && !showSensitiveData)}
         >
           {isSaving ? "Saving..." : "Save Configuration"}
         </Button>
