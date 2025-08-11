@@ -6,7 +6,7 @@ export type ToastOptions = {
 };
 
 export function toastSuccess(opts: ToastOptions) {
-  toast({ title: opts.title, description: opts.description });
+  toast({ variant: "success", title: opts.title, description: opts.description });
 }
 
 export function toastInfo(opts: ToastOptions) {
@@ -14,8 +14,7 @@ export function toastInfo(opts: ToastOptions) {
 }
 
 export function toastWarning(opts: ToastOptions) {
-  // Using default variant for warnings; keep messaging clear in title/description
-  toast({ title: opts.title, description: opts.description });
+  toast({ variant: "warning", title: opts.title, description: opts.description });
 }
 
 export function toastError(opts: ToastOptions) {

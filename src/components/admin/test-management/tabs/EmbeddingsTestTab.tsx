@@ -6,14 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useConfig } from "../../document-processing/ConfigContext";
-import { EmbeddingService, EmbeddingConfig } from "@/services/embedding/embeddingService";
+import { EmbeddingService } from "@/services/embedding/embeddingService";
 import { Loader2, Zap, Search, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toastWarning } from "@/lib/toast";
+import { useEmbeddingConfig } from "./embedding/hooks/useEmbeddingConfig";
+import { mapDatabaseConfigToEmbeddingConfig } from "@/utils/embeddingConfigMapper";
 
 export function EmbeddingsTestTab() {
-  const { config } = useConfig();
+  const { configLoaded, loadedConfig } = useEmbeddingConfig();
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -22,20 +23,11 @@ export function EmbeddingsTestTab() {
   const [embeddingResult, setEmbeddingResult] = useState<any>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   
-  // Determine effective API key from provider-specific or default config
-  const effectiveApiKey = (config.providerApiKeys?.[config.provider] || config.apiKey || "").trim();
+  // Build mapping from loaded configuration
+  const mappedConfig = (configLoaded && loadedConfig) ? mapDatabaseConfigToEmbeddingConfig(loadedConfig) : null;
+  // Determine effective API key from mapped configuration
+  const effectiveApiKey = mappedConfig?.apiKey?.trim() || "";
   const apiKeyMasked = effectiveApiKey ? '***' + effectiveApiKey.slice(-4) : 'Not set';
-
-  // Map ConfigSettings to EmbeddingConfig
-  const createEmbeddingConfig = (): EmbeddingConfig => ({
-    provider: config.provider as "openai" | "cohere" | "huggingface",
-    model: config.specificModelId,
-    apiKey: config.providerApiKeys[config.provider] || config.apiKey || "",
-    batchSize: parseInt(config.embeddingBatchSize) || 10,
-    similarityThreshold: config.similarityThreshold,
-    embeddingMetadata: config.embeddingMetadata,
-    vectorStorage: config.vectorStorage
-  });
 
   const handleGenerateEmbedding = async () => {
     if (!testText.trim()) {
@@ -46,10 +38,18 @@ export function EmbeddingsTestTab() {
       return;
     }
 
+    if (!configLoaded || !mappedConfig) {
+      toastWarning({
+        title: "Configuration not loaded",
+        description: "Please wait or open Configuration Management.",
+      });
+      return;
+    }
+
     if (!effectiveApiKey) {
       toastWarning({
         title: "Missing API key",
-        description: `No API key configured for ${config.provider}. Please set it in Configuration Management.`,
+        description: `No API key configured for ${mappedConfig.provider}. Please set it in Configuration Management.`,
       });
       return;
     }
@@ -57,7 +57,7 @@ export function EmbeddingsTestTab() {
     setIsGenerating(true);
     try {
       console.log("Generating embedding for text:", testText);
-      const embeddingService = new EmbeddingService(createEmbeddingConfig());
+      const embeddingService = new EmbeddingService(mappedConfig);
       const result = await embeddingService.generateEmbedding(testText);
       setEmbeddingResult(result);
       
@@ -86,10 +86,18 @@ export function EmbeddingsTestTab() {
       return;
     }
 
+    if (!configLoaded || !mappedConfig) {
+      toastWarning({
+        title: "Configuration not loaded",
+        description: "Please wait or open Configuration Management.",
+      });
+      return;
+    }
+
     if (!effectiveApiKey) {
       toastWarning({
         title: "Missing API key",
-        description: `No API key configured for ${config.provider}. Please set it in Configuration Management.`,
+        description: `No API key configured for ${mappedConfig.provider}. Please set it in Configuration Management.`,
       });
       return;
     }
@@ -97,7 +105,7 @@ export function EmbeddingsTestTab() {
     setIsSearching(true);
     try {
       console.log("Searching for similar embeddings:", queryText);
-      const embeddingService = new EmbeddingService(createEmbeddingConfig());
+      const embeddingService = new EmbeddingService(mappedConfig);
       const results = await embeddingService.searchSimilarEmbeddings(queryText, 10);
       setSearchResults(results);
       
@@ -141,8 +149,8 @@ export function EmbeddingsTestTab() {
             </div>
             
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary">{config.provider}</Badge>
-              <Badge variant="outline">{config.specificModelId}</Badge>
+              <Badge variant="secondary">{configLoaded ? (mappedConfig?.provider || "openai") : "Loading..."}</Badge>
+              <Badge variant="outline">{configLoaded ? (mappedConfig?.model || "text-embedding-3-small") : "Loading..."}</Badge>
             </div>
             
             <Button 
@@ -200,8 +208,8 @@ export function EmbeddingsTestTab() {
             </div>
             
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary">Similarity: {config.similarityThreshold}</Badge>
-              <Badge variant="outline">Storage: {config.vectorStorage}</Badge>
+              <Badge variant="secondary">Similarity: {configLoaded ? (mappedConfig?.similarityThreshold || "0.7") : "Loading..."}</Badge>
+              <Badge variant="outline">Storage: {configLoaded ? (mappedConfig?.vectorStorage || "supabase") : "Loading..."}</Badge>
             </div>
             
             <Button 
@@ -255,19 +263,19 @@ export function EmbeddingsTestTab() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <strong>Provider:</strong> {config.provider}
+              <strong>Provider:</strong> {configLoaded ? (mappedConfig?.provider || "openai") : "Loading..."}
             </div>
             <div>
-              <strong>Model:</strong> {config.specificModelId}
+              <strong>Model:</strong> {configLoaded ? (mappedConfig?.model || "text-embedding-3-small") : "Loading..."}
             </div>
             <div>
-              <strong>Batch Size:</strong> {config.embeddingBatchSize}
+              <strong>Batch Size:</strong> {configLoaded ? (mappedConfig?.batchSize || 10) : "Loading..."}
             </div>
             <div>
-              <strong>Similarity Threshold:</strong> {config.similarityThreshold}
+              <strong>Similarity Threshold:</strong> {configLoaded ? (mappedConfig?.similarityThreshold || "0.7") : "Loading..."}
             </div>
             <div>
-              <strong>Vector Storage:</strong> {config.vectorStorage}
+              <strong>Vector Storage:</strong> {configLoaded ? (mappedConfig?.vectorStorage || "supabase") : "Loading..."}
             </div>
             <div>
               <strong>API Key:</strong> {apiKeyMasked}
