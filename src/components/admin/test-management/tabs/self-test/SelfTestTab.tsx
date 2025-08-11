@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DocumentProcessingService, type ProcessingConfig } from "@/services/documentProcessingService";
 import { TestDataCleanupService } from "../../services/testDataCleanupService";
 import SelfTestUpload from "./SelfTestUpload";
+import { Loader2 } from "lucide-react";
 
 export const SelfTestTab: React.FC = () => {
   const { toast } = useToast();
@@ -199,7 +200,16 @@ export const SelfTestTab: React.FC = () => {
           />
 
           <div className="flex gap-3">
-            <Button onClick={handleRun} disabled={isRunning || !selectedFile || isConfigLoading || !hasApiKey}>Kör E2E Test</Button>
+            <Button onClick={handleRun} disabled={isRunning || !selectedFile || isConfigLoading || !hasApiKey} aria-busy={isRunning}>
+              {isRunning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Bearbetar...
+                </>
+              ) : (
+                "Kör E2E Test"
+              )}
+            </Button>
           </div>
 
           <Alert>
