@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, RotateCcw } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { VectorStats } from "./components/VectorStats";
 import { VectorControls } from "./components/VectorControls";
 import { RecentEmbeddingsTable } from "./components/RecentEmbeddingsTable";

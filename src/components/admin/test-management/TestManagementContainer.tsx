@@ -9,7 +9,7 @@ import { DatabaseTab } from "./tabs/DatabaseTab";
 import { ConfigProvider } from "../document-processing/ConfigContext";
 import { TestResultDisplay } from "./TestResultDisplay";
 import { SelfTestTab } from "./tabs/self-test/SelfTestTab";
-
+import { ToastsTab } from "./tabs/ToastsTab";
 export function TestManagement() {
   const [testResults, setTestResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -88,13 +88,14 @@ export function TestManagement() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="extraction" className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
                 <TabsTrigger value="chunking">Text Chunking</TabsTrigger>
                 <TabsTrigger value="embeddings">Embeddings Processing</TabsTrigger>
                 <TabsTrigger value="embeddings-test">Embeddings Testing</TabsTrigger>
                 <TabsTrigger value="self-test">E2E Test</TabsTrigger>
                 <TabsTrigger value="database">Database</TabsTrigger>
+                <TabsTrigger value="toasts">Toasts</TabsTrigger>
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
@@ -132,6 +133,10 @@ export function TestManagement() {
                   isLoading={isLoading} 
                   onRunTest={handleTestComplete}
                 />
+              </TabsContent>
+
+              <TabsContent value="toasts" className="mt-6">
+                <ToastsTab />
               </TabsContent>
             </Tabs>
           </CardContent>

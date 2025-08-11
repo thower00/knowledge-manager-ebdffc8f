@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useEnhancedDocumentSync } from "./hooks/useEnhancedDocumentSync";
 import { Trash2, RefreshCw, AlertTriangle, CheckCircle, Database, Zap } from "lucide-react";
 import {

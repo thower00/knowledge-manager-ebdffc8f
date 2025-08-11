@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentsTab } from "@/components/content/DocumentsTab";
 import { DocumentProcessingTab } from "@/components/content/processing/DocumentProcessingTab";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ContentManagement() {
   // Use localStorage to persist the active tab between renders with error handling

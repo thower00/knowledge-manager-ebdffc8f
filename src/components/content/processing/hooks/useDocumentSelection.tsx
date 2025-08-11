@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments } from "../../utils/documentDbService";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { createClient } from '@supabase/supabase-js';
 
 export function useDocumentSelection() {

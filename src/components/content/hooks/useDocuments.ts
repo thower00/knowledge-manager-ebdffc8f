@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { DocumentSourceConfig, DocumentFile } from "@/types/document";
 import { fetchGoogleDriveDocuments } from "../utils/googleDriveService";
 import { processSelectedDocuments } from "../documentUtils";

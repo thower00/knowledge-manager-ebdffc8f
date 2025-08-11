@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { usePasswordRecovery } from "@/hooks/usePasswordRecovery";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AuthContextProps, AuthProviderProps, AuthError, SignOutOptions } from "@/types/auth";

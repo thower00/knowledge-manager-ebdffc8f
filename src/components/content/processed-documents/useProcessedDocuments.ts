@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments, deleteProcessedDocuments } from "../utils/documentDbService";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export function useProcessedDocuments() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);

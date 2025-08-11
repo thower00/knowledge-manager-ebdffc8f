@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
