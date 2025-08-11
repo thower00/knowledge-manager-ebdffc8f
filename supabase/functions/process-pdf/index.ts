@@ -5,7 +5,7 @@ import { extractWithAdobe } from './pdf-processor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-correlation-id',
 };
 
 // Convert Google Drive sharing URL to direct download URL
@@ -53,7 +53,12 @@ Deno.serve(async (req) => {
     console.log(`🚀 === EDGE FUNCTION STARTED ===`);
     console.log(`Method: ${req.method}`);
     console.log(`URL: ${req.url}`);
-    console.log(`Headers:`, Object.fromEntries(req.headers.entries()));
+    const headersObject = Object.fromEntries(req.headers.entries());
+    console.log(`Headers:`, headersObject);
+    const correlationId = req.headers.get('x-correlation-id');
+    if (correlationId) {
+      console.log(`🧵 Correlation ID: ${correlationId}`);
+    }
 
     if (req.method !== 'POST') {
       console.log('❌ Method not allowed');

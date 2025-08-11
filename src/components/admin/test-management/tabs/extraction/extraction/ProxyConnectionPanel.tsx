@@ -66,7 +66,7 @@ export function ProxyConnectionPanel() {
       const { data, error } = await supabase.functions.invoke("pdf-proxy", {
         body: {
           action: "connection_test",
-          correlationId: newId,
+          nonce: newId,
           timestamp: Date.now(),
         },
       });
@@ -117,7 +117,19 @@ export function ProxyConnectionPanel() {
       )}
 
       <Separator />
-      <div className="text-xs text-muted-foreground">Correlation ID: {correlationId}</div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div>Correlation ID: {correlationId}</div>
+        <Button size="sm" variant="outline" onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(correlationId);
+            toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
+          } catch (e) {
+            toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
+          }
+        }}>
+          Copy ID
+        </Button>
+      </div>
     </div>
   );
 }

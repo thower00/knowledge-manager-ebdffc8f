@@ -105,7 +105,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
     
     try {
       console.log(`Starting database document test: ${testStep} with document:`, document.title);
-      
+      const correlationId = Math.random().toString(36).slice(2, 10);
       const { data, error } = await supabase.functions.invoke('process-pdf', {
         body: {
           testStep: testStep,
@@ -113,6 +113,9 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
           documentTitle: document.title,
           documentId: document.id,
           useStoredDocument: true
+        },
+        headers: {
+          'X-Correlation-Id': correlationId
         }
       });
 
@@ -185,8 +188,12 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         formData.append('file', selectedFile);
       }
 
+      const correlationId = Math.random().toString(36).slice(2, 10);
       const { data, error } = await supabase.functions.invoke('process-pdf', {
-        body: formData
+        body: formData,
+        headers: {
+          'X-Correlation-Id': correlationId
+        }
       });
 
       console.log(`Test ${testStep} response:`, { data, error });
