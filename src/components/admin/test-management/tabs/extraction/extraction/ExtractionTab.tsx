@@ -36,6 +36,7 @@ interface TestResult {
   data?: any;
   error?: string;
   details?: string;
+  correlationId?: string;
 }
 
 export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
@@ -103,9 +104,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
     setCurrentTest(testStep);
     
+    const correlationId = Math.random().toString(36).slice(2, 10);
     try {
-      console.log(`Starting database document test: ${testStep} with document:`, document.title);
-      const correlationId = Math.random().toString(36).slice(2, 10);
       const { data, error } = await supabase.functions.invoke('process-pdf', {
         body: {
           testStep: testStep,
@@ -128,7 +128,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       const result: TestResult = {
         status: 'success',
         message: data.message || `${testStep} test with stored document completed successfully`,
-        data: data
+        data: data,
+        correlationId
       };
 
       if (testStep === 'full' && data.extractedText) {
@@ -155,7 +156,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       const result: TestResult = {
         status: 'error',
         message: `${testStep} test with stored document failed`,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        correlationId
       };
 
       // Update results for current test mode

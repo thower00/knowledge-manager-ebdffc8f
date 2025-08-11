@@ -21,6 +21,7 @@ export async function extractPdfWithProxy(
 ): Promise<string> {
   const maxRetries = 3;
   const baseDelay = 1000;
+  const correlationId = Math.random().toString(36).slice(2, 10);
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -48,6 +49,9 @@ export async function extractPdfWithProxy(
                 ...options,
                 timeout: options.timeout || 30
               }
+            },
+            headers: {
+              'X-Correlation-Id': correlationId
             }
           });
           
@@ -87,6 +91,7 @@ export async function extractPdfWithProxy(
       };
       
       console.log(`Attempt ${attempt}: Making direct fetch call to process-pdf function`);
+      console.log(`Using Correlation ID: ${correlationId}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
@@ -99,6 +104,7 @@ export async function extractPdfWithProxy(
             'Authorization': `Bearer ${authToken}`,
             'apikey': apiKey,
             'Cache-Control': 'no-cache',
+            'X-Correlation-Id': correlationId,
           },
           body: JSON.stringify(requestBody),
           signal: controller.signal
