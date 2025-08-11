@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { MODEL_PROVIDERS } from "./utils/modelProviders";
 import { useConfig } from "./ConfigContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 
 export function CohereKeyField({ isLoading }: { isLoading: boolean }) {

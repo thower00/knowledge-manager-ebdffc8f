@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments } from "../../utils/documentDbService";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export function useChunkingDocuments() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useConfig } from "../../document-processing/ConfigContext";
 import { EmbeddingService, EmbeddingConfig } from "@/services/embedding/embeddingService";
 import { Loader2, Zap, Search, Database } from "lucide-react";

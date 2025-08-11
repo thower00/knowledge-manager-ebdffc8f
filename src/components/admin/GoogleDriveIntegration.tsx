@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { VerificationStatusAlert, VerificationButton } from "./VerificationStatus";

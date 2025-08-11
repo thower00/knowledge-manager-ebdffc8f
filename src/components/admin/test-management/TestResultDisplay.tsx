@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { SUPABASE_CONFIG } from "@/config/constants";
 
 interface TestResultDisplayProps {

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CHAT_PROVIDERS } from "../document-processing/utils/chatProviders";
 import { useChatConfig } from "./ChatConfigContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
