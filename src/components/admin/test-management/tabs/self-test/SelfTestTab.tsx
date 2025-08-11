@@ -1,24 +1,23 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useToast, toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useConfig } from "@/components/admin/document-processing/ConfigContext";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentProcessingService, type ProcessingConfig } from "@/services/documentProcessingService";
 import { TestDataCleanupService } from "../../services/testDataCleanupService";
+import SelfTestUpload from "./SelfTestUpload";
 
 export const SelfTestTab: React.FC = () => {
   const { toast } = useToast();
   const { config } = useConfig();
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [counts, setCounts] = useState<{documents:number;chunks:number;embeddings:number}>({documents:0,chunks:0,embeddings:0});
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const cleanupService = useMemo(() => new TestDataCleanupService(), []);
 
@@ -54,23 +53,57 @@ export const SelfTestTab: React.FC = () => {
     };
   }, [config]);
 
-  const handleRun = useCallback(async () => {
-    if (!title || !url) {
-      toast({ title: "Fält saknas", description: "Ange titel och PDF-URL.", variant: "destructive" });
+  const handleFileSelect = useCallback((file: File) => {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Ogiltig filtyp", description: "Välj en PDF-fil.", variant: "destructive" });
       return;
     }
+    const maxBytes = 50 * 1024 * 1024; // 50MB (matchar storage-config)
+    if (file.size > maxBytes) {
+      toast({ title: "Filen är för stor", description: "Max 50 MB tillåts.", variant: "destructive" });
+      return;
+    }
+    setSelectedFile(file);
+  }, [toast]);
+
+  const handleRun = useCallback(async () => {
+    if (!selectedFile) {
+      toast({ title: "Ingen fil vald", description: "Välj en PDF för att köra self-test.", variant: "destructive" });
+      return;
+    }
+
     setIsRunning(true);
     try {
-      const prefixedTitle = title.startsWith("TEST:") ? title : `TEST: ${title}`;
+      // 1) Ladda upp filen till Supabase Storage (public bucket: documents)
+      const uniquePath = `self-tests/${Date.now()}-${selectedFile.name}`;
+      const uploadRes = await supabase.storage
+        .from("documents")
+        .upload(uniquePath, selectedFile, {
+          cacheControl: "3600",
+          contentType: "application/pdf",
+          upsert: false,
+        });
+
+      if (uploadRes.error) {
+        throw new Error(uploadRes.error.message || "Uppladdning misslyckades");
+      }
+
+      const { data: pub } = supabase.storage.from("documents").getPublicUrl(uniquePath);
+      const publicUrl = pub?.publicUrl;
+      if (!publicUrl) throw new Error("Kunde inte hämta publik URL för den uppladdade filen");
+
+      // 2) Skapa processed_documents-rad (automatisk titel)
+      const autoTitle = `TEST: ${selectedFile.name}`;
       const { data: inserted, error: insertError } = await supabase
         .from("processed_documents")
         .insert({
-          title: prefixedTitle,
+          title: autoTitle,
           source_type: "test",
           source_id: "self-test",
           mime_type: "application/pdf",
           status: "pending",
-          url,
+          url: publicUrl,
+          size: selectedFile.size,
         })
         .select("id, title")
         .single();
@@ -79,9 +112,9 @@ export const SelfTestTab: React.FC = () => {
         throw new Error(insertError?.message || "Kunde inte skapa testdokument");
       }
 
+      // 3) Kör bearbetningspipeline
       const processingConfig = buildProcessingConfig();
       const svc = new DocumentProcessingService(processingConfig, (p) => {
-        // Optional: could set local progress state
         console.log("Self-test progress:", p);
       });
 
@@ -100,7 +133,7 @@ export const SelfTestTab: React.FC = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [title, url, buildProcessingConfig, toast, loadCounts]);
+  }, [selectedFile, buildProcessingConfig, toast, loadCounts]);
 
   const handleClear = useCallback(async () => {
     try {
@@ -113,31 +146,36 @@ export const SelfTestTab: React.FC = () => {
     }
   }, [cleanupService, toast, loadCounts]);
 
+  const resetSelection = useCallback(() => {
+    setSelectedFile(null);
+  }, []);
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>E2E Self-test</CardTitle>
-          <CardDescription>Kör ett end-to-end-test mot ett PDF-dokument och skapa riktiga embeddings som blir sökbara i chatten.</CardDescription>
+          <CardDescription>
+            Ladda upp en PDF för end-to-end-test. En testpost skapas och bearbetas till chunks och embeddings som blir sökbara i chatten.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Titel</Label>
-              <Input id="title" placeholder="Ex: Produktblad v1" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="url">PDF-URL</Label>
-              <Input id="url" placeholder="https://.../fil.pdf" value={url} onChange={(e) => setUrl(e.target.value)} />
-            </div>
-          </div>
+          <SelfTestUpload
+            selectedFile={selectedFile}
+            onFileSelect={handleFileSelect}
+            disabled={isRunning}
+            onReset={resetSelection}
+          />
+
           <div className="flex gap-3">
-            <Button onClick={handleRun} disabled={isRunning}>Kör E2E Self-test</Button>
+            <Button onClick={handleRun} disabled={isRunning || !selectedFile}>Kör E2E Self-test</Button>
           </div>
+
           <Alert>
             <AlertTitle>Observera</AlertTitle>
             <AlertDescription>
-              Testdatan markeras som test (source_type = "test"). Den ligger kvar efter testet så att du kan verifiera i chatten. Använd panelen nedan för att rensa när du är klar.
+              Testdatan markeras som test (source_type = "test" och titel prefixad med "TEST:"). Den ligger kvar efter testet så att du kan verifiera i chatten.
+              Använd panelen nedan för att rensa när du är klar.
             </AlertDescription>
           </Alert>
         </CardContent>
