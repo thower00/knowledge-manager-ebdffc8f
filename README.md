@@ -71,3 +71,19 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Toast guidelines
+
+- Import path: use `import { useToast, toast } from "@/hooks/use-toast"` only (no re-exports).
+- Mount a single Toaster: `<Toaster />` from `@/components/ui/toaster` once in App.
+- Defaults: max 4 concurrent toasts, auto-dismiss ≈ 5.5s.
+- Variants usage:
+  - Success/info: default variant
+  - Validation issues: warning tone via helpers (non-destructive)
+  - Errors/exceptions: `variant: "destructive"`
+- Helpers available in `src/lib/toast.ts`:
+  - `toastSuccess({ title, description })`
+  - `toastInfo({ title, description })`
+  - `toastWarning({ title, description })`
+  - `toastError({ title, description })`
+- Playground: Test under Test Management → Toasts.
