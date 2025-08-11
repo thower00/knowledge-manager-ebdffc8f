@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -183,8 +182,19 @@ export const SelfTestTab: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rensa testdata</CardTitle>
-          <CardDescription>Rensar enbart data som är märkt som test.</CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Rensa testdata</CardTitle>
+              <CardDescription>Rensar enbart data som är märkt som test.</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadCounts}
+            >
+              Uppdatera
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
