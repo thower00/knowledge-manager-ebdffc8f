@@ -151,7 +151,7 @@ export const SelfTestTab: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>E2E Self-test</CardTitle>
+          <CardTitle>E2E Test</CardTitle>
           <CardDescription>
             Ladda upp en PDF för end-to-end-test. En testpost skapas och bearbetas till chunks och embeddings som blir sökbara i chatten.
           </CardDescription>
@@ -199,7 +199,7 @@ export const SelfTestTab: React.FC = () => {
           />
 
           <div className="flex gap-3">
-            <Button onClick={handleRun} disabled={isRunning || !selectedFile || isConfigLoading || !hasApiKey}>Kör E2E Self-test</Button>
+            <Button onClick={handleRun} disabled={isRunning || !selectedFile || isConfigLoading || !hasApiKey}>Kör E2E Test</Button>
           </div>
 
           <Alert>

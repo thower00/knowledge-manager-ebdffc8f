@@ -93,7 +93,7 @@ export function TestManagement() {
                 <TabsTrigger value="chunking">Text Chunking</TabsTrigger>
                 <TabsTrigger value="embeddings">Embeddings Processing</TabsTrigger>
                 <TabsTrigger value="embeddings-test">Embeddings Testing</TabsTrigger>
-                <TabsTrigger value="self-test">Self-test</TabsTrigger>
+                <TabsTrigger value="self-test">E2E Test</TabsTrigger>
                 <TabsTrigger value="database">Database</TabsTrigger>
               </TabsList>
               
