@@ -61,27 +61,24 @@ export function ResetPasswordForm() {
     e.preventDefault();
 
     if (!newPassword || !confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "Please fill in all fields.",
       });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "Passwords do not match.",
       });
       return;
     }
 
     if (newPassword.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "Password must be at least 6 characters long.",
       });
       return;

@@ -8,6 +8,7 @@ import { useChatConfig } from "./ChatConfigContext";
 import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toastWarning } from "@/lib/toast";
 
 interface ChatAPIKeyFieldProps {
   isLoading: boolean;
@@ -29,8 +30,7 @@ export function ChatAPIKeyField({ isLoading }: ChatAPIKeyFieldProps) {
 
   const verifyApiKey = async () => {
     if (!config.apiKey.trim()) {
-      toast({
-        variant: "destructive",
+      toastWarning({
         title: "API key required",
         description: `Please enter your ${CHAT_PROVIDERS[config.chatProvider]?.name || "provider"} API key`,
       });

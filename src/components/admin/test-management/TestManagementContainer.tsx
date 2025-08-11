@@ -88,7 +88,7 @@ export function TestManagement() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="extraction" className="w-full">
-              <TabsList className="grid w-full grid-cols-7">
+              <TabsList className="mb-4 w-full overflow-x-auto whitespace-nowrap">
                 <TabsTrigger value="extraction">Document Extraction</TabsTrigger>
                 <TabsTrigger value="chunking">Text Chunking</TabsTrigger>
                 <TabsTrigger value="embeddings">Embeddings Processing</TabsTrigger>

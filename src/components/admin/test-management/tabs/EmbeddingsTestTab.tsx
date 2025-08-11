@@ -10,6 +10,7 @@ import { useConfig } from "../../document-processing/ConfigContext";
 import { EmbeddingService, EmbeddingConfig } from "@/services/embedding/embeddingService";
 import { Loader2, Zap, Search, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toastWarning } from "@/lib/toast";
 
 export function EmbeddingsTestTab() {
   const { config } = useConfig();
@@ -34,10 +35,9 @@ export function EmbeddingsTestTab() {
 
   const handleGenerateEmbedding = async () => {
     if (!testText.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please enter some text to generate embeddings for.",
+      toastWarning({
+        title: "Missing text",
+        description: "Please enter text to generate embeddings.",
       });
       return;
     }
@@ -67,9 +67,8 @@ export function EmbeddingsTestTab() {
 
   const handleSearchSimilar = async () => {
     if (!queryText.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Missing query",
         description: "Please enter search text.",
       });
       return;

@@ -7,6 +7,7 @@ import { MODEL_PROVIDERS } from "./utils/modelProviders";
 import { useConfig } from "./ConfigContext";
 import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
+import { toastWarning } from "@/lib/toast";
 
 export function CohereKeyField({ isLoading }: { isLoading: boolean }) {
   const { config, setConfig } = useConfig();
@@ -24,8 +25,7 @@ export function CohereKeyField({ isLoading }: { isLoading: boolean }) {
 
   const verifyApiKey = async () => {
     if (!config.apiKey.trim()) {
-      toast({
-        variant: "destructive",
+      toastWarning({
         title: "API key required",
         description: "Please enter your Cohere API key",
       });

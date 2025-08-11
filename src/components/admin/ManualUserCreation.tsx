@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toastWarning } from "@/lib/toast";
 
 interface ManualUserCreationProps {
   onUserCreated: () => void;
@@ -23,9 +24,8 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
     e.preventDefault();
     
     if (!email) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "Email is required.",
       });
       return;

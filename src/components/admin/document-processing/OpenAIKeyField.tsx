@@ -8,6 +8,7 @@ import { MODEL_PROVIDERS } from "./utils/modelProviders";
 import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toastWarning } from "@/lib/toast";
 
 export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
   const { config, setConfig } = useConfig();
@@ -25,8 +26,7 @@ export function OpenAIKeyField({ isLoading }: { isLoading: boolean }) {
 
   const verifyApiKey = async () => {
     if (!config.apiKey.trim()) {
-      toast({
-        variant: "destructive",
+      toastWarning({
         title: "API key required",
         description: "Please enter your API key",
       });

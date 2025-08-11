@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { toastWarning } from "@/lib/toast";
 import { supabase, cleanupAuthState } from "@/integrations/supabase/client";
 
 interface SignInFormProps {
@@ -20,9 +21,8 @@ export default function SignInForm({ onSignUp }: SignInFormProps) {
     e.preventDefault();
     
     if (!email || !password) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
+      toastWarning({
+        title: "Validation",
         description: "Please fill in all fields.",
       });
       return;

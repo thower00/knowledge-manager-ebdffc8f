@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Key, User } from "lucide-react";
+import { toastWarning } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -20,27 +21,24 @@ export function PasswordChangeSettings() {
     e.preventDefault();
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "All fields are required.",
       });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "New passwords do not match.",
       });
       return;
     }
 
     if (newPassword.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toastWarning({
+        title: "Validation",
         description: "Password must be at least 6 characters long.",
       });
       return;
