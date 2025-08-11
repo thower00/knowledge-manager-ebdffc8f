@@ -49,7 +49,7 @@ export const SelfTestUpload: React.FC<SelfTestUploadProps> = ({
         disabled={!!disabled}
       />
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2">
         {selectedFile && onReset && (
           <Button variant="outline" onClick={onReset} disabled={disabled}>
             Återställ
