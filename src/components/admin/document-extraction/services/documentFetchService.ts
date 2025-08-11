@@ -1,4 +1,5 @@
 
+import { supabase } from "@/integrations/supabase/client";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
 import { getEdgeFunctionUrl, createApiHeaders } from "@/utils/supabaseHelpers";
 import { API_ENDPOINTS } from "@/config/constants";
@@ -50,6 +51,8 @@ export const fetchDocumentViaProxy = async (
       
       // Build URL and headers via helpers
       const proxyUrl = getEdgeFunctionUrl(API_ENDPOINTS.FUNCTIONS.PDF_PROXY);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const authToken = sessionData.session?.access_token || '';
       const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
