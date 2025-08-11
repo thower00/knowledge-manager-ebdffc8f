@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { SUPABASE_CONFIG } from "@/config/constants";
 
 interface TestResultDisplayProps {
   result: any;
@@ -79,6 +80,8 @@ ${data.error ? `Details: ${data.error}` : ''}`;
   
   const displayText = formatResult(result);
   const correlationId = typeof result === 'object' ? (result?.correlationId || result?.data?.correlationId) : undefined;
+  const projectRef = new URL(SUPABASE_CONFIG.URL).host.split('.')[0];
+  const logsUrl = `https://supabase.com/dashboard/project/${projectRef}/functions/process-pdf/logs`;
   
   return (
     <Card>
@@ -100,6 +103,13 @@ ${data.error ? `Details: ${data.error}` : ''}`;
               }}
             >
               Copy ID
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(logsUrl, "_blank", "noopener,noreferrer")}
+            >
+              Open logs
             </Button>
           </div>
         )}

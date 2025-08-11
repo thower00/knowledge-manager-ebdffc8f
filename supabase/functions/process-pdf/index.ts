@@ -55,16 +55,15 @@ Deno.serve(async (req) => {
     console.log(`URL: ${req.url}`);
     const headersObject = Object.fromEntries(req.headers.entries());
     console.log(`Headers:`, headersObject);
-    const correlationId = req.headers.get('x-correlation-id');
-    if (correlationId) {
-      console.log(`🧵 Correlation ID: ${correlationId}`);
-    }
+    const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID().slice(0, 8);
+    console.log(`[CID:${correlationId}] Correlation ID set`);
+    const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json', 'x-correlation-id': correlationId };
 
     if (req.method !== 'POST') {
-      console.log('❌ Method not allowed');
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+      console.log(`[CID:${correlationId}] ❌ Method not allowed`);
+      return new Response(JSON.stringify({ error: 'Method not allowed', correlationId }), { 
         status: 405, 
-        headers: corsHeaders 
+        headers: jsonHeaders 
       });
     }
 
@@ -106,10 +105,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         status: 'error',
         error: 'Failed to parse request body',
-        details: error.message
+        details: error.message,
+        correlationId
       }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: jsonHeaders
       });
     }
 
@@ -121,9 +121,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         status: 'success',
         message: 'Basic edge function test passed',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        correlationId
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: jsonHeaders
       });
     }
 
@@ -133,18 +134,19 @@ Deno.serve(async (req) => {
         console.log('🔐 Starting credentials test...');
         const result = await testAdobeCredentials();
         console.log('✅ Credentials test completed successfully');
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ ...result, correlationId }), {
+          headers: jsonHeaders
         });
       } catch (error) {
         console.error('❌ Credentials test failed:', error);
         return new Response(JSON.stringify({
           status: 'error',
           error: error.message,
-          details: error.stack
+          details: error.stack,
+          correlationId
         }), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: jsonHeaders
         });
       }
     }
@@ -155,10 +157,11 @@ Deno.serve(async (req) => {
         console.log('❌ No file provided for upload test');
         return new Response(JSON.stringify({ 
           status: 'error',
-          error: 'No file provided for upload test' 
+          error: 'No file provided for upload test',
+          correlationId 
         }), { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: jsonHeaders
         });
       }
       
@@ -195,15 +198,16 @@ Deno.serve(async (req) => {
           console.log('✅ Upload test with stored document completed successfully');
           return new Response(JSON.stringify({
             ...result,
-            message: `Adobe file upload test passed for stored document: ${documentTitle}`
+            message: `Adobe file upload test passed for stored document: ${documentTitle}`,
+            correlationId
           }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: jsonHeaders
           });
         } else {
           const result = await testAdobeUpload(file);
           console.log('✅ Upload test completed successfully');
-          return new Response(JSON.stringify(result), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          return new Response(JSON.stringify({ ...result, correlationId }), {
+            headers: jsonHeaders
           });
         }
       } catch (error) {
@@ -211,10 +215,11 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           status: 'error',
           error: error.message,
-          details: error.stack
+          details: error.stack,
+          correlationId
         }), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: jsonHeaders
         });
       }
     }
@@ -225,10 +230,11 @@ Deno.serve(async (req) => {
         console.log('❌ No file provided for extract test');
         return new Response(JSON.stringify({ 
           status: 'error',
-          error: 'No file provided for extract test' 
+          error: 'No file provided for extract test',
+          correlationId 
         }), { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: jsonHeaders
         });
       }
       
@@ -261,15 +267,16 @@ Deno.serve(async (req) => {
           console.log('✅ Extract test with stored document completed');
           return new Response(JSON.stringify({
             ...result,
-            message: `Adobe extract job creation test passed for stored document: ${documentTitle}`
+            message: `Adobe extract job creation test passed for stored document: ${documentTitle}`,
+            correlationId
           }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: jsonHeaders
           });
         } else {
           const result = await testAdobeExtractJobWithFixedHandling(file);
           console.log('✅ Extract test completed');
-          return new Response(JSON.stringify(result), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          return new Response(JSON.stringify({ ...result, correlationId }), {
+            headers: jsonHeaders
           });
         }
       } catch (error) {
@@ -277,10 +284,11 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           status: 'error',
           error: error.message,
-          details: error.stack
+          details: error.stack,
+          correlationId
         }), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: jsonHeaders
         });
       }
     }
@@ -290,10 +298,11 @@ Deno.serve(async (req) => {
       console.log('❌ No file or document reference provided for full processing');
       return new Response(JSON.stringify({ 
         status: 'error',
-        error: 'No file or document reference provided' 
+        error: 'No file or document reference provided',
+        correlationId 
       }), { 
         status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: jsonHeaders
       });
     }
 
@@ -338,10 +347,11 @@ Deno.serve(async (req) => {
           console.log(`❌ Invalid file type: ${file.type}`);
           return new Response(JSON.stringify({ 
             status: 'error',
-            error: 'File must be a PDF' 
+            error: 'File must be a PDF',
+            correlationId 
           }), { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: jsonHeaders
           });
         }
 
@@ -361,9 +371,10 @@ Deno.serve(async (req) => {
         extractedText: extractedText,
         status: 'completed',
         source: useStoredDocument ? 'database' : 'upload',
-        documentId: useStoredDocument ? documentId : undefined
+        documentId: useStoredDocument ? documentId : undefined,
+        correlationId
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: jsonHeaders
       });
     } catch (extractError) {
       console.error(`❌ FULL PROCESSING FAILED for: ${useStoredDocument ? documentTitle : file?.name}`);
@@ -376,10 +387,11 @@ Deno.serve(async (req) => {
         error: `Full processing failed: ${extractError.message}`,
         details: extractError.stack,
         filename: useStoredDocument ? documentTitle : file?.name,
-        source: useStoredDocument ? 'database' : 'upload'
+        source: useStoredDocument ? 'database' : 'upload',
+        correlationId
       }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: jsonHeaders
       });
     }
 
@@ -395,10 +407,11 @@ Deno.serve(async (req) => {
       error: error.message || 'Unknown error occurred',
       errorType: error.constructor.name,
       timestamp: new Date().toISOString(),
-      stack: error.stack
+      stack: error.stack,
+      correlationId
     }), { 
       status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: jsonHeaders
     });
   }
 });

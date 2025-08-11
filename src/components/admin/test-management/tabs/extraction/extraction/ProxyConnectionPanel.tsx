@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProxyConnectionStatus } from "@/components/admin/document-extraction/hooks/useProxyConnectionStatus";
 import { Plug, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
-
+import { SUPABASE_CONFIG } from "@/config/constants";
 export function ProxyConnectionPanel() {
   const { toast } = useToast();
   const {
@@ -20,6 +20,8 @@ export function ProxyConnectionPanel() {
     Math.random().toString(36).slice(2, 10)
   );
   const stability = getConnectionStability();
+  const projectRef = new URL(SUPABASE_CONFIG.URL).host.split('.')[0];
+  const proxyLogsUrl = `https://supabase.com/dashboard/project/${projectRef}/functions/pdf-proxy/logs`;
 
   const statusBadge = useMemo(() => {
     switch (connectionStatus) {
@@ -119,16 +121,21 @@ export function ProxyConnectionPanel() {
       <Separator />
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div>Correlation ID: {correlationId}</div>
-        <Button size="sm" variant="outline" onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(correlationId);
-            toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
-          } catch (e) {
-            toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
-          }
-        }}>
-          Copy ID
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(correlationId);
+              toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
+            } catch (e) {
+              toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
+            }
+          }}>
+            Copy ID
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => window.open(proxyLogsUrl, "_blank", "noopener,noreferrer")}>
+            Open logs
+          </Button>
+        </div>
       </div>
     </div>
   );
