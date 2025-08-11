@@ -7,6 +7,8 @@ export default function TestManagementPage() {
     <>
       <Helmet>
         <title>Test Management | Knowledge Manager</title>
+        <meta name="description" content="Test document extraction, chunking and embeddings with production services." />
+        <link rel="canonical" href="/test-management" />
       </Helmet>
       
       <div className="container py-8">

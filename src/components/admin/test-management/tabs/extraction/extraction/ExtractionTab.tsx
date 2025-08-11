@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useProcessedDocumentsFetch } from "@/components/admin/document-extraction/hooks/useProcessedDocumentsFetch";
+import { ProxyConnectionPanel } from "./ProxyConnectionPanel";
 import { 
   FileText, 
   Upload, 
@@ -382,6 +383,11 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
               </div>
             </RadioGroup>
           </div>
+
+          <Separator />
+
+          {/* PDF Proxy Connection Health */}
+          <ProxyConnectionPanel />
 
           <Separator />
 
