@@ -21,6 +21,10 @@ export function EmbeddingsTestTab() {
   const [queryText, setQueryText] = useState("artificial intelligence");
   const [embeddingResult, setEmbeddingResult] = useState<any>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  
+  // Determine effective API key from provider-specific or default config
+  const effectiveApiKey = (config.providerApiKeys?.[config.provider] || config.apiKey || "").trim();
+  const apiKeyMasked = effectiveApiKey ? '***' + effectiveApiKey.slice(-4) : 'Not set';
 
   // Map ConfigSettings to EmbeddingConfig
   const createEmbeddingConfig = (): EmbeddingConfig => ({
@@ -38,6 +42,14 @@ export function EmbeddingsTestTab() {
       toastWarning({
         title: "Missing text",
         description: "Please enter text to generate embeddings.",
+      });
+      return;
+    }
+
+    if (!effectiveApiKey) {
+      toastWarning({
+        title: "Missing API key",
+        description: `No API key configured for ${config.provider}. Please set it in Configuration Management.`,
       });
       return;
     }
@@ -70,6 +82,14 @@ export function EmbeddingsTestTab() {
       toastWarning({
         title: "Missing query",
         description: "Please enter search text.",
+      });
+      return;
+    }
+
+    if (!effectiveApiKey) {
+      toastWarning({
+        title: "Missing API key",
+        description: `No API key configured for ${config.provider}. Please set it in Configuration Management.`,
       });
       return;
     }
@@ -250,7 +270,7 @@ export function EmbeddingsTestTab() {
               <strong>Vector Storage:</strong> {config.vectorStorage}
             </div>
             <div>
-              <strong>API Key:</strong> {config.apiKey ? '***' + config.apiKey.slice(-4) : 'Not set'}
+              <strong>API Key:</strong> {apiKeyMasked}
             </div>
           </div>
         </CardContent>

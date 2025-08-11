@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { ProcessedDocument } from "@/types/document";
 import { fetchProcessedDocuments } from "../../utils/documentDbService";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from '@supabase/supabase-js';
+import { createFreshSupabaseClient } from "@/utils/supabaseHelpers";
 
 export function useDocumentSelection() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -24,22 +24,7 @@ export function useDocumentSelection() {
         const timestamp = Date.now();
         setLastRefreshTime(timestamp);
         
-        const freshClient = createClient(
-          'https://sxrinuxxlmytddymjbmr.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
-          {
-            db: { schema: 'public' },
-            global: {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-                'X-Timestamp': timestamp.toString(),
-                'X-Force-Refresh': 'true'
-              }
-            }
-          }
-        );
+        const freshClient = createFreshSupabaseClient();
         
         console.log('Using fresh client to fetch documents with timestamp:', timestamp);
         

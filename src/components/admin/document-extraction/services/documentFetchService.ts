@@ -1,6 +1,7 @@
 
-import { supabase } from "@/integrations/supabase/client";
 import { convertGoogleDriveUrl } from "../utils/urlUtils";
+import { getEdgeFunctionUrl, createApiHeaders } from "@/utils/supabaseHelpers";
+import { API_ENDPOINTS } from "@/config/constants";
 
 /**
  * Fetches a document through the proxy service
@@ -47,21 +48,12 @@ export const fetchDocumentViaProxy = async (
       const nonce = Math.random().toString(36).substring(2, 15);
       const timestamp = Date.now();
       
-      // Access the anon key directly - this is a public key so it's fine to have in code
-      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
-      
-      // Get the auth token
-      const authSession = await supabase.auth.getSession();
-      const authToken = authSession.data.session?.access_token || '';
-      
-      // Use direct fetch for better control and debugging
-      const proxyUrl = 'https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/pdf-proxy';
+      // Build URL and headers via helpers
+      const proxyUrl = getEdgeFunctionUrl(API_ENDPOINTS.FUNCTIONS.PDF_PROXY);
       const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-          'apikey': apiKey,
+          ...createApiHeaders(authToken),
           'Cache-Control': 'no-cache, no-store',
           'Pragma': 'no-cache',
         },

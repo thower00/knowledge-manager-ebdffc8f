@@ -1,5 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { getEdgeFunctionUrl, createApiHeaders } from "@/utils/supabaseHelpers";
+import { API_ENDPOINTS } from "@/config/constants";
 
 interface PdfExtractionOptions {
   maxPages?: number;
@@ -78,10 +80,8 @@ export async function extractPdfWithProxy(
         }
       }
       
-      // Fallback: Use direct fetch method
-      const functionUrl = `https://sxrinuxxlmytddymjbmr.supabase.co/functions/v1/process-pdf`;
+      const functionUrl = getEdgeFunctionUrl(API_ENDPOINTS.FUNCTIONS.PROCESS_PDF);
       const authToken = session.session?.access_token || '';
-      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0";
       
       const requestBody = {
         pdfBase64: base64Data,
@@ -101,9 +101,7 @@ export async function extractPdfWithProxy(
         const response = await fetch(functionUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'apikey': apiKey,
+            ...createApiHeaders(authToken),
             'Cache-Control': 'no-cache',
             'X-Correlation-Id': correlationId,
           },

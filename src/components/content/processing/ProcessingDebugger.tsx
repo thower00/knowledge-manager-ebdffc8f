@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from '@supabase/supabase-js';
+import { createFreshSupabaseClient } from "@/utils/supabaseHelpers";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedDocumentSync } from "./hooks/useEnhancedDocumentSync";
@@ -59,21 +59,7 @@ export const ProcessingDebugger = forwardRef<{ onStatusSyncComplete: () => void 
         
         // Always use a completely fresh client with timestamp to bypass all caching
         const timestamp = Date.now();
-        const freshClient = createClient(
-          'https://sxrinuxxlmytddymjbmr.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4cmludXh4bG15dGRkeW1qYm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczODk0NzIsImV4cCI6MjA2Mjk2NTQ3Mn0.iT8OfJi5-PvKoF_hsjCytPpWiM2bhB6z8Q_XY6klqt0',
-          {
-            db: { schema: 'public' },
-            global: {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-                'X-Timestamp': timestamp.toString()
-              }
-            }
-          }
-        );
+        const freshClient = createFreshSupabaseClient();
         
         if (forceFresh) {
           console.log('Force fresh enabled - waiting 3 seconds for database consistency...');
