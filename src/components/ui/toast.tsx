@@ -36,7 +36,6 @@ const toastVariants = cva(
       },
     },
     defaultVariants: {
-    defaultVariants: {
       variant: "default",
     },
   }
