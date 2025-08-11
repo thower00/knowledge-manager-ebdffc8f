@@ -179,6 +179,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
 
   const runTest = async (testStep: string) => {
     setCurrentTest(testStep);
+    const correlationId = Math.random().toString(36).slice(2, 10);
     
     try {
       console.log(`Starting test: ${testStep}`);
@@ -190,7 +191,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
         formData.append('file', selectedFile);
       }
 
-      const correlationId = Math.random().toString(36).slice(2, 10);
+      // correlationId declared above
       const { data, error } = await supabase.functions.invoke('process-pdf', {
         body: formData,
         headers: {
@@ -207,7 +208,8 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       const result: TestResult = {
         status: 'success',
         message: data.message || `${testStep} test completed successfully`,
-        data: data
+        data: data,
+        correlationId
       };
 
       if (testStep === 'full' && data.extractedText) {
@@ -218,7 +220,7 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       const resultKey = testMode === "file" ? testStep : `${testStep}_stored`;
       setTestResults(prev => ({
         ...prev,
-        [testStep]: result
+        [resultKey]: result
       }));
 
       onRunTest(data);
@@ -234,13 +236,15 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
       const result: TestResult = {
         status: 'error',
         message: `${testStep} test failed`,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        correlationId
       };
 
       // Update results for current test mode
+      const resultKey = testMode === "file" ? testStep : `${testStep}_stored`;
       setTestResults(prev => ({
         ...prev,
-        [testStep]: result
+        [resultKey]: result
       }));
 
       toast({
@@ -552,6 +556,25 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                             {getTestResult(step.key)?.error}
                           </div>
                         )}
+                        {getTestResult(step.key)?.correlationId && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Correlation ID: {getTestResult(step.key)?.correlationId}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(getTestResult(step.key)!.correlationId!);
+                                  toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
+                                } catch (e) {
+                                  toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
+                                }
+                              }}
+                            >
+                              Copy ID
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       
                       <Button
@@ -632,6 +655,25 @@ export function ExtractionTab({ isLoading, onRunTest }: ExtractionTabProps) {
                         <span className={result.status === 'success' ? 'text-green-600' : 'text-red-600'}>
                           {result.message}
                         </span>
+                        {result.correlationId && (
+                          <div className="ml-2 flex items-center gap-2">
+                            <span className="text-muted-foreground">ID: {result.correlationId}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(result.correlationId!);
+                                  toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
+                                } catch (e) {
+                                  toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
+                                }
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

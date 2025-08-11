@@ -1,5 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 
 interface TestResultDisplayProps {
   result: any;
@@ -76,11 +78,31 @@ ${data.error ? `Details: ${data.error}` : ''}`;
   };
   
   const displayText = formatResult(result);
+  const correlationId = typeof result === 'object' ? (result?.correlationId || result?.data?.correlationId) : undefined;
   
   return (
     <Card>
       <CardHeader>
         <CardTitle>Test Results</CardTitle>
+        {correlationId && (
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Correlation ID: {correlationId}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(correlationId);
+                  toast({ title: "Copied", description: "Correlation ID copied to clipboard" });
+                } catch (e) {
+                  toast({ variant: "destructive", title: "Copy failed", description: e instanceof Error ? e.message : String(e) });
+                }
+              }}
+            >
+              Copy ID
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto whitespace-pre-wrap font-mono text-sm">
