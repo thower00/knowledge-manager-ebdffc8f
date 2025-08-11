@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useConfig } from "@/components/admin/document-processing/ConfigContext";
+import { useProcessingConfiguration } from "@/components/content/processing/hooks/useProcessingConfiguration";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentProcessingService, type ProcessingConfig } from "@/services/documentProcessingService";
 import { TestDataCleanupService } from "../../services/testDataCleanupService";
@@ -13,7 +13,7 @@ import SelfTestUpload from "./SelfTestUpload";
 
 export const SelfTestTab: React.FC = () => {
   const { toast } = useToast();
-  const { config } = useConfig();
+  const { config: processingConfig, isLoading: isConfigLoading } = useProcessingConfiguration();
   const [isRunning, setIsRunning] = useState(false);
   const [counts, setCounts] = useState<{documents:number;chunks:number;embeddings:number}>({documents:0,chunks:0,embeddings:0});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -30,27 +30,20 @@ export const SelfTestTab: React.FC = () => {
   }, [loadCounts]);
 
   const buildProcessingConfig = useCallback((): ProcessingConfig => {
-    const provider = (config.provider || "openai").toLowerCase();
-    const model = config.specificModelId || config.embeddingModel || "text-embedding-ada-002";
-    const apiKey = (config.providerApiKeys as Record<string, string>)[provider] || config.apiKey || "";
-
+    const { chunking, embedding } = processingConfig;
     return {
-      chunking: {
-        chunkSize: parseInt(config.chunkSize || "1000", 10),
-        chunkOverlap: parseInt(config.chunkOverlap || "200", 10),
-        chunkStrategy: config.chunkStrategy || "fixed_size",
-      },
+      chunking,
       embedding: {
-        provider: provider as any,
-        model,
-        apiKey,
-        batchSize: parseInt(config.embeddingBatchSize || "10", 10),
-        similarityThreshold: config.similarityThreshold || "0.5",
+        provider: embedding.provider as any,
+        model: embedding.model,
+        apiKey: embedding.apiKey,
+        batchSize: embedding.batchSize,
+        similarityThreshold: embedding.similarityThreshold,
         embeddingMetadata: { is_test: true },
         vectorStorage: "supabase",
       },
     };
-  }, [config]);
+  }, [processingConfig]);
 
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -149,6 +142,11 @@ export const SelfTestTab: React.FC = () => {
     setSelectedFile(null);
   }, []);
 
+  const hasApiKey = !!processingConfig.embedding.apiKey;
+  const handleOpenConfig = useCallback(() => {
+    window.open('/configuration-management', '_blank');
+  }, []);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -159,6 +157,40 @@ export const SelfTestTab: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isConfigLoading ? (
+            <div>Laddar konfiguration...</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div className="text-muted-foreground">Leverantör</div>
+                  <div className="font-medium capitalize">{processingConfig.embedding.provider}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Modell</div>
+                  <div className="font-medium">{processingConfig.embedding.model}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">API-nyckel</div>
+                  <div className="font-medium">{hasApiKey ? "Konfigurerad" : "Saknas"}</div>
+                </div>
+              </div>
+              {!hasApiKey && (
+                <Alert>
+                  <AlertTitle>API-nyckel saknas</AlertTitle>
+                  <AlertDescription>
+                    Lägg till API-nyckel i Konfigurationshantering för att kunna köra self-test.
+                    <div className="mt-2">
+                      <Button variant="outline" size="sm" onClick={handleOpenConfig}>
+                        Öppna Konfigurationshantering
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
+
           <SelfTestUpload
             selectedFile={selectedFile}
             onFileSelect={handleFileSelect}
@@ -167,7 +199,7 @@ export const SelfTestTab: React.FC = () => {
           />
 
           <div className="flex gap-3">
-            <Button onClick={handleRun} disabled={isRunning || !selectedFile}>Kör E2E Self-test</Button>
+            <Button onClick={handleRun} disabled={isRunning || !selectedFile || isConfigLoading || !hasApiKey}>Kör E2E Self-test</Button>
           </div>
 
           <Alert>
