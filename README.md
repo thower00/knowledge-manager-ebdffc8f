@@ -87,3 +87,13 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-trick
   - `toastWarning({ title, description })`
   - `toastError({ title, description })`
 - Playground: Test under Test Management → Toasts.
+
+## Logging
+
+- Default levels: development = info, production = warn
+- Override at runtime in DevTools console:
+  - localStorage.setItem('app:log-level', 'debug')
+  - localStorage.removeItem('app:log-level') to reset
+- Use the logger API in code: logger.debug/info/warn/error
+- Sensitive fields (apiKey, token, secret, password, etc.) are masked automatically.
+

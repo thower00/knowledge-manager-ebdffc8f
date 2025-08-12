@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, DEFAULT_CONFIG } from "./ConfigContext";
 import { Json } from "@/integrations/supabase/types";
-
+import { logger } from "@/utils/logger";
 export function useConfigLoader(configKey: string = "document_processing") {
   const { config, setConfig, setIsLoading, setIsSaving } = useConfig();
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +13,7 @@ export function useConfigLoader(configKey: string = "document_processing") {
     setError(null);
     
     try {
-      console.log(`Loading ${configKey} configuration from database`);
+      logger.info(`Loading ${configKey} configuration from database`);
       
       const { data, error: dbError } = await supabase
         .from("configurations")
@@ -26,7 +26,7 @@ export function useConfigLoader(configKey: string = "document_processing") {
       }
       
       if (data?.value && typeof data.value === 'object' && data.value !== null) {
-        console.log(`${configKey} configuration loaded:`, data.value);
+        logger.info(`${configKey} configuration loaded:`, data.value);
         
         // Only extract document processing specific fields
         const dbConfig = data.value as any;
@@ -49,12 +49,12 @@ export function useConfigLoader(configKey: string = "document_processing") {
         
         setConfig(docConfig);
       } else {
-        console.log(`No ${configKey} configuration found in database, using defaults`);
+        logger.info(`No ${configKey} configuration found in database, using defaults`);
       }
       
       return data;
     } catch (err: any) {
-      console.error(`Error loading ${configKey} configuration:`, err);
+      logger.error(`Error loading ${configKey} configuration:`, err);
       setError(err.message || `Failed to load ${configKey} configuration`);
       throw err;
     } finally {
@@ -67,7 +67,7 @@ export function useConfigLoader(configKey: string = "document_processing") {
     setError(null);
     
     try {
-      console.log(`Saving ${configKey} configuration to database:`, config);
+      logger.info(`Saving ${configKey} configuration to database:`, config);
       
       // Only save document processing specific fields
       const docConfigToSave = {
@@ -121,9 +121,9 @@ export function useConfigLoader(configKey: string = "document_processing") {
         throw new Error(`Error saving configuration: ${result.error.message}`);
       }
       
-      console.log(`${configKey} configuration saved successfully`);
+      logger.info(`${configKey} configuration saved successfully`);
     } catch (err: any) {
-      console.error(`Error saving ${configKey} configuration:`, err);
+      logger.error(`Error saving ${configKey} configuration:`, err);
       setError(err.message || `Failed to save ${configKey} configuration`);
       throw err;
     } finally {

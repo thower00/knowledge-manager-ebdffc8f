@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useChatConfig, DEFAULT_CHAT_CONFIG } from "./ChatConfigContext";
 import { Json } from "@/integrations/supabase/types";
 import { maskSecretsInObject } from "@/utils/logging";
+import { logger } from "@/utils/logger";
 
 export function useChatConfigLoader() {
   const { config, setConfig, setIsLoading, setIsSaving } = useChatConfig();
@@ -14,7 +15,7 @@ export function useChatConfigLoader() {
     setError(null);
     
     try {
-      console.log('Loading chat_settings configuration from database');
+      logger.info('Loading chat_settings configuration from database');
       
       const { data, error: dbError } = await supabase
         .from("configurations")
@@ -27,7 +28,7 @@ export function useChatConfigLoader() {
       }
       
       if (data?.value && typeof data.value === 'object' && data.value !== null) {
-        console.log('Chat configuration loaded:', maskSecretsInObject(data.value));
+        logger.info('Chat configuration loaded:', maskSecretsInObject(data.value));
         
         // Only extract chat-specific fields
         const dbConfig = data.value as any;
@@ -43,13 +44,13 @@ export function useChatConfigLoader() {
         
         setConfig(chatConfig);
       } else {
-        console.log('No chat configuration found in database, using defaults');
+        logger.info('No chat configuration found in database, using defaults');
         setConfig(DEFAULT_CHAT_CONFIG);
       }
       
       return data;
     } catch (err: any) {
-      console.error('Error loading chat configuration:', err);
+      logger.error('Error loading chat configuration:', err);
       setError(err.message || 'Failed to load chat configuration');
       throw err;
     } finally {
@@ -62,7 +63,7 @@ export function useChatConfigLoader() {
     setError(null);
     
     try {
-      console.log('Saving chat_settings configuration to database:', maskSecretsInObject(config));
+      logger.info('Saving chat_settings configuration to database:', maskSecretsInObject(config));
       
       // Only save chat-specific fields
       const chatConfigToSave = {
@@ -109,9 +110,9 @@ export function useChatConfigLoader() {
         throw new Error(`Error saving chat configuration: ${result.error.message}`);
       }
       
-      console.log('Chat configuration saved successfully');
+      logger.info('Chat configuration saved successfully');
     } catch (err: any) {
-      console.error('Error saving chat configuration:', err);
+      logger.error('Error saving chat configuration:', err);
       setError(err.message || 'Failed to save chat configuration');
       throw err;
     } finally {

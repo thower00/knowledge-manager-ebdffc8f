@@ -1,4 +1,5 @@
 import { maskSecretsInObject } from "@/utils/logging";
+import { logger } from "@/utils/logger";
 
 export interface EmbeddingConfig {
   provider: "openai" | "cohere" | "huggingface";
@@ -28,7 +29,7 @@ export interface ConfigValidationResult {
 }
 
 export function mapDatabaseConfigToEmbeddingConfig(dbConfig: DatabaseConfig): EmbeddingConfig {
-  console.log('Mapping database config to embedding config:', maskSecretsInObject(dbConfig));
+  logger.debug('Mapping database config to embedding config:', maskSecretsInObject(dbConfig));
   
   const provider = (dbConfig.provider || "openai") as "openai" | "cohere" | "huggingface";
   const model = dbConfig.specificModelId || getDefaultModel(provider);
@@ -48,7 +49,7 @@ export function mapDatabaseConfigToEmbeddingConfig(dbConfig: DatabaseConfig): Em
     vectorStorage: dbConfig.vectorStorage || "supabase"
   };
   
-  console.log('Mapped embedding config:', {
+  logger.debug('Mapped embedding config:', {
     provider: config.provider,
     model: config.model,
     hasApiKey: !!config.apiKey,

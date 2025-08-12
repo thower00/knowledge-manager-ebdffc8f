@@ -4,6 +4,7 @@ import { ChunkingConfig } from "@/types/chunking";
 import { supabase } from "@/integrations/supabase/client";
 import { mapDatabaseConfigToEmbeddingConfig, type EmbeddingConfig } from "@/utils/embeddingConfigMapper";
 import { maskSecretsInObject } from "@/utils/logging";
+import { logger } from "@/utils/logger";
 
 interface ProcessingConfig {
   chunking: ChunkingConfig;
@@ -32,7 +33,7 @@ export function useProcessingConfiguration() {
 
   // Load configuration from Configuration Management (database)
   useEffect(() => {
-    console.log("useProcessingConfiguration - Loading configuration from Configuration Management");
+    logger.info("useProcessingConfiguration - Loading configuration from Configuration Management");
     const loadConfiguration = async () => {
       try {
         const { data: configData, error } = await supabase
@@ -42,13 +43,13 @@ export function useProcessingConfiguration() {
           .maybeSingle();
 
         if (error) {
-          console.error("Error loading processing configuration:", error);
+          logger.error("Error loading processing configuration:", error);
           return;
         }
 
         if (configData && configData.value) {
           const dbConfig = configData.value as any;
-          console.log("Loaded processing configuration from Configuration Management:", maskSecretsInObject(dbConfig));
+          logger.info("Loaded processing configuration from Configuration Management:", maskSecretsInObject(dbConfig));
           
           // Map the Configuration Management structure to Processing Configuration
           const mappedConfig: ProcessingConfig = {
@@ -61,13 +62,13 @@ export function useProcessingConfiguration() {
             embedding: mapDatabaseConfigToEmbeddingConfig(dbConfig)
           };
           
-          console.log("Mapped processing configuration:", maskSecretsInObject(mappedConfig));
+          logger.info("Mapped processing configuration:", maskSecretsInObject(mappedConfig));
           setConfig(mappedConfig);
         } else {
-          console.log("No configuration found in Configuration Management, using defaults");
+          logger.info("No configuration found in Configuration Management, using defaults");
         }
       } catch (error) {
-        console.error("Error loading processing configuration:", error);
+        logger.error("Error loading processing configuration:", error);
       } finally {
         setIsLoading(false);
       }

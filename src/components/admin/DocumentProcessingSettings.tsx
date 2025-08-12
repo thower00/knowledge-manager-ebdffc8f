@@ -12,6 +12,7 @@ import { useConfigLoader } from "./document-processing/useConfigLoader";
 import { ConfigForm } from "./document-processing/ConfigForm";
 import { ConfigActions } from "./document-processing/ConfigActions";
 import { useEffect } from "react";
+import { logger } from "@/utils/logger";
 
 export function DocumentProcessingSettings({ activeTab }: { activeTab: string }) {
   return (
@@ -28,9 +29,9 @@ function DocumentProcessingSettingsContent({ activeTab }: { activeTab: string })
   // Load configuration when component mounts or activeTab changes
   useEffect(() => {
     if (activeTab === "document-processing") {
-      console.log(`DocumentProcessingSettings rendered with activeTab: ${activeTab}`);
+      logger.info(`DocumentProcessingSettings rendered with activeTab: ${activeTab}`);
       loadConfig().catch((err) => {
-        console.error("Error loading document processing configuration:", err);
+        logger.error("Error loading document processing configuration:", err);
       });
     }
   }, [activeTab, loadConfig]);
