@@ -1,5 +1,5 @@
 
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react';
 import { useTextExtraction } from '../useTextExtraction';
 import { fetchDocumentViaProxy } from '../../services/documentFetchService';
 import { extractPdfText } from '../../utils/pdfUtils';
