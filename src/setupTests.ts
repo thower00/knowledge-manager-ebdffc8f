@@ -56,8 +56,8 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace jest {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    interface MockedFunction<T extends (...args: any[]) => any> 
-      extends Mock<ReturnType<T>, Parameters<T>> {}
+    type MockedFunction<T extends (...args: any[]) => any> = Mock<ReturnType<T>, Parameters<T>>;
+
       
     // Add mock interface to fix typescript errors
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
