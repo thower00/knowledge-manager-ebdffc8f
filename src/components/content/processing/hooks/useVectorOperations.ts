@@ -2,11 +2,12 @@
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { VectorDatabaseService } from "./services/vectorDatabaseService";
-import { VectorStats, EmbeddingRecord } from "./types/vectorTypes";
+import { VectorStats } from "./types/vectorTypes";
+import { EmbeddingListItem } from "@/types/embedding";
 
 export function useVectorOperations() {
   const [stats, setStats] = useState<VectorStats | null>(null);
-  const [embeddings, setEmbeddings] = useState<EmbeddingRecord[]>([]);
+  const [embeddings, setEmbeddings] = useState<EmbeddingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const { toast } = useToast();

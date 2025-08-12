@@ -7,19 +7,10 @@ import { Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-interface EmbeddingRecord {
-  id: string;
-  document_id: string;
-  chunk_id: string;
-  embedding_model: string;
-  embedding_provider: string;
-  similarity_threshold: number | null;
-  created_at: string;
-  vector_dimensions: number;
-}
+import { EmbeddingListItem } from "@/types/embedding";
 
 interface DocumentCleanupProps {
-  embeddings: EmbeddingRecord[];
+  embeddings: EmbeddingListItem[];
   onClearDocument: (documentId: string) => Promise<void>;
   isClearing: boolean;
 }

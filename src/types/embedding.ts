@@ -64,3 +64,16 @@ export interface BatchEmbeddingResult {
     dimensions: number;
   }>;
 }
+
+// Shared lightweight type for listing embeddings in UI and services
+export interface EmbeddingListItem {
+  id: string;
+  document_id: string;
+  chunk_id: string;
+  embedding_model: string;
+  embedding_provider: string;
+  similarity_threshold: number | null;
+  created_at: string;
+  // Optional UI-specific field; not stored in DB
+  vector_dimensions?: number;
+}

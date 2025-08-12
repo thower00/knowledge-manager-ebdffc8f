@@ -4,19 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
-interface EmbeddingRecord {
-  id: string;
-  document_id: string;
-  chunk_id: string;
-  embedding_model: string;
-  embedding_provider: string;
-  similarity_threshold: number | null;
-  created_at: string;
-  vector_dimensions: number;
-}
+import { EmbeddingListItem } from "@/types/embedding";
 
 interface RecentEmbeddingsTableProps {
-  embeddings: EmbeddingRecord[];
+  embeddings: EmbeddingListItem[];
   isLoading: boolean;
   onDeleteDocument: (documentId: string) => void;
 }

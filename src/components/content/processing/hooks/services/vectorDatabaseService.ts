@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { VectorStats, EmbeddingRecord } from "../types/vectorTypes";
+import { VectorStats } from "../types/vectorTypes";
+import { EmbeddingListItem } from "@/types/embedding";
 
 export class VectorDatabaseService {
   static async loadStats(): Promise<VectorStats> {
@@ -22,7 +23,7 @@ export class VectorDatabaseService {
     };
   }
 
-  static async loadEmbeddings(): Promise<EmbeddingRecord[]> {
+  static async loadEmbeddings(): Promise<EmbeddingListItem[]> {
     const { data, error } = await supabase
       .from('document_embeddings')
       .select('id, document_id, chunk_id, embedding_model, embedding_provider, similarity_threshold, created_at')
@@ -30,10 +31,10 @@ export class VectorDatabaseService {
     
     if (error) throw error;
     
-    // Transform the data to match EmbeddingRecord interface
+    // Transform the data to match EmbeddingListItem interface
     return (data || []).map(item => ({
       ...item,
-      vector_dimensions: 0 // Default value since we can't easily get dimensions from stored vectors
+      vector_dimensions: 0,
     }));
   }
 
