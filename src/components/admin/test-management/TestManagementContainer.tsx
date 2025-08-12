@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExtractionTab } from "./tabs/extraction";
-import { ChunkingTab } from "./tabs/ChunkingTab";
+aimport { ChunkingTab } from "./tabs/ChunkingTab";
 import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { EmbeddingsTestTab } from "./tabs/EmbeddingsTestTab";
 import { DatabaseTab } from "./tabs/DatabaseTab";
@@ -10,6 +10,7 @@ import { ConfigProvider } from "../document-processing/ConfigContext";
 import { TestResultDisplay } from "./TestResultDisplay";
 import { SelfTestTab } from "./tabs/self-test/SelfTestTab";
 import { ToastsTab } from "./tabs/ToastsTab";
+import { DiagnosticsTab } from "./tabs/DiagnosticsTab";
 export function TestManagement() {
   const [testResults, setTestResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,6 +97,7 @@ export function TestManagement() {
                 <TabsTrigger value="self-test">E2E Test</TabsTrigger>
                 <TabsTrigger value="database">Database</TabsTrigger>
                 <TabsTrigger value="toasts">Toasts</TabsTrigger>
+                <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
               </TabsList>
               
               <TabsContent value="extraction" className="mt-6">
@@ -137,6 +139,10 @@ export function TestManagement() {
 
               <TabsContent value="toasts" className="mt-6">
                 <ToastsTab />
+              </TabsContent>
+
+              <TabsContent value="diagnostics" className="mt-6">
+                <DiagnosticsTab />
               </TabsContent>
             </Tabs>
           </CardContent>
