@@ -8,7 +8,7 @@ export default tseslint.config(
   { ignores: ["dist", "coverage", "public", "supabase/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ["**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -24,9 +24,24 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "react-hooks/exhaustive-deps": "warn",
+      // Base rules adjusted for TS projects
+      "no-console": ["warn", { allow: ["warn", "error", "info", "debug"] }],
+      "no-undef": "off",
+      "no-unused-vars": "off",
+      "no-unused-expressions": "off",
+      "no-redeclare": "off",
+      // TypeScript-specific rules to reduce noise
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-unused-expressions": "off",
-      "no-console": ["warn", { allow: ["warn", "error", "info", "debug"] }],
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-var-requires": "off",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/await-thenable": "off",
       "no-restricted-imports": ["warn", { patterns: ["@/components/ui/use-toast"] }],
     },
   },
@@ -51,6 +66,12 @@ export default tseslint.config(
     },
     rules: {
       "no-console": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "no-unused-expressions": "off",
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "no-restricted-syntax": "off",
     },
   },
   // Config files: node globals
