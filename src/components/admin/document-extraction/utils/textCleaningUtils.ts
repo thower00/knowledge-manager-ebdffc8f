@@ -140,7 +140,7 @@ export function isBinaryData(text: string): boolean {
     (text.match(/\s/g)?.length || 0) < text.length / 15,
     
     // Many unusual character sequences
-    (/[&@#^~*\\\/]{2,}/g).test(text),
+    (/[&@#^~*\\/]{2,}/g).test(text),
     
     // Contains common binary/hex indicators
     (/0x[0-9A-F]{2}/gi).test(text)
