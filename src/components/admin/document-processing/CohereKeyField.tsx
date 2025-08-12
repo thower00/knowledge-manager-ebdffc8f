@@ -8,6 +8,7 @@ import { useConfig } from "./ConfigContext";
 import { useToast } from "@/hooks/use-toast";
 import { Check, AlertCircle } from "lucide-react";
 import { toastWarning } from "@/lib/toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export function CohereKeyField({ isLoading }: { isLoading: boolean }) {
   const { config, setConfig } = useConfig();
@@ -36,14 +37,12 @@ export function CohereKeyField({ isLoading }: { isLoading: boolean }) {
     setIsValid(null);
 
     try {
-      const { data, error } = await fetch('/functions/v1/verify-cohere-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: config.apiKey })
-      }).then(res => res.json());
+      const { data, error } = await supabase.functions.invoke('verify-cohere-key', {
+        body: { apiKey: config.apiKey }
+      });
 
       if (error) {
-        throw new Error(error);
+        throw new Error(error.message || 'Verification failed');
       }
 
       if (data?.valid) {
