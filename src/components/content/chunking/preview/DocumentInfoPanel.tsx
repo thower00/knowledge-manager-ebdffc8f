@@ -2,16 +2,11 @@
 import { Button } from "@/components/ui/button";
 import { FileText, Eye } from "lucide-react";
 
-interface ProcessedDocument {
-  id: string;
-  title: string;
+import type { ProcessedDocument as SharedProcessedDocument } from "@/types/document";
+
+type ProcessedDocument = SharedProcessedDocument & {
   content?: string;
-  status: string;
-  mime_type: string;
-  url?: string;
-  created_at: string;
-  processed_at: string | null;
-}
+};
 
 interface DocumentInfoPanelProps {
   document: ProcessedDocument;

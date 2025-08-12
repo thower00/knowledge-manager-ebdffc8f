@@ -24,6 +24,15 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-restricted-imports": ["warn", { patterns: ["@/components/ui/use-toast"] }],
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "Literal[value=/supabase\\.co/]",
+          message: "Do not hardcode Supabase URLs; use SUPABASE_CONFIG and helpers.",
+        },
+      ],
     },
   }
 );

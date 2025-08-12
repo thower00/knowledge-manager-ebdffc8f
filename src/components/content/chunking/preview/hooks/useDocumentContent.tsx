@@ -3,16 +3,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface ProcessedDocument {
-  id: string;
-  title: string;
+import type { ProcessedDocument as SharedProcessedDocument } from "@/types/document";
+
+type ProcessedDocument = SharedProcessedDocument & {
   content?: string;
-  status: string;
-  mime_type: string;
-  url?: string;
-  created_at: string;
-  processed_at: string | null;
-}
+};
 
 export function useDocumentContent(documentId: string) {
   const [document, setDocument] = useState<ProcessedDocument | null>(null);
@@ -44,7 +39,17 @@ export function useDocumentContent(documentId: string) {
         }
         
         const processedDoc: ProcessedDocument = {
-          ...docData,
+          id: docData.id,
+          title: docData.title,
+          source_id: docData.source_id,
+          source_type: docData.source_type,
+          mime_type: docData.mime_type,
+          status: docData.status as ProcessedDocument["status"],
+          created_at: docData.created_at,
+          processed_at: docData.processed_at ?? undefined,
+          error: docData.error ?? undefined,
+          size: docData.size ?? undefined,
+          url: docData.url ?? undefined,
           content: undefined // We don't have content directly stored in the database
         };
         
