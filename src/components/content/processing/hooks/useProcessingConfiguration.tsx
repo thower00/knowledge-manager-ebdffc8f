@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { ChunkingConfig } from "@/types/chunking";
 import { supabase } from "@/integrations/supabase/client";
 import { mapDatabaseConfigToEmbeddingConfig, type EmbeddingConfig } from "@/utils/embeddingConfigMapper";
+import { maskSecretsInObject } from "@/utils/logging";
 
 interface ProcessingConfig {
   chunking: ChunkingConfig;
@@ -47,7 +48,7 @@ export function useProcessingConfiguration() {
 
         if (configData && configData.value) {
           const dbConfig = configData.value as any;
-          console.log("Loaded processing configuration from Configuration Management:", dbConfig);
+          console.log("Loaded processing configuration from Configuration Management:", maskSecretsInObject(dbConfig));
           
           // Map the Configuration Management structure to Processing Configuration
           const mappedConfig: ProcessingConfig = {
@@ -60,7 +61,7 @@ export function useProcessingConfiguration() {
             embedding: mapDatabaseConfigToEmbeddingConfig(dbConfig)
           };
           
-          console.log("Mapped processing configuration:", mappedConfig);
+          console.log("Mapped processing configuration:", maskSecretsInObject(mappedConfig));
           setConfig(mappedConfig);
         } else {
           console.log("No configuration found in Configuration Management, using defaults");

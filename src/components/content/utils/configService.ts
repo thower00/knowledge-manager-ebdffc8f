@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentSourceConfig } from "@/types/document";
+import { maskSecretsInObject } from "@/utils/logging";
 
 /**
  * Fetches source configuration for document integration
@@ -23,7 +24,7 @@ export async function fetchSourceConfig(documentSource: string) {
         return { error: `No configuration found for ${documentSource}. Please set it up in Configuration Management.` };
       }
 
-      console.log("Retrieved source config:", data);
+      console.log("Retrieved source config:", maskSecretsInObject(data));
       return { config: data.value as DocumentSourceConfig };
     }
   } catch (err) {

@@ -1,3 +1,4 @@
+import { maskSecretsInObject } from "@/utils/logging";
 
 export interface EmbeddingConfig {
   provider: "openai" | "cohere" | "huggingface";
@@ -27,7 +28,7 @@ export interface ConfigValidationResult {
 }
 
 export function mapDatabaseConfigToEmbeddingConfig(dbConfig: DatabaseConfig): EmbeddingConfig {
-  console.log('Mapping database config to embedding config:', dbConfig);
+  console.log('Mapping database config to embedding config:', maskSecretsInObject(dbConfig));
   
   const provider = (dbConfig.provider || "openai") as "openai" | "cohere" | "huggingface";
   const model = dbConfig.specificModelId || getDefaultModel(provider);
