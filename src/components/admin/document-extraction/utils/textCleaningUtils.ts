@@ -18,7 +18,7 @@ export function cleanPdfText(text: string): string {
   
   try {
     // First pass: Basic cleaning of control characters
-    let cleanedText = text
+    const cleanedText = text
       .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')  // Control chars
       .replace(/[^\x20-\x7E\r\n\t\u00A0-\u00FF\u2000-\u206F]/g, ' ')  // Keep printable ASCII, Latin-1 and punctuation
       .replace(/\uFFFD/g, ' ')  // Replace Unicode replacement char

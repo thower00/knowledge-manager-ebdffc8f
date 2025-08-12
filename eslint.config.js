@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", "public", "supabase/**", "src/components/ui/**", "src/**/__tests__/**", "src/**/*.test.*", "src/**/*.spec.*"] },
+  { ignores: ["dist", "coverage", "public", "supabase/**", "src/components/ui/**", "src/**/__tests__/**", "src/**/*.test.*", "src/**/*.spec.*", "tailwind.config.ts"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["src/**/*.{ts,tsx}"],
@@ -39,6 +39,8 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/await-thenable": "off",
+      "no-control-regex": "off",
+      "no-useless-escape": "warn",
       "no-restricted-imports": ["warn", { patterns: ["@/components/ui/use-toast"] }],
     },
   },

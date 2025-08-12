@@ -53,7 +53,7 @@ export const useProxyConnectionStatus = () => {
     setConnectionStatus('checking');
     console.log("Checking proxy service connection...");
     
-    let retries = 2;
+    const retries = 2;
     let currentRetry = 0;
     
     while (currentRetry <= retries) {

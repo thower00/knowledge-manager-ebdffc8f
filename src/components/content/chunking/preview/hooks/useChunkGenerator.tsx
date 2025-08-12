@@ -83,7 +83,7 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
     const generatedChunks: DocumentChunk[] = [];
     
     switch (chunkingConfig.chunkStrategy) {
-      case "fixed_size":
+      case "fixed_size": {
         // Simple fixed size chunking
         let startIdx = 0;
         let chunkIndex = 0;
@@ -107,8 +107,9 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
           chunkIndex++;
         }
         break;
-        
-      case "paragraph":
+      }
+      
+      case "paragraph": {
         // Paragraph splitting
         const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
         let paragraphIndex = 0;
@@ -131,8 +132,9 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
           paragraphIndex++;
         }
         break;
-        
-      case "sentence":
+      }
+      
+      case "sentence": {
         // Sentence splitting
         const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
         let sentenceIndex = 0;
@@ -155,8 +157,9 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
           sentenceIndex++;
         }
         break;
-        
-      case "recursive":
+      }
+      
+      case "recursive": {
         // For demo, use a simple recursive approach
         const recursivelyChunk = (content: string, level: number = 0) => {
           if (content.length <= chunkingConfig.chunkSize / 2) {
@@ -195,8 +198,9 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
         
         generatedChunks.push(...recursivelyChunk(text));
         break;
-        
-      case "semantic":
+      }
+      
+      case "semantic": {
         // For semantic chunking preview, we'll simulate with paragraphs and add 'semantic score' metadata
         const semanticParagraphs = text.split(/\n\s*\n/).filter(Boolean);
         let semIndex = 0;
@@ -220,6 +224,7 @@ export function useChunkGenerator(documentId: string, config: ChunkingConfig, do
           semIndex++;
         }
         break;
+      }
     }
     
     console.log(`Generated ${generatedChunks.length} chunks using strategy: ${chunkingConfig.chunkStrategy}`);

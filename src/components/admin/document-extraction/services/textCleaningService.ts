@@ -12,7 +12,7 @@ export function cleanAndNormalizeText(text: string): string {
     // Since we now use PDF.js, the text should already be properly extracted
     // We just need to clean up formatting and spacing issues
     
-    let cleanedText = text
+    const cleanedText = text
       // Normalize whitespace but preserve paragraph breaks
       .replace(/[ \t]+/g, ' ')                               // Multiple spaces/tabs to single space
       .replace(/\n\s*\n\s*\n/g, '\n\n')                     // Multiple line breaks to double
