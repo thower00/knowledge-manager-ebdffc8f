@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExtractionTab } from "./tabs/extraction";
-aimport { ChunkingTab } from "./tabs/ChunkingTab";
+import { ChunkingTab } from "./tabs/ChunkingTab";
 import { EmbeddingsTab } from "./tabs/EmbeddingsTab";
 import { EmbeddingsTestTab } from "./tabs/EmbeddingsTestTab";
 import { DatabaseTab } from "./tabs/DatabaseTab";
