@@ -43,8 +43,13 @@ export function ManualUserCreation({ onUserCreated }: ManualUserCreationProps) {
         },
       });
 
-      if (error) throw error;
+      // Handle FunctionsHttpError or FunctionsRelayError
+      if (error) {
+        const errorMessage = error.message || 'Failed to create user';
+        throw new Error(errorMessage);
+      }
 
+      // Handle application-level errors returned in data
       if (data?.error) {
         throw new Error(data.error);
       }
