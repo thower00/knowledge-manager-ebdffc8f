@@ -22,8 +22,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, firstName }: WelcomeEmailRequest = await req.json();
     
-    // Use APP_URL from environment, fallback to extracting from Supabase URL
-    const appUrl = Deno.env.get("APP_URL") || "https://knowledge-manager.lovable.app";
+    // Use APP_URL from environment, fallback to the actual published app URL
+    const appUrl = Deno.env.get("APP_URL") || "https://knowledge-manager-02.lovable.app";
 
     const emailResponse = await resend.emails.send({
       from: "Knowledge Manager <onboarding@resend.dev>",

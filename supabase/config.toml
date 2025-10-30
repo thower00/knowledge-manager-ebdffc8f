@@ -24,7 +24,7 @@ file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-site_url = "https://knowledge-manager.lovable.app"
+site_url = "https://knowledge-manager-02.lovable.app"
 
 [auth.email]
 enabled = true
