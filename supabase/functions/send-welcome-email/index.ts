@@ -21,6 +21,9 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { email, firstName }: WelcomeEmailRequest = await req.json();
+    
+    // Use APP_URL from environment, fallback to extracting from Supabase URL
+    const appUrl = Deno.env.get("APP_URL") || "https://knowledge-manager.lovable.app";
 
     const emailResponse = await resend.emails.send({
       from: "Knowledge Manager <onboarding@resend.dev>",
@@ -31,7 +34,7 @@ const handler = async (req: Request): Promise<Response> => {
         <p>Ditt konto har skapats av en administratör.</p>
         <p>För att komma igång behöver du sätta ett nytt lösenord:</p>
         <ol>
-          <li>Gå till inloggningssidan på <a href="https://knowledge-manager.lovable.app">knowledge-manager.lovable.app</a></li>
+          <li>Gå till inloggningssidan på <a href="${appUrl}">${appUrl.replace('https://', '')}</a></li>
           <li>Klicka på "Glömt lösenord?"</li>
           <li>Ange din e-postadress: <strong>${email}</strong></li>
           <li>Följ instruktionerna i det mail du får för att sätta ditt lösenord</li>
